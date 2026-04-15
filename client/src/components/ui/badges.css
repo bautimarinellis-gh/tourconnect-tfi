@@ -1,0 +1,28 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.badge-info { background-color: #DBEAFE; color: #1E40AF; } /* primary light */
+.badge-success { background-color: #DCFCE7; color: #166534; }
+.badge-error { background-color: #FEE2E2; color: #991B1B; }
+.badge-warning { background-color: #FEF3C7; color: #92400E; }
+
+/* Estados de Cotización */
+.badge-pendiente        { background-color: #FEF3C7; color: #92400E; }   /* amber */
+.badge-aprobada         { background-color: #DCFCE7; color: #166534; }   /* emerald */
+.badge-rechazada        { background-color: #FEE2E2; color: #991B1B; }   /* red */
+.badge-vencida          { background-color: #F3F4F6; color: #374151; }   /* slate */
+.badge-cancelada        { background-color: #F3F4F6; color: #374151; }   /* slate */
+.badge-reserva_generada { background-color: #DBEAFE; color: #1E40AF; }   /* blue */
+
+/* Estados de Reserva */
+.badge-pendiente_pago   { background-color: #FEF3C7; color: #92400E; }   /* amber */
+.badge-pago_informado   { background-color: #FED7AA; color: #9A3412; }   /* naranja */
+.badge-pagada           { background-color: #DCFCE7; color: #166534; }   /* emerald */
+.badge-cerrada          { background-color: #E0E7FF; color: #3730A3; }   /* blue/indigo */
