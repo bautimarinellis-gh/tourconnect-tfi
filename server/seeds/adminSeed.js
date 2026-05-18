@@ -37,7 +37,6 @@ const seedAdmin = async () => {
       existente.password_hash = await Usuario.hashPassword(password);
       existente.activo = true;
       existente.rol = 'admin';
-      existente.nombre = 'Administrador';
       await existente.save();
       console.log('✅ Usuario admin actualizado correctamente.');
     } else {
@@ -46,7 +45,6 @@ const seedAdmin = async () => {
       await Usuario.create({
         email,
         password_hash,
-        nombre: 'Administrador',
         rol: 'admin',
         activo: true,
       });

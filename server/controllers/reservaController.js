@@ -1,69 +1,57 @@
 const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const Cotizacion = require('../models/Cotizacion');
-const EstadoReserva = require('../models/EstadoReserva');
+const HistorialEstadoReserva = require('../models/HistorialEstadoReserva');
 const Pago = require('../models/Pago');
-const { registrarCambioEstado } = require('../utils/estadoReserva');
+const { registrarCambioEstado } = require('../utils/historialEstadoReserva');
+const {
+  COTIZACION_POPULATE,
+  enriquecerReserva,
+  buildCotizacionIdsFilter,
+  validarAccesoReserva,
+  obtenerPrecioFinal,
+  extraerUltimoRechazo,
+} = require('../utils/reservaHelpers');
 
 // =============================================
 // RESERVAS
 // =============================================
 
-// @desc    Obtener todas las reservas
-// @route   GET /api/v1/reservas
-// @access  Private (Mayorista o Agencia)
 exports.getReservas = async (req, res, next) => {
   try {
-    const { rol, mayorista_id, agencia_id } = req.usuario;
     const { estado, agencia_id: filtroAgencia, desde, hasta } = req.query;
 
-    const query = {};
+    const cotizacionIds = await buildCotizacionIdsFilter(req.usuario, {
+      agencia_id: filtroAgencia,
+      desde,
+      hasta,
+    });
 
-    if (rol === 'mayorista') {
-      query.mayorista_id = mayorista_id;
-      if (filtroAgencia) query.agencia_id = filtroAgencia;
-    } else if (rol === 'agencia') {
-      query.agencia_id = agencia_id;
+    if (cotizacionIds.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
     }
 
+    const query = { cotizacion_id: { $in: cotizacionIds } };
     if (estado) query.estado = estado;
 
-    if (desde || hasta) {
-      query.fecha_inicio = {};
-      if (desde) query.fecha_inicio.$gte = new Date(desde);
-      if (hasta) query.fecha_inicio.$lte = new Date(hasta);
-    }
-
-    let queryBuilder = Reserva.find(query)
-      .populate('producto_id', 'nombre tipo precio_base')
+    const reservas = await Reserva.find(query)
+      .populate(COTIZACION_POPULATE)
       .sort({ created_at: -1 });
-
-    if (rol === 'mayorista') {
-      queryBuilder = queryBuilder.populate('agencia_id', 'nombre');
-    }
-
-    const reservas = await queryBuilder;
 
     res.status(200).json({
       success: true,
-      data: reservas,
+      data: reservas.map((r) => enriquecerReserva(r)),
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Crear reserva desde cotización confirmada (ID en URL)
-// @route   POST /api/v1/reservas/cotizacion/:cotizacionId
-// @access  Private (Solo Agencia)
 exports.createReservaFromCotizacion = async (req, res, next) => {
   req.body.cotizacion_id = req.params.cotizacionId;
   return exports.createReserva(req, res, next);
 };
 
-// @desc    Crear reserva desde cotización confirmada
-// @route   POST /api/v1/reservas
-// @access  Private (Solo Agencia)
 exports.createReserva = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -81,7 +69,6 @@ exports.createReserva = async (req, res, next) => {
       });
     }
 
-    // 1. La cotización existe
     const cotizacion = await Cotizacion.findById(cotizacion_id).session(session);
     if (!cotizacion) {
       await session.abortTransaction();
@@ -92,7 +79,6 @@ exports.createReserva = async (req, res, next) => {
       });
     }
 
-    // 2. La cotización tiene estado = aprobada
     if (cotizacion.estado !== 'aprobada') {
       await session.abortTransaction();
       session.endSession();
@@ -102,7 +88,6 @@ exports.createReserva = async (req, res, next) => {
       });
     }
 
-    // 3. La cotización pertenece a la agencia autenticada
     if (cotizacion.agencia_id.toString() !== agencia_id.toString()) {
       await session.abortTransaction();
       session.endSession();
@@ -112,8 +97,8 @@ exports.createReserva = async (req, res, next) => {
       });
     }
 
-    // 4. La cotización no tiene reserva_id asignado
-    if (cotizacion.reserva_id) {
+    const reservaExistente = await Reserva.findOne({ cotizacion_id: cotizacion._id }).session(session);
+    if (reservaExistente) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
@@ -122,45 +107,24 @@ exports.createReserva = async (req, res, next) => {
       });
     }
 
-    // Crear la reserva (dentro de la transacción)
     const [reserva] = await Reserva.create(
-      [
-        {
-          cotizacion_id: cotizacion._id,
-          agencia_id: cotizacion.agencia_id,
-          producto_id: cotizacion.producto_id,
-          mayorista_id: cotizacion.mayorista_id,
-          pasajeros: cotizacion.pasajeros,
-          fecha_inicio: cotizacion.fecha_inicio,
-          fecha_fin: cotizacion.fecha_fin,
-          precio_final: cotizacion.precio_total,
-          estado: 'pendiente_pago',
-        },
-      ],
+      [{ cotizacion_id: cotizacion._id, estado: 'pendiente_pago' }],
       { session }
     );
 
-    // Actualizar cotización: vincular reserva y marcar como reserva_generada
-    cotizacion.reserva_id = reserva._id;
     cotizacion.estado = 'reserva_generada';
     await cotizacion.save({ session });
 
-    // Registrar cambio de estado
-    await registrarCambioEstado(
-      reserva._id,
-      usuario_id,
-      null,
-      'pendiente_pago',
-      null,
-      session
-    );
+    await registrarCambioEstado(reserva._id, usuario_id, null, 'pendiente_pago', null, session);
 
     await session.commitTransaction();
     session.endSession();
 
+    const reservaPoblada = await Reserva.findById(reserva._id).populate(COTIZACION_POPULATE);
+
     res.status(201).json({
       success: true,
-      data: reserva,
+      data: enriquecerReserva(reservaPoblada),
     });
   } catch (error) {
     await session.abortTransaction();
@@ -169,18 +133,11 @@ exports.createReserva = async (req, res, next) => {
   }
 };
 
-// @desc    Obtener detalle de una reserva
-// @route   GET /api/v1/reservas/:id
-// @access  Private (Mayorista o Agencia)
 exports.getReservaById = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { rol, mayorista_id, agencia_id } = req.usuario;
 
-    const reserva = await Reserva.findById(id)
-      .populate('producto_id')
-      .populate('agencia_id', 'nombre')
-      .populate('mayorista_id', 'nombre razon_social');
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE);
 
     if (!reserva) {
       return res.status(404).json({
@@ -189,45 +146,37 @@ exports.getReservaById = async (req, res, next) => {
       });
     }
 
-    // Validar pertenencia según rol
-    if (rol === 'mayorista' && reserva.mayorista_id._id.toString() !== mayorista_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para ver esta reserva',
-      });
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
-    if (rol === 'agencia' && reserva.agencia_id._id.toString() !== agencia_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para ver esta reserva',
-      });
-    }
-
-    // Historial de estados
-    const historial = await EstadoReserva.find({ reserva_id: id })
+    const historial = await HistorialEstadoReserva.find({ reserva_id: id })
       .populate('usuario_id', 'email rol')
       .sort({ created_at: 1 });
 
-    // Pagos registrados
-    const pagos = await Pago.find({ reserva_id: id }).sort({ fecha_pago: 1 });
+    const pagos = await Pago.find({ reserva_id: id }).sort({ created_at: 1 });
+
+    const ultimoRechazo = extraerUltimoRechazo(historial);
+    const pagoPendiente =
+      reserva.estado === 'pago_informado' && pagos.length > 0 ? pagos[pagos.length - 1] : null;
 
     res.status(200).json({
       success: true,
-      data: {
-        ...reserva.toJSON(),
+      data: enriquecerReserva(reserva, {
         historial,
         pagos,
-      },
+        pago_pendiente: pagoPendiente,
+        pago_informado_datos: pagoPendiente,
+        rechazo_datos: ultimoRechazo,
+        ultimo_rechazo: ultimoRechazo,
+      }),
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Marcar reserva como pagada
-// @route   PUT /api/v1/reservas/:id/pagar
-// @access  Private (Solo Mayorista)
 exports.pagarReserva = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -235,25 +184,21 @@ exports.pagarReserva = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { mayorista_id, id: usuario_id } = req.usuario;
+    const { monto, fecha_pago, metodo, comprobante, notas } = req.body;
 
-    const reserva = await Reserva.findById(id).session(session);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada',
-      });
+      return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    if (reserva.mayorista_id.toString() !== mayorista_id.toString()) {
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para modificar esta reserva',
-      });
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     if (!['pendiente_pago', 'pago_informado'].includes(reserva.estado)) {
@@ -265,6 +210,24 @@ exports.pagarReserva = async (req, res, next) => {
       });
     }
 
+    const pagosExistentes = await Pago.countDocuments({ reserva_id: reserva._id }).session(session);
+    if (pagosExistentes === 0 && monto && fecha_pago) {
+      await Pago.create(
+        [
+          {
+            reserva_id: reserva._id,
+            registrado_por: usuario_id,
+            monto,
+            metodo: metodo || 'transferencia',
+            comprobante: comprobante || null,
+            notas: notas || null,
+            fecha_pago: new Date(fecha_pago),
+          },
+        ],
+        { session }
+      );
+    }
+
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pagada';
     await reserva.save({ session });
@@ -274,17 +237,15 @@ exports.pagarReserva = async (req, res, next) => {
       usuario_id,
       estadoAnterior,
       'pagada',
-      null,
+      'Pago registrado por el mayorista',
       session
     );
 
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({
-      success: true,
-      data: reserva,
-    });
+    const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+    res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -292,35 +253,27 @@ exports.pagarReserva = async (req, res, next) => {
   }
 };
 
-// @desc    Cerrar reserva
-// @route   PUT /api/v1/reservas/:id/cerrar
-// @access  Private (Solo Mayorista)
 exports.cerrarReserva = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { id } = req.params;
-    const { mayorista_id, id: usuario_id } = req.usuario;
+    const { id: usuario_id } = req.usuario;
 
-    const reserva = await Reserva.findById(id).session(session);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada',
-      });
+      return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    if (reserva.mayorista_id.toString() !== mayorista_id.toString()) {
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para modificar esta reserva',
-      });
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     if (reserva.estado !== 'pagada') {
@@ -336,22 +289,13 @@ exports.cerrarReserva = async (req, res, next) => {
     reserva.estado = 'cerrada';
     await reserva.save({ session });
 
-    await registrarCambioEstado(
-      reserva._id,
-      usuario_id,
-      estadoAnterior,
-      'cerrada',
-      null,
-      session
-    );
+    await registrarCambioEstado(reserva._id, usuario_id, estadoAnterior, 'cerrada', null, session);
 
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({
-      success: true,
-      data: reserva,
-    });
+    const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+    res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -359,16 +303,13 @@ exports.cerrarReserva = async (req, res, next) => {
   }
 };
 
-// @desc    Cancelar reserva
-// @route   PUT /api/v1/reservas/:id/cancelar
-// @access  Private (Mayorista o Agencia)
 exports.cancelarReserva = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { id } = req.params;
-    const { rol, mayorista_id, agencia_id, id: usuario_id } = req.usuario;
+    const { id: usuario_id } = req.usuario;
     const { motivo_cancelacion } = req.body;
 
     if (!motivo_cancelacion) {
@@ -380,37 +321,21 @@ exports.cancelarReserva = async (req, res, next) => {
       });
     }
 
-    const reserva = await Reserva.findById(id).session(session);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada',
-      });
+      return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    // Validar pertenencia según rol
-    if (rol === 'mayorista' && reserva.mayorista_id.toString() !== mayorista_id.toString()) {
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para cancelar esta reserva',
-      });
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
-    if (rol === 'agencia' && reserva.agencia_id.toString() !== agencia_id.toString()) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para cancelar esta reserva',
-      });
-    }
-
-    // Una reserva cerrada no se puede cancelar
     if (reserva.estado === 'cerrada') {
       await session.abortTransaction();
       session.endSession();
@@ -420,7 +345,6 @@ exports.cancelarReserva = async (req, res, next) => {
       });
     }
 
-    // Una reserva ya cancelada no se puede cancelar de nuevo
     if (reserva.estado === 'cancelada') {
       await session.abortTransaction();
       session.endSession();
@@ -447,10 +371,8 @@ exports.cancelarReserva = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({
-      success: true,
-      data: reserva,
-    });
+    const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+    res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -458,15 +380,11 @@ exports.cancelarReserva = async (req, res, next) => {
   }
 };
 
-// @desc    Obtener historial de estados de una reserva
-// @route   GET /api/v1/reservas/:id/historial
-// @access  Private (Mayorista o Agencia)
 exports.getHistorial = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { rol, mayorista_id, agencia_id } = req.usuario;
 
-    const reserva = await Reserva.findById(id);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE);
 
     if (!reserva) {
       return res.status(404).json({
@@ -475,22 +393,12 @@ exports.getHistorial = async (req, res, next) => {
       });
     }
 
-    // Validar pertenencia según rol
-    if (rol === 'mayorista' && reserva.mayorista_id.toString() !== mayorista_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para ver el historial de esta reserva',
-      });
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
-    if (rol === 'agencia' && reserva.agencia_id.toString() !== agencia_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para ver el historial de esta reserva',
-      });
-    }
-
-    const historial = await EstadoReserva.find({ reserva_id: id })
+    const historial = await HistorialEstadoReserva.find({ reserva_id: id })
       .populate('usuario_id', 'email rol')
       .sort({ created_at: 1 });
 
@@ -507,14 +415,11 @@ exports.getHistorial = async (req, res, next) => {
 // PAGOS
 // =============================================
 
-// @desc    Registrar un pago
-// @route   POST /api/v1/reservas/:id/pagos
-// @access  Private (Solo Mayorista)
 exports.createPago = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { mayorista_id, id: usuario_id } = req.usuario;
-    const { monto, fecha_pago, comprobante, notas } = req.body;
+    const { id: usuario_id } = req.usuario;
+    const { monto, fecha_pago, metodo, comprobante, notas } = req.body;
 
     if (!monto || !fecha_pago) {
       return res.status(400).json({
@@ -530,26 +435,22 @@ exports.createPago = async (req, res, next) => {
       });
     }
 
-    const reserva = await Reserva.findById(id);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE);
 
     if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada',
-      });
+      return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    if (reserva.mayorista_id.toString() !== mayorista_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para registrar pagos en esta reserva',
-      });
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     const pago = await Pago.create({
       reserva_id: reserva._id,
       registrado_por: usuario_id,
       monto,
+      metodo: metodo || 'transferencia',
       fecha_pago,
       comprobante: comprobante || null,
       notas: notas || null,
@@ -564,20 +465,13 @@ exports.createPago = async (req, res, next) => {
   }
 };
 
-// =============================================
-// FLUJO BIDIRECCIONAL DE PAGOS
-// =============================================
-
-// @desc    La agencia informa que realizó un pago
-// @route   POST /api/v1/reservas/:id/informar-pago
-// @access  Private (Solo Agencia)
 exports.informarPago = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { id } = req.params;
-    const { agencia_id, id: usuario_id } = req.usuario;
+    const { id: usuario_id } = req.usuario;
     const { metodo, comprobante, fecha_pago, monto, notas } = req.body;
 
     if (!metodo || !fecha_pago || !monto) {
@@ -589,7 +483,7 @@ exports.informarPago = async (req, res, next) => {
       });
     }
 
-    const reserva = await Reserva.findById(id).session(session);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
       await session.abortTransaction();
@@ -597,10 +491,11 @@ exports.informarPago = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    if (reserva.agencia_id.toString() !== agencia_id.toString()) {
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({ success: false, message: 'No tienes permisos para informar pagos en esta reserva' });
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     if (reserva.estado !== 'pendiente_pago') {
@@ -612,10 +507,10 @@ exports.informarPago = async (req, res, next) => {
       });
     }
 
-    const precioFinal = parseFloat(reserva.precio_final.toString());
+    const precioFinal = obtenerPrecioFinal(reserva);
     const montoInformado = parseFloat(monto);
 
-    if (Math.abs(montoInformado - precioFinal) > 0.01) {
+    if (precioFinal === null || Math.abs(montoInformado - precioFinal) > 0.01) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
@@ -624,19 +519,23 @@ exports.informarPago = async (req, res, next) => {
       });
     }
 
+    await Pago.create(
+      [
+        {
+          reserva_id: reserva._id,
+          registrado_por: usuario_id,
+          monto: montoInformado,
+          metodo,
+          comprobante: comprobante || null,
+          notas: notas || null,
+          fecha_pago: new Date(fecha_pago),
+        },
+      ],
+      { session }
+    );
+
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pago_informado';
-    reserva.pago_informado_datos = {
-      metodo,
-      comprobante: comprobante || null,
-      fecha_pago: new Date(fecha_pago),
-      monto: montoInformado,
-      notas: notas || null,
-      informado_por: usuario_id,
-      informado_at: new Date(),
-    };
-    // Limpiar rechazo anterior si existía
-    reserva.rechazo_datos = undefined;
     await reserva.save({ session });
 
     await registrarCambioEstado(
@@ -651,7 +550,17 @@ exports.informarPago = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({ success: true, data: reserva });
+    const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+    const pagos = await Pago.find({ reserva_id: id }).sort({ created_at: 1 });
+    const pagoPendiente = pagos[pagos.length - 1];
+
+    res.status(200).json({
+      success: true,
+      data: enriquecerReserva(actualizada, {
+        pago_pendiente: pagoPendiente,
+        pago_informado_datos: pagoPendiente,
+      }),
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -659,18 +568,15 @@ exports.informarPago = async (req, res, next) => {
   }
 };
 
-// @desc    El mayorista confirma el pago informado por la agencia
-// @route   POST /api/v1/reservas/:id/confirmar-pago
-// @access  Private (Solo Mayorista)
 exports.confirmarPago = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { id } = req.params;
-    const { mayorista_id, id: usuario_id } = req.usuario;
+    const { id: usuario_id } = req.usuario;
 
-    const reserva = await Reserva.findById(id).session(session);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
       await session.abortTransaction();
@@ -678,10 +584,11 @@ exports.confirmarPago = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    if (reserva.mayorista_id.toString() !== mayorista_id.toString()) {
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({ success: false, message: 'No tienes permisos para confirmar pagos en esta reserva' });
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     if (reserva.estado !== 'pago_informado') {
@@ -693,23 +600,18 @@ exports.confirmarPago = async (req, res, next) => {
       });
     }
 
-    const datos = reserva.pago_informado_datos;
+    const pagoPendiente = await Pago.findOne({ reserva_id: reserva._id })
+      .sort({ created_at: -1 })
+      .session(session);
 
-    // Crear registro oficial de Pago
-    await Pago.create(
-      [
-        {
-          reserva_id: reserva._id,
-          registrado_por: usuario_id,
-          monto: datos.monto,
-          metodo: datos.metodo,
-          comprobante: datos.comprobante || null,
-          notas: datos.notas || null,
-          fecha_pago: datos.fecha_pago,
-        },
-      ],
-      { session }
-    );
+    if (!pagoPendiente) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'No hay un pago informado para confirmar',
+      });
+    }
 
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pagada';
@@ -727,7 +629,8 @@ exports.confirmarPago = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({ success: true, data: reserva });
+    const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+    res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -735,16 +638,13 @@ exports.confirmarPago = async (req, res, next) => {
   }
 };
 
-// @desc    El mayorista rechaza el pago informado por la agencia
-// @route   POST /api/v1/reservas/:id/rechazar-pago
-// @access  Private (Solo Mayorista)
 exports.rechazarPago = async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     const { id } = req.params;
-    const { mayorista_id, id: usuario_id } = req.usuario;
+    const { id: usuario_id } = req.usuario;
     const { motivo } = req.body;
 
     if (!motivo || motivo.trim() === '') {
@@ -753,7 +653,7 @@ exports.rechazarPago = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'El motivo del rechazo es obligatorio' });
     }
 
-    const reserva = await Reserva.findById(id).session(session);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
       await session.abortTransaction();
@@ -761,10 +661,11 @@ exports.rechazarPago = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Reserva no encontrada' });
     }
 
-    if (reserva.mayorista_id.toString() !== mayorista_id.toString()) {
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(403).json({ success: false, message: 'No tienes permisos para rechazar pagos en esta reserva' });
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     if (reserva.estado !== 'pago_informado') {
@@ -776,13 +677,10 @@ exports.rechazarPago = async (req, res, next) => {
       });
     }
 
+    await Pago.deleteMany({ reserva_id: reserva._id }).session(session);
+
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pendiente_pago';
-    reserva.rechazo_datos = {
-      motivo: motivo.trim(),
-      rechazado_por: usuario_id,
-      rechazado_at: new Date(),
-    };
     await reserva.save({ session });
 
     await registrarCambioEstado(
@@ -797,7 +695,13 @@ exports.rechazarPago = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    res.status(200).json({ success: true, data: reserva });
+    const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+    res.status(200).json({
+      success: true,
+      data: enriquecerReserva(actualizada, {
+        rechazo_datos: { motivo: motivo.trim(), rechazado_at: new Date() },
+      }),
+    });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -805,15 +709,11 @@ exports.rechazarPago = async (req, res, next) => {
   }
 };
 
-// @desc    Listar pagos de una reserva
-// @route   GET /api/v1/reservas/:id/pagos
-// @access  Private (Mayorista o Agencia)
 exports.getPagos = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { rol, mayorista_id, agencia_id } = req.usuario;
 
-    const reserva = await Reserva.findById(id);
+    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE);
 
     if (!reserva) {
       return res.status(404).json({
@@ -822,19 +722,9 @@ exports.getPagos = async (req, res, next) => {
       });
     }
 
-    // Validar pertenencia según rol
-    if (rol === 'mayorista' && reserva.mayorista_id.toString() !== mayorista_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para ver los pagos de esta reserva',
-      });
-    }
-
-    if (rol === 'agencia' && reserva.agencia_id.toString() !== agencia_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para ver los pagos de esta reserva',
-      });
+    const acceso = validarAccesoReserva(reserva, req.usuario);
+    if (!acceso.ok) {
+      return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
     const pagos = await Pago.find({ reserva_id: id }).sort({ fecha_pago: 1 });

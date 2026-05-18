@@ -18,7 +18,7 @@ exports.getAgencias = async (req, res, next) => {
 
     // Obtener agencias con el usuario asociado para el mail/nombre
     const agencias = await Agencia.find({ mayorista_id: mayoristaId })
-      .populate('usuario_id', 'email nombre activo')
+      .populate('usuario_id', 'email activo')
       .lean(); // usar lean para modificar el objeto y agregar campos extras
 
     // Calcular la cantidad de productos habilitados para cada agencia
@@ -49,7 +49,7 @@ exports.createAgencia = async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const { nombre, razon_social, telefono, email, nombre_usuario, password } = req.body;
+    const { nombre, razon_social, telefono, cuit, email, nombre_usuario, password } = req.body;
     const mayoristaId = req.usuario.mayorista_id;
 
     // 1. Verificar si el email ya existe
@@ -80,12 +80,10 @@ exports.createAgencia = async (req, res, next) => {
     // 2. Crear el usuario (agencia)
     const nuevoUsuario = new Usuario({
       email,
-      nombre: nombre_usuario,
       rol: 'agencia',
       activo: tienePassword,
       invite_token: tienePassword ? undefined : inviteToken,
       invite_token_expires: tienePassword ? undefined : inviteTokenExpires,
-      mayorista_id: mayoristaId,
     });
     if (tienePassword) {
       nuevoUsuario.password_hash = await Usuario.hashPassword(password.trim());
@@ -99,16 +97,13 @@ exports.createAgencia = async (req, res, next) => {
       nombre,
       razon_social,
       telefono,
-      activo: true, // as por db-default
+      cuit,
+      activo: true,
     });
 
     await nuevaAgencia.save({ session });
 
-    // 5. Vincular id de agencia al usuario
-    nuevoUsuario.agencia_id = nuevaAgencia._id;
-    await nuevoUsuario.save({ session });
-
-    // 6. Enviar correo de invitación (solo si no se configuró password)
+    // Enviar correo de invitación (solo si no se configuró password)
     if (!tienePassword && inviteToken) {
       try {
         await enviarInvitacion(email, inviteToken, 'Agencia');
@@ -148,7 +143,7 @@ exports.getAgencia = async (req, res, next) => {
       _id: req.params.id,
       mayorista_id: req.usuario.mayorista_id,
     })
-      .populate('usuario_id', 'email nombre activo')
+      .populate('usuario_id', 'email activo')
       .lean();
 
     if (!agencias) {
@@ -216,22 +211,39 @@ exports.updateAgencia = async (req, res, next) => {
  */
 async function contarOperacionesActivas(agenciaId, mayoristaId) {
   const ahora = new Date();
+  const cotizacionCollection = Cotizacion.collection.name;
 
-  const [cotizacionesActivas, reservasActivas] = await Promise.all([
+  const [cotizacionesActivas, reservasActivasAgg] = await Promise.all([
     Cotizacion.countDocuments({
       agencia_id: agenciaId,
       mayorista_id: mayoristaId,
       estado: { $in: ['pendiente', 'aprobada'] },
     }),
-    Reserva.countDocuments({
-      agencia_id: agenciaId,
-      mayorista_id: mayoristaId,
-      $or: [
-        { estado: 'pendiente_pago' },
-        { estado: 'pagada', fecha_fin: { $gte: ahora } },
-      ],
-    }),
+    Reserva.aggregate([
+      {
+        $lookup: {
+          from: cotizacionCollection,
+          localField: 'cotizacion_id',
+          foreignField: '_id',
+          as: 'cot',
+        },
+      },
+      { $unwind: '$cot' },
+      {
+        $match: {
+          'cot.agencia_id': agenciaId,
+          'cot.mayorista_id': mayoristaId,
+          $or: [
+            { estado: 'pendiente_pago' },
+            { estado: 'pagada', 'cot.fecha_fin': { $gte: ahora } },
+          ],
+        },
+      },
+      { $count: 'total' },
+    ]),
   ]);
+
+  const reservasActivas = reservasActivasAgg[0]?.total ?? 0;
 
   return { cotizacionesActivas, reservasActivas };
 }

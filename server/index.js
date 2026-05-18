@@ -125,6 +125,10 @@ const { checkCotizacionesVencidas } = require('./utils/cotizacionVencimiento');
 const startServer = async () => {
   await connectDB();
 
+  require('./models/Persona');
+  require('./models/Mayorista');
+  require('./models/Agencia');
+
   app.listen(PORT, () => {
     console.log(`🚀 TourConnect corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 

@@ -17,12 +17,12 @@ export const AdminMayoristas = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMayorista, setEditingMayorista] = useState(null);
-  const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', activo: true });
+  const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', cuit: '', plan_suscripcion: '', activo: true });
   const [deletingMayorista, setDeletingMayorista] = useState(null);
   const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
   const [activarPassword, setActivarPassword] = useState('');
   const [formData, setFormData] = useState({
-    nombre: '', razon_social: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: ''
+    nombre: '', razon_social: '', cuit: '', plan_suscripcion: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: ''
   });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -45,8 +45,8 @@ export const AdminMayoristas = () => {
 
   const handleCreate = async () => {
     setFormError('');
-    if (!formData.nombre || !formData.admin_email || !formData.admin_password) {
-      setFormError('Nombre, email y password del administrador son obligatorios.');
+    if (!formData.nombre || !formData.cuit || !formData.admin_email || !formData.admin_password) {
+      setFormError('Nombre, CUIT, email y contraseña del administrador son obligatorios.');
       return;
     }
     setSaving(true);
@@ -55,13 +55,15 @@ export const AdminMayoristas = () => {
         nombre: formData.nombre,
         razon_social: formData.razon_social || formData.nombre,
         telefono: formData.telefono || undefined,
+        cuit: formData.cuit,
+        plan_suscripcion: formData.plan_suscripcion || undefined,
         email: formData.admin_email,
         nombre_usuario: formData.admin_nombre || formData.admin_email.split('@')[0],
         password: formData.admin_password || undefined,
       };
       await mayoristaService.create(payload);
       setIsModalOpen(false);
-      setFormData({ nombre: '', razon_social: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
+      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
       fetchMayoristas();
     } catch (err) {
       setFormError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al crear mayorista');
@@ -76,6 +78,8 @@ export const AdminMayoristas = () => {
       nombre: m.nombre || '',
       razon_social: m.razon_social || '',
       telefono: m.telefono || '',
+      cuit: m.cuit || '',
+      plan_suscripcion: m.plan_suscripcion || '',
       activo: m.activo !== false,
     });
     setFormError('');
@@ -94,6 +98,8 @@ export const AdminMayoristas = () => {
         nombre: editFormData.nombre,
         razon_social: editFormData.razon_social?.trim() || editFormData.nombre,
         telefono: editFormData.telefono || null,
+        cuit: editFormData.cuit,
+        plan_suscripcion: editFormData.plan_suscripcion || null,
         activo: Boolean(editFormData.activo),
       });
       setEditingMayorista(null);
@@ -216,6 +222,10 @@ export const AdminMayoristas = () => {
         <Input label="Nombre de Fantasía *" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
         <Input label="Razón Social" value={formData.razon_social} onChange={e => setFormData({...formData, razon_social: e.target.value})} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <Input label="CUIT *" value={formData.cuit} onChange={e => setFormData({ ...formData, cuit: e.target.value })} />
+          <Input label="Plan de suscripción" value={formData.plan_suscripcion} onChange={e => setFormData({ ...formData, plan_suscripcion: e.target.value })} />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <Input label="Email de Contacto" type="email" value={formData.email_contacto} onChange={e => setFormData({...formData, email_contacto: e.target.value})} />
           <Input label="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} />
         </div>
@@ -241,6 +251,8 @@ export const AdminMayoristas = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <Input label="Nombre de Fantasía *" value={editFormData.nombre} onChange={e => setEditFormData({...editFormData, nombre: e.target.value})} />
           <Input label="Razón Social" value={editFormData.razon_social} onChange={e => setEditFormData({...editFormData, razon_social: e.target.value})} />
+          <Input label="CUIT *" value={editFormData.cuit} onChange={e => setEditFormData({...editFormData, cuit: e.target.value})} />
+          <Input label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({...editFormData, plan_suscripcion: e.target.value})} />
           <Input label="Teléfono" value={editFormData.telefono} onChange={e => setEditFormData({...editFormData, telefono: e.target.value})} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <input

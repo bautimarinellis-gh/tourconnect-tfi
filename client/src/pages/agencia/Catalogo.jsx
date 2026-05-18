@@ -7,7 +7,6 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
-import { Textarea } from '../../components/ui/Textarea';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -29,7 +28,6 @@ export const AgenciaCatalogo = () => {
     fecha_inicio: '',
     fecha_fin: '',
     cantidad_pasajeros: 1,
-    notas: ''
   });
 
   const fetchCatalogo = useCallback(async () => {
@@ -64,11 +62,10 @@ export const AgenciaCatalogo = () => {
         fecha_inicio: formData.fecha_inicio,
         fecha_fin:    formData.fecha_fin,
         pasajeros:    formData.cantidad_pasajeros,
-        notas:        formData.notas,
       });
       toast.success('Cotización generada exitosamente. El mayorista la revisará pronto.');
       setIsModalOpen(false);
-      setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1, notas: '' });
+      setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.mensaje || 'Error al generar la cotización.');
     } finally {
@@ -78,7 +75,7 @@ export const AgenciaCatalogo = () => {
 
   const openQuoteModal = (producto) => {
     setSelectedProduct(producto);
-    setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1, notas: '' });
+    setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
     setIsModalOpen(true);
   };
 
@@ -223,14 +220,6 @@ export const AgenciaCatalogo = () => {
           value={formData.cantidad_pasajeros}
           onChange={e => setFormData({ ...formData, cantidad_pasajeros: Number(e.target.value) })}
         />
-        <Textarea
-          label="Notas adicionales"
-          rows={2}
-          value={formData.notas}
-          onChange={e => setFormData({ ...formData, notas: e.target.value })}
-          placeholder="Ej: Dos adultos y un niño..."
-        />
-
         <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontWeight: 600 }}>Total Estimado:</span>

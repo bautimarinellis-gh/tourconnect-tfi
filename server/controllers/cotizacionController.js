@@ -23,7 +23,7 @@ exports.getCotizaciones = async (req, res, next) => {
     }
 
     const cotizaciones = await Cotizacion.find(query)
-      .populate('agencia_id', 'nombre username email') // Adaptado para mostrar algo util si 'nombre' no existe
+      .populate('agencia_id', 'nombre')
       .populate('producto_id', 'nombre tipo precio_base')
       .sort({ created_at: -1 });
 
@@ -42,7 +42,7 @@ exports.getCotizaciones = async (req, res, next) => {
 exports.createCotizacion = async (req, res, next) => {
   try {
     const { agencia_id } = req.usuario;
-    const { producto_id, pasajeros, fecha_inicio, fecha_fin, notas } = req.body;
+    const { producto_id, pasajeros, fecha_inicio, fecha_fin } = req.body;
 
     // Validar datos básicos
     if (!producto_id || !pasajeros || !fecha_inicio || !fecha_fin) {
@@ -125,11 +125,8 @@ exports.createCotizacion = async (req, res, next) => {
       pasajeros,
       fecha_inicio,
       fecha_fin,
-      notas,
-      precio_unitario_snapshot: precio_base,
-      markup_snapshot: markup_porcentaje,
       precio_total,
-      estado: 'pendiente'
+      estado: 'pendiente',
     });
 
     res.status(201).json({
@@ -152,7 +149,7 @@ exports.getCotizacionById = async (req, res, next) => {
     const cotizacion = await Cotizacion.findById(id)
       .populate('agencia_id')
       .populate('producto_id')
-      .populate('mayorista_id', 'nombre_comercial email');
+      .populate('mayorista_id', 'nombre razon_social');
 
     if (!cotizacion) {
       return res.status(404).json({
@@ -348,8 +345,6 @@ exports.cancelarCotizacion = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { agencia_id } = req.usuario;
-    const { motivo_cancelacion } = req.body;
-
     const cotizacion = await Cotizacion.findById(id);
 
     if (!cotizacion) {
@@ -374,9 +369,6 @@ exports.cancelarCotizacion = async (req, res, next) => {
     }
 
     cotizacion.estado = 'cancelada';
-    if (motivo_cancelacion) {
-      cotizacion.motivo_cancelacion = motivo_cancelacion;
-    }
     await cotizacion.save();
 
     res.status(200).json({

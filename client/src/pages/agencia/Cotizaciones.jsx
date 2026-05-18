@@ -83,7 +83,7 @@ export const AgenciaCotizaciones = () => {
     setCancelLoading(true);
     setCancelError('');
     try {
-      await cotizacionService.cancelar(cancelTarget._id, cancelMotivo);
+      await cotizacionService.cancelar(cancelTarget._id);
       setIsCancelModalOpen(false);
       setCancelTarget(null);
       setCancelMotivo('');
@@ -163,25 +163,18 @@ export const AgenciaCotizaciones = () => {
                         Motivo: {c.motivo_rechazo}
                       </div>
                     )}
-                    {c.estado === 'cancelada' && c.motivo_cancelacion && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', marginTop: '0.25rem' }}>
-                        Motivo: {c.motivo_cancelacion}
-                      </div>
-                    )}
                   </TableCell>
                   <TableCell>
                     {c.estado === 'aprobada' ? (
-                      c.reserva_id ? (
-                        <div title="Esta cotización ya fue convertida en reserva." style={{ display: 'inline-block', cursor: 'not-allowed' }}>
-                          <Button size="sm" disabled style={{ pointerEvents: 'none', opacity: 0.5, backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
-                            <ShoppingBag size={14} /> Generar Reserva
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button size="sm" onClick={() => { setSelectedCotizacion(c); setBookingError(''); setIsBookingModalOpen(true); }} style={{ backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+                      <Button size="sm" onClick={() => { setSelectedCotizacion(c); setBookingError(''); setIsBookingModalOpen(true); }} style={{ backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+                        <ShoppingBag size={14} /> Generar Reserva
+                      </Button>
+                    ) : c.estado === 'reserva_generada' ? (
+                      <div title="Esta cotización ya fue convertida en reserva." style={{ display: 'inline-block', cursor: 'not-allowed' }}>
+                        <Button size="sm" disabled style={{ pointerEvents: 'none', opacity: 0.5, backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
                           <ShoppingBag size={14} /> Generar Reserva
                         </Button>
-                      )
+                      </div>
                     ) : c.estado === 'pendiente' ? (
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>

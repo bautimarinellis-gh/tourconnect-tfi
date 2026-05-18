@@ -7,9 +7,8 @@ const Mayorista = require('../models/Mayorista');
  */
 exports.getPerfil = async (req, res, next) => {
   try {
-    // req.usuario.userId viene del verifyToken (auth)
-    const mayorista = await Mayorista.findOne({ usuario_id: req.usuario.userId })
-      .populate('usuario_id', 'email nombre')
+    const mayorista = await Mayorista.findOne({ usuario_id: req.usuario.id })
+      .populate('usuario_id', 'email activo')
       .lean();
 
     if (!mayorista) {
@@ -32,14 +31,20 @@ exports.getPerfil = async (req, res, next) => {
  */
 exports.updatePerfil = async (req, res, next) => {
   try {
-    const { nombre, razon_social, telefono } = req.body;
+    const { nombre, razon_social, telefono, cuit, plan_suscripcion } = req.body;
 
-    // Actualizamos basándonos en el usuario autenticado
+    const updateFields = {};
+    if (nombre !== undefined) updateFields.nombre = nombre;
+    if (razon_social !== undefined) updateFields.razon_social = razon_social;
+    if (telefono !== undefined) updateFields.telefono = telefono;
+    if (cuit !== undefined) updateFields.cuit = cuit;
+    if (plan_suscripcion !== undefined) updateFields.plan_suscripcion = plan_suscripcion;
+
     const mayorista = await Mayorista.findOneAndUpdate(
-      { usuario_id: req.usuario.userId },
-      { nombre, razon_social, telefono },
+      { usuario_id: req.usuario.id },
+      { $set: updateFields },
       { new: true, runValidators: true }
-    ).populate('usuario_id', 'email nombre');
+    ).populate('usuario_id', 'email activo');
 
     if (!mayorista) {
       return res.status(404).json({ success: false, message: 'Perfil de mayorista no encontrado' });

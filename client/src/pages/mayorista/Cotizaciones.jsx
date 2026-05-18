@@ -243,20 +243,6 @@ export const MayoristaCotizaciones = () => {
                 </Alert>
               </div>
             )}
-            {detailCotizacion.motivo_cancelacion && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <Alert variant="warning">
-                  <strong>Motivo de cancelación (agencia):</strong> {detailCotizacion.motivo_cancelacion}
-                </Alert>
-              </div>
-            )}
-            {detailCotizacion.notas && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
-                  <strong>Notas:</strong> {detailCotizacion.notas}
-                </p>
-              </div>
-            )}
           </div>
         )}
       </Modal>

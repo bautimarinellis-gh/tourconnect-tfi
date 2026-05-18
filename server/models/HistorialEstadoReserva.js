@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const estadoReservaSchema = new mongoose.Schema(
+const historialEstadoReservaSchema = new mongoose.Schema(
   {
     reserva_id: {
       type: mongoose.Schema.Types.ObjectId,
@@ -30,12 +30,11 @@ const estadoReservaSchema = new mongoose.Schema(
   }
 );
 
-// Transformación para JSON
-estadoReservaSchema.set('toJSON', {
+historialEstadoReservaSchema.set('toJSON', {
   transform(_doc, ret) {
     delete ret.__v;
     return ret;
   },
 });
 
-module.exports = mongoose.model('EstadoReserva', estadoReservaSchema);
+module.exports = mongoose.model('HistorialEstadoReserva', historialEstadoReservaSchema);

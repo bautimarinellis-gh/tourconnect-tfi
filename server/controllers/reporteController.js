@@ -3,15 +3,18 @@ const Reserva = require('../models/Reserva');
 const Cotizacion = require('../models/Cotizacion');
 const Mayorista = require('../models/Mayorista');
 const Agencia = require('../models/Agencia');
+const {
+  lookupCotizacionStages,
+  productoCollection,
+  agenciaCollection,
+} = require('../utils/reporteHelpers');
 
-// Helper para obtener fechas según los requerimientos
 const getDefaultFechas = (desde, hasta, mesesAtras = 6, paraMesActual = false) => {
   let fechaInicio, fechaFin;
 
   if (desde && hasta) {
     fechaInicio = new Date(desde);
     fechaFin = new Date(hasta);
-    // Establecer el fin del día para 'hasta'
     fechaFin.setUTCHours(23, 59, 59, 999);
   } else if (paraMesActual) {
     const now = new Date();
@@ -20,104 +23,101 @@ const getDefaultFechas = (desde, hasta, mesesAtras = 6, paraMesActual = false) =
   } else {
     const now = new Date();
     fechaFin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-    // Retiene desde el primer día del mes hace "mesesAtras - 1"
     fechaInicio = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (mesesAtras - 1), 1));
   }
-  
+
   return { fechaInicio, fechaFin };
 };
 
-// =========================================================
-// ADMIN ENDPOINTS
-// =========================================================
-
 exports.getAdminDashboard = async (req, res, next) => {
   try {
-    const [totalMayoristas, totalAgencias, totalReservas, cotizacionesPendientes, ultimosMayoristas] = await Promise.all([
-      Mayorista.countDocuments(),
-      Agencia.countDocuments({ activo: true }),
-      Reserva.countDocuments({ estado: { $ne: 'cancelada' } }),
-      Cotizacion.countDocuments({ estado: 'pendiente' }),
-      Mayorista.find()
-        .sort({ created_at: -1 })
-        .limit(10)
-        .populate('usuario_id', 'email')
-        .lean()
-    ]);
+    const [totalMayoristas, totalAgencias, totalReservas, cotizacionesPendientes, ultimosMayoristas] =
+      await Promise.all([
+        Mayorista.countDocuments(),
+        Agencia.countDocuments({ activo: true }),
+        Reserva.countDocuments({ estado: { $ne: 'cancelada' } }),
+        Cotizacion.countDocuments({ estado: 'pendiente' }),
+        Mayorista.find().sort({ created_at: -1 }).limit(10).populate('usuario_id', 'email').lean(),
+      ]);
 
     const kpis = {
       mayoristas: totalMayoristas,
       agencias: totalAgencias,
       reservas: totalReservas,
-      cotizacionesPendientes
+      cotizacionesPendientes,
     };
 
-    const ultimos = ultimosMayoristas.map(m => ({
+    const ultimos = ultimosMayoristas.map((m) => ({
       _id: m._id,
       nombre: m.nombre,
       email_contacto: m.usuario_id?.email ?? '-',
-      activo: m.activo
+      activo: m.activo,
     }));
 
     res.json({
       success: true,
-      data: { kpis, ultimosMayoristas: ultimos }
+      data: { kpis, ultimosMayoristas: ultimos },
     });
   } catch (err) {
     next(err);
   }
 };
 
-// =========================================================
-// MAYORISTA ENDPOINTS
-// =========================================================
-
 exports.getReservasPorMes = async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
-
-    const matchStage = {
-      mayorista_id: new mongoose.Types.ObjectId(req.mayorista_id),
-      estado: { $ne: 'cancelada' },
-      created_at: { $gte: fechaInicio, $lte: fechaFin }
-    };
+    const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
     const pipeline = [
-      { $match: matchStage },
+      ...lookupCotizacionStages({
+        'cot.mayorista_id': mayoristaId,
+      }),
+      {
+        $match: {
+          estado: { $ne: 'cancelada' },
+          created_at: { $gte: fechaInicio, $lte: fechaFin },
+        },
+      },
       {
         $group: {
           _id: {
-            year: { $year: "$created_at" },
-            month: { $month: "$created_at" }
+            year: { $year: '$created_at' },
+            month: { $month: '$created_at' },
           },
           cantidad_reservas: { $sum: 1 },
-          monto_total: { $sum: "$precio_final" }
-        }
+          monto_total: { $sum: '$cot.precio_total' },
+        },
       },
-      { $sort: { "_id.year": 1, "_id.month": 1 } },
+      { $sort: { '_id.year': 1, '_id.month': 1 } },
       {
         $project: {
           _id: 0,
-          mes: { 
+          mes: {
             $concat: [
-              { $toString: "$_id.year" }, 
-              "-", 
-              { $cond: { if: { $lt: ["$_id.month", 10] }, then: { $concat: ["0", { $toString: "$_id.month" }] }, else: { $toString: "$_id.month" } } }
-            ]
+              { $toString: '$_id.year' },
+              '-',
+              {
+                $cond: {
+                  if: { $lt: ['$_id.month', 10] },
+                  then: { $concat: ['0', { $toString: '$_id.month' }] },
+                  else: { $toString: '$_id.month' },
+                },
+              },
+            ],
           },
           cantidad_reservas: 1,
-          monto_total: 1
-        }
-      }
+          monto_total: 1,
+        },
+      },
     ];
 
     const resultados = await Reserva.aggregate(pipeline);
 
-    const data = resultados.map(r => ({
+    const data = resultados.map((r) => ({
       mes: r.mes,
       cantidad_reservas: r.cantidad_reservas,
-      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0
+      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
     }));
 
     res.json({ success: true, data });
@@ -130,50 +130,49 @@ exports.getIngresosPorAgencia = async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
+    const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
     const pipeline = [
+      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
       {
         $match: {
-          mayorista_id: new mongoose.Types.ObjectId(req.mayorista_id),
           estado: { $ne: 'cancelada' },
-          created_at: { $gte: fechaInicio, $lte: fechaFin }
-        }
+          created_at: { $gte: fechaInicio, $lte: fechaFin },
+        },
       },
       {
         $group: {
-          _id: "$agencia_id",
+          _id: '$cot.agencia_id',
           cantidad_reservas: { $sum: 1 },
-          monto_total: { $sum: "$precio_final" }
-        }
+          monto_total: { $sum: '$cot.precio_total' },
+        },
       },
-      {
-        $sort: { monto_total: -1 } // Ordenar por suma Decimal128 en BD
-      },
+      { $sort: { monto_total: -1 } },
       {
         $lookup: {
-          from: "agencias",
-          localField: "_id",
-          foreignField: "_id",
-          as: "agencia_info"
-        }
+          from: agenciaCollection(),
+          localField: '_id',
+          foreignField: '_id',
+          as: 'agencia_info',
+        },
       },
-      { $unwind: { path: "$agencia_info", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
-          nombre: { $ifNull: ["$agencia_info.nombre", "Agencia desconocida"] },
+          nombre: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
           cantidad_reservas: 1,
-          monto_total: 1
-        }
-      }
+          monto_total: 1,
+        },
+      },
     ];
 
     const resultados = await Reserva.aggregate(pipeline);
 
-    const data = resultados.map(r => ({
+    const data = resultados.map((r) => ({
       nombre: r.nombre,
       cantidad_reservas: r.cantidad_reservas,
-      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0
+      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
     }));
 
     res.json({ success: true, data });
@@ -186,52 +185,51 @@ exports.getIngresosPorProducto = async (req, res, next) => {
   try {
     const { desde, hasta } = req.query;
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
+    const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
     const pipeline = [
+      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
       {
         $match: {
-          mayorista_id: new mongoose.Types.ObjectId(req.mayorista_id),
           estado: { $ne: 'cancelada' },
-          created_at: { $gte: fechaInicio, $lte: fechaFin }
-        }
+          created_at: { $gte: fechaInicio, $lte: fechaFin },
+        },
       },
       {
         $group: {
-          _id: "$producto_id",
+          _id: '$cot.producto_id',
           cantidad_reservas: { $sum: 1 },
-          monto_total: { $sum: "$precio_final" }
-        }
+          monto_total: { $sum: '$cot.precio_total' },
+        },
       },
-      {
-        $sort: { monto_total: -1 }
-      },
+      { $sort: { monto_total: -1 } },
       {
         $lookup: {
-          from: "productos",
-          localField: "_id",
-          foreignField: "_id",
-          as: "producto_info"
-        }
+          from: productoCollection(),
+          localField: '_id',
+          foreignField: '_id',
+          as: 'producto_info',
+        },
       },
-      { $unwind: { path: "$producto_info", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
-          nombre: { $ifNull: ["$producto_info.nombre", "Producto desconocido"] },
-          tipo: { $ifNull: ["$producto_info.tipo", "N/A"] },
+          nombre: { $ifNull: ['$producto_info.nombre', 'Producto desconocido'] },
+          tipo: { $ifNull: ['$producto_info.tipo', 'N/A'] },
           cantidad_reservas: 1,
-          monto_total: 1
-        }
-      }
+          monto_total: 1,
+        },
+      },
     ];
 
     const resultados = await Reserva.aggregate(pipeline);
 
-    const data = resultados.map(r => ({
+    const data = resultados.map((r) => ({
       nombre: r.nombre,
       tipo: r.tipo,
       cantidad_reservas: r.cantidad_reservas,
-      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0
+      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
     }));
 
     res.json({ success: true, data });
@@ -245,61 +243,61 @@ exports.getRankingAgencias = async (req, res, next) => {
     const { desde, hasta, limit } = req.query;
     const itemsLimit = parseInt(limit, 10) || 10;
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
+    const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
     const pipeline = [
+      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
       {
         $match: {
-          mayorista_id: new mongoose.Types.ObjectId(req.mayorista_id),
           estado: { $ne: 'cancelada' },
-          created_at: { $gte: fechaInicio, $lte: fechaFin }
-        }
+          created_at: { $gte: fechaInicio, $lte: fechaFin },
+        },
       },
       {
         $group: {
-          _id: { agencia_id: "$agencia_id", producto_id: "$producto_id" },
+          _id: { agencia_id: '$cot.agencia_id', producto_id: '$cot.producto_id' },
           cantidad: { $sum: 1 },
-          monto: { $sum: "$precio_final" }
-        }
+          monto: { $sum: '$cot.precio_total' },
+        },
       },
-      // Ordenamos para que, al agrupar, el primer producto que tome $first sea el que tiene max cantidad
       { $sort: { cantidad: -1, monto: -1 } },
       {
         $group: {
-          _id: "$_id.agencia_id",
-          cantidad_reservas: { $sum: "$cantidad" },
-          monto_total: { $sum: "$monto" },
-          producto_top_id: { $first: "$_id.producto_id" }
-        }
+          _id: '$_id.agencia_id',
+          cantidad_reservas: { $sum: '$cantidad' },
+          monto_total: { $sum: '$monto' },
+          producto_top_id: { $first: '$_id.producto_id' },
+        },
       },
       { $sort: { cantidad_reservas: -1, monto_total: -1 } },
       { $limit: itemsLimit },
       {
         $lookup: {
-          from: "agencias",
-          localField: "_id",
-          foreignField: "_id",
-          as: "agencia_info"
-        }
+          from: agenciaCollection(),
+          localField: '_id',
+          foreignField: '_id',
+          as: 'agencia_info',
+        },
       },
-      { $unwind: { path: "$agencia_info", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
-          from: "productos",
-          localField: "producto_top_id",
-          foreignField: "_id",
-          as: "producto_info"
-        }
+          from: productoCollection(),
+          localField: 'producto_top_id',
+          foreignField: '_id',
+          as: 'producto_info',
+        },
       },
-      { $unwind: { path: "$producto_info", preserveNullAndEmptyArrays: true } },
+      { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
-          nombre_agencia: { $ifNull: ["$agencia_info.nombre", "Agencia desconocida"] },
+          nombre_agencia: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
           cantidad_reservas: 1,
           monto_total: 1,
-          producto_mas_reservado: { $ifNull: ["$producto_info.nombre", "N/A"] }
-        }
-      }
+          producto_mas_reservado: { $ifNull: ['$producto_info.nombre', 'N/A'] },
+        },
+      },
     ];
 
     const resultados = await Reserva.aggregate(pipeline);
@@ -309,7 +307,7 @@ exports.getRankingAgencias = async (req, res, next) => {
       nombre_agencia: r.nombre_agencia,
       cantidad_reservas: r.cantidad_reservas,
       monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
-      producto_mas_reservado: r.producto_mas_reservado
+      producto_mas_reservado: r.producto_mas_reservado,
     }));
 
     res.json({ success: true, data });
@@ -321,90 +319,98 @@ exports.getRankingAgencias = async (req, res, next) => {
 exports.getMayoristaDashboard = async (req, res, next) => {
   try {
     const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
-    
+
     const now = new Date();
     const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 
+    const cotLookup = lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId });
+
     const [
-      reservasActivas,
+      reservasActivasAgg,
       ingresosMesData,
-      agenciasActivas,
+      agenciasActivasAgg,
       cotizacionesPendientes,
       productoTopData,
-      pagosPorConfirmar
+      pagosPorConfirmarAgg,
     ] = await Promise.all([
-      // reservas activas (pendiente_pago o pago_informado)
-      Reserva.countDocuments({ mayorista_id: mayoristaId, estado: { $in: ['pendiente_pago', 'pago_informado'] } }),
-      
-      // ingresos del mes actual
       Reserva.aggregate([
+        ...cotLookup,
+        { $match: { estado: { $in: ['pendiente_pago', 'pago_informado'] } } },
+        { $count: 'total' },
+      ]),
+      Reserva.aggregate([
+        ...cotLookup,
         {
           $match: {
-            mayorista_id: mayoristaId,
             estado: { $ne: 'cancelada' },
-            created_at: { $gte: startOfMonth, $lte: endOfMonth }
-          }
+            created_at: { $gte: startOfMonth, $lte: endOfMonth },
+          },
         },
-        { $group: { _id: null, total: { $sum: "$precio_final" } } }
+        { $group: { _id: null, total: { $sum: '$cot.precio_total' } } },
       ]),
-
-      // agencias activas: consideramos a aquellas que han emitido alguna reserva no cancelada en toda su historia, o al menos en el sistema total. 
-      // Si la métrica requiere "agencias unidas" o algo similar, podemos contar distinct de la DB.
-      Reserva.distinct("agencia_id", { mayorista_id: mayoristaId, estado: { $ne: 'cancelada' } }),
-
-      // cotizaciones pendientes sin respuesta
-      Cotizacion.countDocuments({ mayorista_id: mayoristaId, estado: 'pendiente' }),
-
-      // producto con más reservas del mes
       Reserva.aggregate([
+        ...cotLookup,
+        { $match: { estado: { $ne: 'cancelada' } } },
+        { $group: { _id: '$cot.agencia_id' } },
+        { $count: 'total' },
+      ]),
+      Cotizacion.countDocuments({ mayorista_id: mayoristaId, estado: 'pendiente' }),
+      Reserva.aggregate([
+        ...cotLookup,
         {
-           $match: {
-              mayorista_id: mayoristaId,
-              estado: { $ne: 'cancelada' },
-              created_at: { $gte: startOfMonth, $lte: endOfMonth }
-           }
+          $match: {
+            estado: { $ne: 'cancelada' },
+            created_at: { $gte: startOfMonth, $lte: endOfMonth },
+          },
         },
-        { $group: { _id: "$producto_id", count: { $sum: 1 } } },
+        { $group: { _id: '$cot.producto_id', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 1 },
         {
-           $lookup: {
-              from: "productos",
-              localField: "_id",
-              foreignField: "_id",
-              as: "prod"
-           }
+          $lookup: {
+            from: productoCollection(),
+            localField: '_id',
+            foreignField: '_id',
+            as: 'prod',
+          },
         },
-        { $unwind: { path: "$prod", preserveNullAndEmptyArrays: true } }
+        { $unwind: { path: '$prod', preserveNullAndEmptyArrays: true } },
       ]),
-
-      // pagos informados por agencias esperando confirmación
-      Reserva.countDocuments({ mayorista_id: mayoristaId, estado: 'pago_informado' })
+      Reserva.aggregate([
+        ...cotLookup,
+        { $match: { estado: 'pago_informado' } },
+        { $count: 'total' },
+      ]),
     ]);
 
-    const ingresos_mes = ingresosMesData.length > 0 && ingresosMesData[0].total ? parseFloat(ingresosMesData[0].total.toString()) : 0;
-    const producto_top_mes = productoTopData.length > 0 && productoTopData[0].prod ? productoTopData[0].prod.nombre : null;
+    const reservasActivas = reservasActivasAgg[0]?.total ?? 0;
+    const ingresos_mes =
+      ingresosMesData.length > 0 && ingresosMesData[0].total
+        ? parseFloat(ingresosMesData[0].total.toString())
+        : 0;
+    const agenciasActivas = agenciasActivasAgg[0]?.total ?? 0;
+    const pagosPorConfirmar = pagosPorConfirmarAgg[0]?.total ?? 0;
+    const producto_top_mes =
+      productoTopData.length > 0 && productoTopData[0].prod ? productoTopData[0].prod.nombre : null;
 
     res.json({
       success: true,
       data: {
         reservas_activas: reservasActivas,
         ingresos_mes,
-        agencias_activas: agenciasActivas.length,
-        producto_top: producto_top_mes ? { nombre: producto_top_mes, ventas: productoTopData[0].count } : null,
+        agencias_activas: agenciasActivas,
+        producto_top: producto_top_mes
+          ? { nombre: producto_top_mes, ventas: productoTopData[0].count }
+          : null,
         cotizaciones_pendientes: cotizacionesPendientes,
-        pagos_por_confirmar: pagosPorConfirmar
-      }
+        pagos_por_confirmar: pagosPorConfirmar,
+      },
     });
   } catch (err) {
     next(err);
   }
 };
-
-// =========================================================
-// AGENCIA ENDPOINTS
-// =========================================================
 
 exports.getAgenciaDashboard = async (req, res, next) => {
   try {
@@ -412,99 +418,100 @@ exports.getAgenciaDashboard = async (req, res, next) => {
     const agenciaId = new mongoose.Types.ObjectId(req.usuario.agencia_id);
 
     const { desde, hasta } = req.query;
-    const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 1, true); // por defecto: mes actual
+    const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 1, true);
 
     const now = new Date();
     const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 
-    const [
-      reservasActivas,
-      gastoMesData,
-      cotizacionesPendientes,
-      historialData
-    ] = await Promise.all([
-      // reservas activas (estado=pendiente_pago|pagada) globalmente
-      Reserva.countDocuments({
-        mayorista_id: mayoristaId,
-        agencia_id: agenciaId,
-        estado: { $in: ['pendiente_pago', 'pagada'] }
-      }),
+    const cotLookup = lookupCotizacionStages({
+      'cot.mayorista_id': mayoristaId,
+      'cot.agencia_id': agenciaId,
+    });
 
-      // gasto total del mes actual (independiente del filtro desde/hasta que afectará solo a reservas? El prompt dice "gasto del mes actual" así como KPI fijo)
-      Reserva.aggregate([
-        {
-          $match: {
-            mayorista_id: mayoristaId,
-            agencia_id: agenciaId,
-            estado: { $ne: 'cancelada' },
-            created_at: { $gte: startOfMonth, $lte: endOfMonth }
-          }
-        },
-        { $group: { _id: null, total: { $sum: "$precio_final" } } }
-      ]),
-
-      // cotizaciones pendientes propias
-      Cotizacion.countDocuments({
-        mayorista_id: mayoristaId,
-        agencia_id: agenciaId,
-        estado: 'pendiente'
-      }),
-
-      // historial de reservas agrupado por mes, aplicando los filtros de fecha.
-      Reserva.aggregate([
-        {
-          $match: {
-            mayorista_id: mayoristaId,
-            agencia_id: agenciaId,
-            estado: { $ne: 'cancelada' },
-            created_at: { $gte: fechaInicio, $lte: fechaFin }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              year: { $year: "$created_at" },
-              month: { $month: "$created_at" }
+    const [reservasActivasAgg, gastoMesData, cotizacionesPendientes, historialData] =
+      await Promise.all([
+        Reserva.aggregate([
+          ...cotLookup,
+          { $match: { estado: { $in: ['pendiente_pago', 'pagada'] } } },
+          { $count: 'total' },
+        ]),
+        Reserva.aggregate([
+          ...cotLookup,
+          {
+            $match: {
+              estado: { $ne: 'cancelada' },
+              created_at: { $gte: startOfMonth, $lte: endOfMonth },
             },
-            cantidad: { $sum: 1 },
-            monto: { $sum: "$precio_final" }
-          }
-        },
-        { $sort: { "_id.year": 1, "_id.month": 1 } },
-        {
-          $project: {
-            _id: 0,
-            mes: { 
-              $concat: [
-                { $toString: "$_id.year" }, 
-                "-", 
-                { $cond: { if: { $lt: ["$_id.month", 10] }, then: { $concat: ["0", { $toString: "$_id.month" }] }, else: { $toString: "$_id.month" } } }
-              ]
+          },
+          { $group: { _id: null, total: { $sum: '$cot.precio_total' } } },
+        ]),
+        Cotizacion.countDocuments({
+          mayorista_id: mayoristaId,
+          agencia_id: agenciaId,
+          estado: 'pendiente',
+        }),
+        Reserva.aggregate([
+          ...cotLookup,
+          {
+            $match: {
+              estado: { $ne: 'cancelada' },
+              created_at: { $gte: fechaInicio, $lte: fechaFin },
             },
-            cantidad: 1,
-            monto: 1
-          }
-        }
-      ])
-    ]);
+          },
+          {
+            $group: {
+              _id: {
+                year: { $year: '$created_at' },
+                month: { $month: '$created_at' },
+              },
+              cantidad: { $sum: 1 },
+              monto: { $sum: '$cot.precio_total' },
+            },
+          },
+          { $sort: { '_id.year': 1, '_id.month': 1 } },
+          {
+            $project: {
+              _id: 0,
+              mes: {
+                $concat: [
+                  { $toString: '$_id.year' },
+                  '-',
+                  {
+                    $cond: {
+                      if: { $lt: ['$_id.month', 10] },
+                      then: { $concat: ['0', { $toString: '$_id.month' }] },
+                      else: { $toString: '$_id.month' },
+                    },
+                  },
+                ],
+              },
+              cantidad: 1,
+              monto: 1,
+            },
+          },
+        ]),
+      ]);
 
-    const gasto_total_mes = gastoMesData.length > 0 && gastoMesData[0].total ? parseFloat(gastoMesData[0].total.toString()) : 0;
-    
-    const historial = historialData.map(h => ({
+    const gasto_total_mes =
+      gastoMesData.length > 0 && gastoMesData[0].total
+        ? parseFloat(gastoMesData[0].total.toString())
+        : 0;
+
+    const historial = historialData.map((h) => ({
       mes: h.mes,
       cantidad: h.cantidad,
-      monto_total: h.monto ? parseFloat(h.monto.toString()) : 0
+      monto_total: h.monto ? parseFloat(h.monto.toString()) : 0,
     }));
 
     res.json({
       success: true,
       data: {
-        reservas_activas: reservasActivas,
+        reservas_activas: reservasActivasAgg[0]?.total ?? 0,
         gasto_mes: gasto_total_mes,
         cotizaciones_pendientes: cotizacionesPendientes,
-        historial_reservas: historial
-      }
+        historial_reservas: historial,
+      },
     });
   } catch (err) {
     next(err);

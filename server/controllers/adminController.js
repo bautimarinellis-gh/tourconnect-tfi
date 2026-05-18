@@ -16,15 +16,28 @@ const { enviarEmail } = require('../utils/mailer');
 exports.getMayoristas = async (req, res, next) => {
   try {
     const mayoristas = await Mayorista.find()
-      .populate('usuario_id', 'email nombre activo')
+      .populate('usuario_id', 'email activo')
       .lean();
 
-    // Agregar KPIs (Agencias y Reservas) manual o con aggregate.
-    // Usamos counts iterativos o Promise.all para facilidad.
+    const cotizacionCollection = Cotizacion.collection.name;
+
     const result = await Promise.all(
       mayoristas.map(async (m) => {
         const agenciasCount = await Agencia.countDocuments({ mayorista_id: m._id, activo: true });
-        const reservasCount = await Reserva.countDocuments({ mayorista_id: m._id });
+        const reservasAgg = await Reserva.aggregate([
+          {
+            $lookup: {
+              from: cotizacionCollection,
+              localField: 'cotizacion_id',
+              foreignField: '_id',
+              as: 'cot',
+            },
+          },
+          { $unwind: '$cot' },
+          { $match: { 'cot.mayorista_id': m._id } },
+          { $count: 'total' },
+        ]);
+        const reservasCount = reservasAgg[0]?.total ?? 0;
         return {
           ...m,
           kpis: {
@@ -50,7 +63,7 @@ exports.getMayoristas = async (req, res, next) => {
  * @access  Private/Admin
  */
 exports.crearMayorista = async (req, res, next) => {
-  const { nombre, razon_social, telefono, email, nombre_usuario, password } = req.body;
+  const { nombre, razon_social, telefono, cuit, plan_suscripcion, email, nombre_usuario, password } = req.body;
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -78,7 +91,6 @@ exports.crearMayorista = async (req, res, next) => {
     // 2. Crear el Usuario
     const nuevoUsuario = new Usuario({
       email,
-      nombre: nombre_usuario,
       rol: 'mayorista',
       activo: tienePassword,
       invite_token: tienePassword ? undefined : hashedToken,
@@ -95,15 +107,13 @@ exports.crearMayorista = async (req, res, next) => {
       nombre,
       razon_social,
       telefono,
-      activo: true, // El mayorista está activo, el usuario inactivo temporalmente
+      cuit,
+      plan_suscripcion: plan_suscripcion || null,
+      activo: true,
     });
     await nuevoMayorista.save({ session });
 
-    // Vínculo bidireccional opcional
-    nuevoUsuario.mayorista_id = nuevoMayorista._id;
-    await nuevoUsuario.save({ session });
-
-    // 5. Commit de la transacción
+    // Commit de la transacción
     await session.commitTransaction();
     session.endSession();
 
@@ -112,7 +122,7 @@ exports.crearMayorista = async (req, res, next) => {
       const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/set-password/${inviteToken}`;
       const subject = 'Bienvenido a TourConnect - Configura tu contraseña';
       const html = `
-        <h1>Hola ${nombre_usuario}</h1>
+        <h1>Hola ${nombre_usuario || nombre}</h1>
         <p>Has sido invitado a sumarte a TourConnect como administrador del mayorista <strong>${nombre}</strong>.</p>
         <p>Por favor, configura tu contraseña haciendo clic en el siguiente enlace (válido por 48 horas):</p>
         <a href="${inviteUrl}">Configurar mi contraseña</a>
@@ -144,7 +154,7 @@ exports.crearMayorista = async (req, res, next) => {
 exports.getMayoristaById = async (req, res, next) => {
   try {
     const mayorista = await Mayorista.findById(req.params.id)
-      .populate('usuario_id', 'email nombre')
+      .populate('usuario_id', 'email activo')
       .lean();
 
     if (!mayorista) {
@@ -176,7 +186,7 @@ exports.getMayoristaById = async (req, res, next) => {
  */
 exports.updateMayorista = async (req, res, next) => {
   try {
-    const { nombre, razon_social, telefono, activo } = req.body;
+    const { nombre, razon_social, telefono, cuit, plan_suscripcion, activo } = req.body;
     const id = req.params.id;
 
     const activoBool = activo === true || activo === 'true' ? true : activo === false || activo === 'false' ? false : undefined;
@@ -188,6 +198,8 @@ exports.updateMayorista = async (req, res, next) => {
       updateFields.razon_social = rs || nombre || 'Sin especificar';
     }
     if (telefono !== undefined) updateFields.telefono = telefono || null;
+    if (cuit !== undefined) updateFields.cuit = cuit;
+    if (plan_suscripcion !== undefined) updateFields.plan_suscripcion = plan_suscripcion || null;
     if (typeof activoBool === 'boolean') updateFields.activo = activoBool;
 
     const mayorista = await Mayorista.findByIdAndUpdate(
@@ -207,7 +219,7 @@ exports.updateMayorista = async (req, res, next) => {
       }
     }
 
-    const updated = await Mayorista.findById(id).populate('usuario_id', 'email nombre');
+    const updated = await Mayorista.findById(id).populate('usuario_id', 'email activo');
     res.json({ success: true, data: updated });
   } catch (error) {
     next(error);

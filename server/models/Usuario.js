@@ -13,13 +13,7 @@ const usuarioSchema = new mongoose.Schema(
     },
     password_hash: {
       type: String,
-      select: false, // Nunca se devuelve en queries por defecto
-    },
-    nombre: {
-      type: String,
-      required: [true, 'El nombre es obligatorio'],
-      trim: true,
-      maxlength: [100, 'El nombre no puede superar los 100 caracteres'],
+      select: false,
     },
     rol: {
       type: String,
@@ -49,53 +43,23 @@ const usuarioSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
-    mayorista_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Mayorista',
-      default: null,
-    },
-    agencia_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Agencia',
-      default: null,
-    },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   }
 );
 
-// ---------------------
-// Índices
-// ---------------------
 usuarioSchema.index({ invite_token: 1 });
 usuarioSchema.index({ reset_token: 1 });
 
-// ---------------------
-// Métodos de instancia
-// ---------------------
-
-/**
- * Compara una contraseña en texto plano con el hash almacenado.
- */
 usuarioSchema.methods.compararPassword = async function (password) {
   return bcrypt.compare(password, this.password_hash);
 };
 
-// ---------------------
-// Métodos estáticos
-// ---------------------
-
-/**
- * Hashea una contraseña con bcrypt (salt rounds = 12).
- */
 usuarioSchema.statics.hashPassword = async function (password) {
   return bcrypt.hash(password, 12);
 };
 
-// ---------------------
-// Transformación de JSON
-// ---------------------
 usuarioSchema.set('toJSON', {
   transform(_doc, ret) {
     delete ret.password_hash;

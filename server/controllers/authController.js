@@ -1,25 +1,24 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Usuario = require('../models/Usuario');
-const Mayorista = require('../models/Mayorista');
-const Agencia = require('../models/Agencia');
 const { enviarEmail } = require('../utils/mailer');
+const { resolverContextoPersona, enriquecerUsuario } = require('../utils/personaContext');
 
 // ---------------------
 // Helpers
 // ---------------------
 
 /**
- * Genera un JWT con los datos del usuario.
+ * Genera un JWT con los datos del usuario y contexto de negocio.
  */
-const generarToken = (usuario) => {
+const generarToken = (usuario, contexto) => {
   return jwt.sign(
     {
       id: usuario._id,
       email: usuario.email,
       rol: usuario.rol,
-      mayorista_id: usuario.mayorista_id || null,
-      agencia_id: usuario.agencia_id || null,
+      mayorista_id: contexto.mayorista_id || null,
+      agencia_id: contexto.agencia_id || null,
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
@@ -86,18 +85,29 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Si es mayorista o agencia, verificar que el Mayorista/Agencia esté activo
-    if (usuario.rol === 'mayorista' && usuario.mayorista_id) {
-      const mayorista = await Mayorista.findById(usuario.mayorista_id).select('activo').lean();
-      if (mayorista?.activo !== true) {
+    const contexto = await resolverContextoPersona(usuario);
+
+    if (usuario.rol === 'mayorista') {
+      if (!contexto.persona) {
+        return res.status(403).json({
+          success: false,
+          message: 'No se encontró el perfil de mayorista asociado.',
+        });
+      }
+      if (contexto.persona.activo !== true) {
         return res.status(403).json({
           success: false,
           message: 'El mayorista está desactivado. Contactá al administrador.',
         });
       }
-    } else if (usuario.rol === 'agencia' && usuario.agencia_id) {
-      const agencia = await Agencia.findById(usuario.agencia_id).select('activo').lean();
-      if (agencia?.activo !== true) {
+    } else if (usuario.rol === 'agencia') {
+      if (!contexto.persona) {
+        return res.status(403).json({
+          success: false,
+          message: 'No se encontró el perfil de agencia asociado.',
+        });
+      }
+      if (contexto.persona.activo !== true) {
         return res.status(403).json({
           success: false,
           message: 'La agencia está desactivada. Contactá al administrador.',
@@ -105,20 +115,19 @@ const login = async (req, res, next) => {
       }
     }
 
-    // Generar JWT y enviarlo como cookie HttpOnly
-    const token = generarToken(usuario);
+    const token = generarToken(usuario, contexto);
 
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 días en ms
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.json({
       success: true,
       data: {
-        usuario: usuario.toJSON(),
+        usuario: enriquecerUsuario(usuario, contexto),
       },
     });
   } catch (error) {
@@ -337,9 +346,11 @@ const me = async (req, res, next) => {
       });
     }
 
+    const contexto = await resolverContextoPersona(usuario);
+
     res.json({
       success: true,
-      data: { usuario },
+      data: { usuario: enriquecerUsuario(usuario, contexto) },
     });
   } catch (error) {
     next(error);

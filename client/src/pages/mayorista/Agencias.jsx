@@ -21,7 +21,7 @@ export const MayoristaAgencias = () => {
   // --- Crear ---
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
-    nombre: '', razon_social: '', email_contacto: '', telefono: '',
+    nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '',
     admin_nombre: '', admin_email: '', admin_password: ''
   });
   const [createError, setCreateError] = useState('');
@@ -65,8 +65,8 @@ export const MayoristaAgencias = () => {
   // --- Handlers: Crear ---
   const handleCreate = async () => {
     setCreateError('');
-    if (!createForm.nombre || !createForm.admin_email || !createForm.admin_password) {
-      setCreateError('Nombre, email y contraseña del administrador son obligatorios.');
+    if (!createForm.nombre || !createForm.cuit || !createForm.admin_email || !createForm.admin_password) {
+      setCreateError('Nombre, CUIT, email y contraseña del administrador son obligatorios.');
       return;
     }
     if (createForm.admin_password.trim().length < 8) {
@@ -79,13 +79,14 @@ export const MayoristaAgencias = () => {
         nombre: createForm.nombre,
         razon_social: createForm.razon_social || createForm.nombre,
         telefono: createForm.telefono || undefined,
+        cuit: createForm.cuit,
         email: createForm.admin_email,
         nombre_usuario: createForm.admin_nombre || createForm.admin_email?.split('@')[0],
         password: createForm.admin_password || undefined,
       };
       await agenciaService.create(payload);
       setIsCreateModalOpen(false);
-      setCreateForm({ nombre: '', razon_social: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
+      setCreateForm({ nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
       fetchAgencias();
     } catch (err) {
       setCreateError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al crear la agencia');
@@ -243,6 +244,7 @@ export const MayoristaAgencias = () => {
         <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Datos de la Agencia</h4>
         <Input label="Nombre de Fantasía *" value={createForm.nombre} onChange={e => setCreateForm({ ...createForm, nombre: e.target.value })} />
         <Input label="Razón Social" value={createForm.razon_social} onChange={e => setCreateForm({ ...createForm, razon_social: e.target.value })} />
+        <Input label="CUIT *" value={createForm.cuit} onChange={e => setCreateForm({ ...createForm, cuit: e.target.value })} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <Input label="Email de Contacto" type="email" value={createForm.email_contacto} onChange={e => setCreateForm({ ...createForm, email_contacto: e.target.value })} />
           <Input label="Teléfono" value={createForm.telefono} onChange={e => setCreateForm({ ...createForm, telefono: e.target.value })} />
