@@ -1,24 +1,27 @@
 .card {
   background-color: var(--color-surface);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-xs);
   border: 1px solid var(--color-border);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 .card-header {
-  padding: 1.25rem;
+  padding: 1rem 1.125rem;
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: var(--color-surface);
 }
 .card-header h1, .card-header h2, .card-header h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 650;
 }
 .card-body {
-  padding: 1.25rem;
+  padding: 1.125rem;
   flex-grow: 1;
 }

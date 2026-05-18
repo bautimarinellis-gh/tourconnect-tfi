@@ -1,7 +1,9 @@
 .auth-layout {
   display: flex;
   min-height: 100vh;
-  background-color: var(--color-bg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(246, 247, 249, 0.3)),
+    var(--color-bg);
 }
 
 .auth-layout.single-col {
@@ -27,14 +29,16 @@
   background-color: var(--color-surface);
   padding: 2.5rem;
   border-radius: var(--radius);
-  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 .auth-logo {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 800;
   color: var(--color-primary);
   margin-bottom: 2rem;
+  letter-spacing: 0;
 }
 .auth-logo.center {
   text-align: center;
@@ -42,6 +46,7 @@
 
 .auth-title {
   font-size: 1.5rem;
+  line-height: 2rem;
   margin-bottom: 0.5rem;
   color: var(--color-text);
   font-weight: 700;
@@ -50,6 +55,7 @@
 .auth-subtitle {
   color: var(--color-text-soft);
   font-size: 0.875rem;
+  line-height: 1.4rem;
   margin-bottom: 1.5rem;
 }
 
@@ -72,6 +78,7 @@
 .auth-link {
   font-size: 0.75rem;
   font-weight: 500;
+  color: var(--color-primary);
 }
 
 .w-full {
@@ -106,7 +113,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(15, 23, 42, 0.8), rgba(15, 23, 42, 0.2));
+  background: linear-gradient(90deg, rgba(16, 24, 40, 0.78), rgba(16, 24, 40, 0.28));
 }
 
 .auth-quote {
@@ -119,14 +126,25 @@
 }
 
 .auth-quote h2 {
-  font-size: 2.5rem;
+  font-size: clamp(2rem, 3vw, 2.75rem);
   color: white;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  line-height: 1.2;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  line-height: 1.15;
 }
 
 .auth-quote p {
-  font-size: 1.125rem;
+  font-size: 1rem;
   opacity: 0.9;
+}
+
+@media (max-width: 520px) {
+  .auth-layout.single-col,
+  .auth-form-container {
+    padding: 1rem;
+  }
+
+  .auth-form-box {
+    padding: 1.5rem;
+  }
 }

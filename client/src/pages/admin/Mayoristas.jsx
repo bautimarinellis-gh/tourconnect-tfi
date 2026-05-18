@@ -10,22 +10,56 @@ import { Input } from '../../components/ui/Input';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
+import { useToast } from '../../components/ui/Toast';
 import mayoristaService from '../../services/mayoristaService';
 
+const SUBSCRIPTION_PLANS = [
+  { value: 'Starter', label: 'Starter', description: 'Hasta 20 agencias' },
+  { value: 'Professional', label: 'Professional', description: '21 a 100 agencias' },
+  { value: 'Enterprise', label: 'Enterprise', description: 'Más de 100 agencias' },
+];
+
+const SubscriptionPlanSelect = ({ label, value, onChange }) => (
+  <div className="input-group">
+    <label className="input-label">{label}</label>
+    <select className="input-control" value={value} onChange={onChange}>
+      {SUBSCRIPTION_PLANS.map(plan => (
+        <option key={plan.value} value={plan.value}>
+          {plan.label} - {plan.description}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+const getErrorMessage = (err, fallback) => {
+  const data = err?.response?.data;
+  if (Array.isArray(data?.errors) && data.errors.length > 0) {
+    return data.errors.join(' ');
+  }
+  return data?.message || data?.mensaje || fallback;
+};
+
 export const AdminMayoristas = () => {
+  const toast = useToast();
   const [mayoristas, setMayoristas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMayorista, setEditingMayorista] = useState(null);
-  const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', cuit: '', plan_suscripcion: '', activo: true });
+  const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', cuit: '', plan_suscripcion: 'Starter', activo: true });
   const [deletingMayorista, setDeletingMayorista] = useState(null);
   const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
   const [activarPassword, setActivarPassword] = useState('');
   const [formData, setFormData] = useState({
-    nombre: '', razon_social: '', cuit: '', plan_suscripcion: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: ''
+    nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: ''
   });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const showFormError = (message) => {
+    setFormError(message);
+    toast.error(message);
+  };
 
   const fetchMayoristas = async () => {
     setLoading(true);
@@ -46,7 +80,7 @@ export const AdminMayoristas = () => {
   const handleCreate = async () => {
     setFormError('');
     if (!formData.nombre || !formData.cuit || !formData.admin_email || !formData.admin_password) {
-      setFormError('Nombre, CUIT, email y contraseña del administrador son obligatorios.');
+      showFormError('Nombre, CUIT, email y contraseña del administrador son obligatorios.');
       return;
     }
     setSaving(true);
@@ -56,17 +90,17 @@ export const AdminMayoristas = () => {
         razon_social: formData.razon_social || formData.nombre,
         telefono: formData.telefono || undefined,
         cuit: formData.cuit,
-        plan_suscripcion: formData.plan_suscripcion || undefined,
+        plan_suscripcion: formData.plan_suscripcion,
         email: formData.admin_email,
         nombre_usuario: formData.admin_nombre || formData.admin_email.split('@')[0],
         password: formData.admin_password || undefined,
       };
       await mayoristaService.create(payload);
       setIsModalOpen(false);
-      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
+      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
       fetchMayoristas();
     } catch (err) {
-      setFormError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al crear mayorista');
+      showFormError(getErrorMessage(err, 'Error al crear mayorista'));
     } finally {
       setSaving(false);
     }
@@ -79,7 +113,7 @@ export const AdminMayoristas = () => {
       razon_social: m.razon_social || '',
       telefono: m.telefono || '',
       cuit: m.cuit || '',
-      plan_suscripcion: m.plan_suscripcion || '',
+      plan_suscripcion: m.plan_suscripcion || 'Starter',
       activo: m.activo !== false,
     });
     setFormError('');
@@ -89,7 +123,7 @@ export const AdminMayoristas = () => {
     if (!editingMayorista) return;
     setFormError('');
     if (!editFormData.nombre) {
-      setFormError('El nombre es obligatorio.');
+      showFormError('El nombre es obligatorio.');
       return;
     }
     setSaving(true);
@@ -99,13 +133,13 @@ export const AdminMayoristas = () => {
         razon_social: editFormData.razon_social?.trim() || editFormData.nombre,
         telefono: editFormData.telefono || null,
         cuit: editFormData.cuit,
-        plan_suscripcion: editFormData.plan_suscripcion || null,
+        plan_suscripcion: editFormData.plan_suscripcion,
         activo: Boolean(editFormData.activo),
       });
       setEditingMayorista(null);
       fetchMayoristas();
     } catch (err) {
-      setFormError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al actualizar mayorista');
+      showFormError(getErrorMessage(err, 'Error al actualizar mayorista'));
     } finally {
       setSaving(false);
     }
@@ -118,7 +152,7 @@ export const AdminMayoristas = () => {
   const handleConfirmarActivarUsuario = async () => {
     if (!activarUsuarioMayorista) return;
     if (!activarPassword || activarPassword.trim().length < 8) {
-      setFormError('La contraseña debe tener al menos 8 caracteres.');
+      showFormError('La contraseña debe tener al menos 8 caracteres.');
       return;
     }
     setFormError('');
@@ -129,7 +163,7 @@ export const AdminMayoristas = () => {
       setActivarPassword('');
       fetchMayoristas();
     } catch (err) {
-      setFormError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al activar usuario');
+      showFormError(getErrorMessage(err, 'Error al activar usuario'));
     } finally {
       setSaving(false);
     }
@@ -144,7 +178,7 @@ export const AdminMayoristas = () => {
       setDeletingMayorista(null);
       fetchMayoristas();
     } catch (err) {
-      setFormError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al eliminar mayorista');
+      showFormError(getErrorMessage(err, 'Error al eliminar mayorista'));
     } finally {
       setSaving(false);
     }
@@ -223,7 +257,7 @@ export const AdminMayoristas = () => {
         <Input label="Razón Social" value={formData.razon_social} onChange={e => setFormData({...formData, razon_social: e.target.value})} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <Input label="CUIT *" value={formData.cuit} onChange={e => setFormData({ ...formData, cuit: e.target.value })} />
-          <Input label="Plan de suscripción" value={formData.plan_suscripcion} onChange={e => setFormData({ ...formData, plan_suscripcion: e.target.value })} />
+          <SubscriptionPlanSelect label="Plan de suscripción" value={formData.plan_suscripcion} onChange={e => setFormData({ ...formData, plan_suscripcion: e.target.value })} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <Input label="Email de Contacto" type="email" value={formData.email_contacto} onChange={e => setFormData({...formData, email_contacto: e.target.value})} />
@@ -252,7 +286,7 @@ export const AdminMayoristas = () => {
           <Input label="Nombre de Fantasía *" value={editFormData.nombre} onChange={e => setEditFormData({...editFormData, nombre: e.target.value})} />
           <Input label="Razón Social" value={editFormData.razon_social} onChange={e => setEditFormData({...editFormData, razon_social: e.target.value})} />
           <Input label="CUIT *" value={editFormData.cuit} onChange={e => setEditFormData({...editFormData, cuit: e.target.value})} />
-          <Input label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({...editFormData, plan_suscripcion: e.target.value})} />
+          <SubscriptionPlanSelect label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({...editFormData, plan_suscripcion: e.target.value})} />
           <Input label="Teléfono" value={editFormData.telefono} onChange={e => setEditFormData({...editFormData, telefono: e.target.value})} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <input

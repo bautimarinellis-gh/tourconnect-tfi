@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, User, Menu } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import './layout.css';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);

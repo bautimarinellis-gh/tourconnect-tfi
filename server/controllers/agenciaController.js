@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const Agencia = require('../models/Agencia');
+const Mayorista = require('../models/Mayorista');
 const Usuario = require('../models/Usuario');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Cotizacion = require('../models/Cotizacion');
 const Reserva = require('../models/Reserva');
 const { enviarInvitacion } = require('../utils/mailer');
+const { getSubscriptionPlan } = require('../utils/subscriptionPlans');
 
 /**
  * @route   GET /api/v1/agencias
@@ -51,6 +53,33 @@ exports.createAgencia = async (req, res, next) => {
   try {
     const { nombre, razon_social, telefono, cuit, email, nombre_usuario, password } = req.body;
     const mayoristaId = req.usuario.mayorista_id;
+
+    const mayorista = await Mayorista.findById(mayoristaId).session(session);
+    if (!mayorista) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: 'Mayorista no encontrado.',
+      });
+    }
+
+    const plan = getSubscriptionPlan(mayorista.plan_suscripcion);
+    if (plan.maxAgencias !== null) {
+      const agenciasActivas = await Agencia.countDocuments({
+        mayorista_id: mayoristaId,
+        activo: true,
+      }).session(session);
+
+      if (agenciasActivas >= plan.maxAgencias) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({
+          success: false,
+          message: `El plan ${plan.label} permite crear hasta ${plan.maxAgencias} agencias. Actualizá el plan para agregar más agencias.`,
+        });
+      }
+    }
 
     // 1. Verificar si el email ya existe
     const usuarioExistente = await Usuario.findOne({ email }).session(session);

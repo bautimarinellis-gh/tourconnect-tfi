@@ -7,6 +7,15 @@ const Reserva = require('../models/Reserva');
 const Producto = require('../models/Producto');
 const Cotizacion = require('../models/Cotizacion');
 const { enviarEmail } = require('../utils/mailer');
+const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
+
+const validarPlanSuscripcion = (plan) => {
+  if (!SUBSCRIPTION_PLAN_NAMES.includes(plan)) {
+    const error = new Error('El plan de suscripción no es válido');
+    error.statusCode = 400;
+    throw error;
+  }
+};
 
 /**
  * @desc    Obtener lista de mayoristas con KPIs
@@ -64,11 +73,14 @@ exports.getMayoristas = async (req, res, next) => {
  */
 exports.crearMayorista = async (req, res, next) => {
   const { nombre, razon_social, telefono, cuit, plan_suscripcion, email, nombre_usuario, password } = req.body;
+  const planSuscripcion = plan_suscripcion || 'Starter';
 
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    validarPlanSuscripcion(planSuscripcion);
+
     // 1. Verificar si el email ya existe
     const existeUsuario = await Usuario.findOne({ email }).session(session);
     if (existeUsuario) {
@@ -108,7 +120,7 @@ exports.crearMayorista = async (req, res, next) => {
       razon_social,
       telefono,
       cuit,
-      plan_suscripcion: plan_suscripcion || null,
+      plan_suscripcion: planSuscripcion,
       activo: true,
     });
     await nuevoMayorista.save({ session });
@@ -199,7 +211,11 @@ exports.updateMayorista = async (req, res, next) => {
     }
     if (telefono !== undefined) updateFields.telefono = telefono || null;
     if (cuit !== undefined) updateFields.cuit = cuit;
-    if (plan_suscripcion !== undefined) updateFields.plan_suscripcion = plan_suscripcion || null;
+    if (plan_suscripcion !== undefined) {
+      const planSuscripcion = plan_suscripcion || 'Starter';
+      validarPlanSuscripcion(planSuscripcion);
+      updateFields.plan_suscripcion = planSuscripcion;
+    }
     if (typeof activoBool === 'boolean') updateFields.activo = activoBool;
 
     const mayorista = await Mayorista.findByIdAndUpdate(

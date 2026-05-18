@@ -4,13 +4,13 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(15, 23, 42, 0.5);
+  background-color: rgba(16, 24, 40, 0.52);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 1rem;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
   animation: fadeIn 0.2s ease-out;
 }
 
@@ -18,8 +18,9 @@
   background-color: var(--color-surface);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.75);
   width: 100%;
-  max-width: 500px;
+  max-width: 560px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -27,7 +28,7 @@
 }
 
 .modal-header {
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
@@ -36,8 +37,9 @@
 
 .modal-title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 650;
 }
 
 .modal-close-btn {
@@ -45,7 +47,9 @@
   border: none;
   color: var(--color-text-soft);
   cursor: pointer;
-  padding: 0.25rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -54,22 +58,22 @@
 }
 
 .modal-close-btn:hover {
-  background-color: var(--color-bg);
+  background-color: var(--color-surface-subtle);
   color: var(--color-text);
 }
 
 .modal-body {
-  padding: 1.5rem;
+  padding: 1.25rem;
   overflow-y: auto;
 }
 
 .modal-footer {
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   border-top: 1px solid var(--color-border);
   display: flex;
   justify-content: flex-end;
   gap: 0.75rem;
-  background-color: var(--color-bg);
+  background-color: var(--color-surface-subtle);
   border-bottom-left-radius: var(--radius);
   border-bottom-right-radius: var(--radius);
 }

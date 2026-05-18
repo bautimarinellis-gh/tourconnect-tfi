@@ -1,28 +1,29 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.5rem;
+  padding: 0.1875rem 0.5rem;
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: 9999px;
   line-height: 1;
   white-space: nowrap;
+  border: 1px solid transparent;
 }
-.badge-info { background-color: #DBEAFE; color: #1E40AF; } /* primary light */
-.badge-success { background-color: #DCFCE7; color: #166534; }
-.badge-error { background-color: #FEE2E2; color: #991B1B; }
-.badge-warning { background-color: #FEF3C7; color: #92400E; }
+.badge-info { background-color: var(--color-info-soft); color: #1F3F8B; border-color: #D8E6FF; }
+.badge-success { background-color: var(--color-success-soft); color: var(--color-success); border-color: #BFEAD6; }
+.badge-error { background-color: var(--color-error-soft); color: var(--color-error); border-color: #F8C9C4; }
+.badge-warning { background-color: var(--color-warning-soft); color: var(--color-warning); border-color: #FAD8A6; }
 
 /* Estados de Cotización */
-.badge-pendiente        { background-color: #FEF3C7; color: #92400E; }   /* amber */
-.badge-aprobada         { background-color: #DCFCE7; color: #166534; }   /* emerald */
-.badge-rechazada        { background-color: #FEE2E2; color: #991B1B; }   /* red */
-.badge-vencida          { background-color: #F3F4F6; color: #374151; }   /* slate */
-.badge-cancelada        { background-color: #F3F4F6; color: #374151; }   /* slate */
-.badge-reserva_generada { background-color: #DBEAFE; color: #1E40AF; }   /* blue */
+.badge-pendiente        { background-color: var(--color-warning-soft); color: var(--color-warning); border-color: #FAD8A6; }
+.badge-aprobada         { background-color: var(--color-success-soft); color: var(--color-success); border-color: #BFEAD6; }
+.badge-rechazada        { background-color: var(--color-error-soft); color: var(--color-error); border-color: #F8C9C4; }
+.badge-vencida          { background-color: #F2F4F7; color: #475467; border-color: #EAECF0; }
+.badge-cancelada        { background-color: #F2F4F7; color: #475467; border-color: #EAECF0; }
+.badge-reserva_generada { background-color: var(--color-info-soft); color: #1F3F8B; border-color: #D8E6FF; }
 
 /* Estados de Reserva */
-.badge-pendiente_pago   { background-color: #FEF3C7; color: #92400E; }   /* amber */
-.badge-pago_informado   { background-color: #FED7AA; color: #9A3412; }   /* naranja */
-.badge-pagada           { background-color: #DCFCE7; color: #166534; }   /* emerald */
-.badge-cerrada          { background-color: #E0E7FF; color: #3730A3; }   /* blue/indigo */
+.badge-pendiente_pago   { background-color: var(--color-warning-soft); color: var(--color-warning); border-color: #FAD8A6; }
+.badge-pago_informado   { background-color: #FFF1E8; color: #A94A12; border-color: #FFD7BA; }
+.badge-pagada           { background-color: var(--color-success-soft); color: var(--color-success); border-color: #BFEAD6; }
+.badge-cerrada          { background-color: #EEF2FF; color: #3538CD; border-color: #DDE3FF; }
