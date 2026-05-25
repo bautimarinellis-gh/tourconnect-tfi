@@ -2,6 +2,7 @@ const express = require('express');
 const {
   getAdminDashboard,
   getReservasPorMes,
+  getIngresos,
   getIngresosPorAgencia,
   getIngresosPorProducto,
   getRankingAgencias,
@@ -30,6 +31,7 @@ router.use(tenant);
 // ENDPOINTS MAYORISTA (rol: mayorista)
 // ==========================================
 router.get('/reservas', roleCheck(['mayorista']), getReservasPorMes);
+router.get('/ingresos', roleCheck(['mayorista']), getIngresos);
 router.get('/ingresos/agencias', roleCheck(['mayorista']), getIngresosPorAgencia);
 router.get('/ingresos/productos', roleCheck(['mayorista']), getIngresosPorProducto);
 router.get('/agencias/ranking', roleCheck(['mayorista']), getRankingAgencias);

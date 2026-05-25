@@ -12,7 +12,9 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { NumberStepper } from '../../components/ui/NumberStepper';
 import { Alert } from '../../components/ui/Alert';
 import { formatCurrency } from '../../utils/formatters';
+import { applyRangePreset, daysBetween, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
 import productoService from '../../services/productoService';
+import './productos.css';
 
 const INITIAL_FORM = {
   nombre: '',
@@ -32,9 +34,22 @@ const INITIAL_FORM = {
   paquete_itinerario: '',
 };
 
-const toDateInput = (val) => {
-  if (!val) return '';
-  return val.split('T')[0];
+const PRODUCT_DATE_PRESETS = [
+  { label: '30 días', days: 30 },
+  { label: '60 días', days: 60 },
+  { label: '90 días', days: 90 },
+  { label: '6 meses', months: 6 },
+  { label: '1 año', months: 12 },
+];
+
+const getAvailabilitySummary = (form) => {
+  if (!form.disponibilidad_desde || !form.disponibilidad_hasta) {
+    return 'Elegí un rango de disponibilidad para publicar el producto.';
+  }
+
+  const days = daysBetween(form.disponibilidad_desde, form.disponibilidad_hasta);
+  if (days === null || days < 0) return 'Rango inválido: la fecha final debe ser igual o posterior al inicio.';
+  return `Disponible por ${days} día${days !== 1 ? 's' : ''}.`;
 };
 
 export const MayoristaProductos = () => {
@@ -123,6 +138,10 @@ export const MayoristaProductos = () => {
       setFormError('Las fechas de disponibilidad son obligatorias.');
       return;
     }
+    if (!isValidDateRange(formData.disponibilidad_desde, formData.disponibilidad_hasta)) {
+      setFormError('La fecha de disponibilidad final debe ser igual o posterior a la inicial.');
+      return;
+    }
     setSaving(true);
     try {
       await productoService.create(buildPayload(tipoProducto, formData));
@@ -143,8 +162,8 @@ export const MayoristaProductos = () => {
       nombre: p.nombre || '',
       descripcion: p.descripcion || '',
       precio_base: p.precio_base ?? '',
-      disponibilidad_desde: toDateInput(p.disponibilidad_desde),
-      disponibilidad_hasta: toDateInput(p.disponibilidad_hasta),
+      disponibilidad_desde: toDateInputValue(p.disponibilidad_desde),
+      disponibilidad_hasta: toDateInputValue(p.disponibilidad_hasta),
       dias_antelacion: p.dias_antelacion ?? 1,
       hotel_ciudad: p.ciudad || '',
       hotel_direccion: p.direccion || '',
@@ -165,6 +184,10 @@ export const MayoristaProductos = () => {
     }
     if (!editForm.disponibilidad_desde || !editForm.disponibilidad_hasta) {
       setEditError('Las fechas de disponibilidad son obligatorias.');
+      return;
+    }
+    if (!isValidDateRange(editForm.disponibilidad_desde, editForm.disponibilidad_hasta)) {
+      setEditError('La fecha de disponibilidad final debe ser igual o posterior a la inicial.');
       return;
     }
     setEditSaving(true);
@@ -223,6 +246,64 @@ export const MayoristaProductos = () => {
   };
 
   const tipoLabel = { hotel: 'Hotel', actividad: 'Actividad', paquete: 'Paquete' };
+
+  const applyProductPreset = (preset, mode = 'create') => {
+    const currentForm = mode === 'edit' ? editForm : formData;
+    const update = mode === 'edit' ? setEditForm : setFormData;
+    const range = applyRangePreset({
+      startInput: currentForm.disponibilidad_desde,
+      days: preset.days,
+      months: preset.months,
+      fallbackStart: todayDateInput(),
+    });
+
+    update(prev => ({
+      ...prev,
+      disponibilidad_desde: range.start,
+      disponibilidad_hasta: range.end,
+    }));
+  };
+
+  const renderAvailabilityFields = (form, onSet, mode = 'create') => {
+    const invalidRange =
+      form.disponibilidad_desde &&
+      form.disponibilidad_hasta &&
+      !isValidDateRange(form.disponibilidad_desde, form.disponibilidad_hasta);
+
+    return (
+      <div className={`availability-box ${invalidRange ? 'availability-box-error' : ''}`}>
+        <div className="availability-header">
+          <div>
+            <h4>Disponibilidad</h4>
+            <p>{getAvailabilitySummary(form)}</p>
+          </div>
+          <CalendarIcon size={18} />
+        </div>
+        <div className="availability-grid">
+          <Input
+            label="Disponible desde *"
+            type="date"
+            value={form.disponibilidad_desde}
+            onChange={e => onSet('disponibilidad_desde', e.target.value)}
+          />
+          <Input
+            label="Disponible hasta *"
+            type="date"
+            min={form.disponibilidad_desde || undefined}
+            value={form.disponibilidad_hasta}
+            onChange={e => onSet('disponibilidad_hasta', e.target.value)}
+          />
+        </div>
+        <div className="availability-presets">
+          {PRODUCT_DATE_PRESETS.map(preset => (
+            <button key={preset.label} type="button" onClick={() => applyProductPreset(preset, mode)}>
+              {preset.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   if (loading && productos.length === 0) return <Spinner center size="lg" />;
 
@@ -318,10 +399,7 @@ export const MayoristaProductos = () => {
         <Input label="Nombre *" value={formData.nombre} onChange={e => set('nombre', e.target.value)} />
         <Textarea label="Descripción *" rows={3} value={formData.descripcion} onChange={e => set('descripcion', e.target.value)} />
         <Input label="Precio Base (USD) *" type="number" min="0" value={formData.precio_base} onChange={e => set('precio_base', e.target.value)} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input label="Disponible desde *" type="date" value={formData.disponibilidad_desde} onChange={e => set('disponibilidad_desde', e.target.value)} />
-          <Input label="Disponible hasta *" type="date" value={formData.disponibilidad_hasta} onChange={e => set('disponibilidad_hasta', e.target.value)} />
-        </div>
+        {renderAvailabilityFields(formData, set, 'create')}
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
           {tipoProducto === 'hotel' && (
@@ -433,10 +511,7 @@ export const MayoristaProductos = () => {
           Las cotizaciones ya realizadas no se verán afectadas por este cambio.
         </Alert>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input label="Disponible desde *" type="date" value={editForm.disponibilidad_desde} onChange={e => setEdit('disponibilidad_desde', e.target.value)} />
-          <Input label="Disponible hasta *" type="date" value={editForm.disponibilidad_hasta} onChange={e => setEdit('disponibilidad_hasta', e.target.value)} />
-        </div>
+        {renderAvailabilityFields(editForm, setEdit, 'edit')}
 
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>

@@ -1,18 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar } from 'lucide-react';
+import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar, Minus, Plus } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
-import { Modal } from '../../components/ui/Modal';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
+import { addDays, applyRangePreset, daysBetween, isValidDateRange, toDateInputValue } from '../../utils/dateRanges';
 import productoService from '../../services/productoService';
 import cotizacionService from '../../services/cotizacionService';
 import { useToast } from '../../components/ui/Toast';
+import './catalogo.css';
+
+const QUOTE_DURATION_PRESETS = [
+  { label: '1 día', days: 1 },
+  { label: '3 días', days: 3 },
+  { label: '7 días', days: 7 },
+  { label: '14 días', days: 14 },
+];
 
 export const AgenciaCatalogo = () => {
   const toast = useToast();
@@ -20,8 +28,6 @@ export const AgenciaCatalogo = () => {
   const [loading, setLoading] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState('');
 
-  // Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -51,7 +57,7 @@ export const AgenciaCatalogo = () => {
       toast.error('Debe completar las fechas y la cantidad de pasajeros.');
       return;
     }
-    if (new Date(formData.fecha_inicio) > new Date(formData.fecha_fin)) {
+    if (!isValidDateRange(formData.fecha_inicio, formData.fecha_fin, { allowSameDay: false })) {
       toast.error('La fecha de inicio debe ser anterior a la fecha de fin.');
       return;
     }
@@ -64,7 +70,6 @@ export const AgenciaCatalogo = () => {
         pasajeros:    formData.cantidad_pasajeros,
       });
       toast.success('Cotización generada exitosamente. El mayorista la revisará pronto.');
-      setIsModalOpen(false);
       setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.mensaje || 'Error al generar la cotización.');
@@ -73,10 +78,9 @@ export const AgenciaCatalogo = () => {
     }
   };
 
-  const openQuoteModal = (producto) => {
+  const selectProduct = (producto) => {
     setSelectedProduct(producto);
     setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
-    setIsModalOpen(true);
   };
 
   const getIconForType = (tipo) => {
@@ -86,19 +90,13 @@ export const AgenciaCatalogo = () => {
     return <Tag />;
   };
 
-  // Convierte un Date/string ISO a "YYYY-MM-DD" para min/max de <input type="date">
-  const toDateInputValue = (val) => {
-    if (!val) return '';
-    return String(val).split('T')[0];
-  };
-
   if (loading && productos.length === 0) return <Spinner center size="lg" />;
 
+  const minDisponible = toDateInputValue(selectedProduct?.disponibilidad_desde);
+  const maxDisponible = toDateInputValue(selectedProduct?.disponibilidad_hasta);
   const cantidadNoches =
     formData.fecha_inicio && formData.fecha_fin
-      ? Math.round(
-          (new Date(formData.fecha_fin) - new Date(formData.fecha_inicio)) / 86400000
-        )
+      ? daysBetween(formData.fecha_inicio, formData.fecha_fin)
       : 0;
 
   const precioFinalEstimado =
@@ -106,14 +104,40 @@ export const AgenciaCatalogo = () => {
       ? selectedProduct.precio_final * cantidadNoches * formData.cantidad_pasajeros
       : 0;
 
+  const canApplyDurationPreset = (days) => {
+    if (!selectedProduct || !maxDisponible) return false;
+    const start = formData.fecha_inicio || minDisponible;
+    const end = addDays(start, days);
+    return Boolean(start && end && end <= maxDisponible);
+  };
+
+  const applyDurationPreset = (days) => {
+    if (!selectedProduct || !canApplyDurationPreset(days)) return;
+    const range = applyRangePreset({
+      startInput: formData.fecha_inicio,
+      days,
+      fallbackStart: minDisponible,
+      maxEnd: maxDisponible,
+    });
+    setFormData(prev => ({
+      ...prev,
+      fecha_inicio: range.start,
+      fecha_fin: range.end,
+    }));
+  };
+
   return (
-    <div>
+    <div className="catalog-page">
       <div className="page-header">
-        <h1 className="page-title">Catálogo de Experiencias</h1>
+        <div>
+          <p className="page-kicker">Experiencias disponibles</p>
+          <h1 className="page-title">Catálogo</h1>
+        </div>
       </div>
 
-      <div style={{ marginBottom: '2rem', maxWidth: '300px' }}>
+      <div className="toolbar-row catalog-toolbar">
         <Select
+          className="catalog-filter"
           value={filtroTipo}
           onChange={e => setFiltroTipo(e.target.value)}
           options={[
@@ -128,112 +152,133 @@ export const AgenciaCatalogo = () => {
       {productos.length === 0 ? (
         <EmptyState title="Catálogo vacío" description="Su mayorista aún no ha habilitado productos para su agencia." />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2rem' }}>
-          {productos.map(p => (
-            <Card key={p._id} style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', border: 'none', boxShadow: 'var(--shadow-md)' }}>
-              <div style={{ height: '160px', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8' }}>
-                <img
-                  src={`https://images.unsplash.com/photo-${p.tipo === 'hotel' ? '1566073771506-d2df80738e4a' : p.tipo === 'actividad' ? '1520625340621-c4fc7ae046f1' : '1436491865332-7a61a109cc05'}?q=80&w=800&auto=format&fit=crop`}
-                  alt={p.nombre}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+        <div className="catalog-shell">
+          <Card className="catalog-list-card">
+            <div className="catalog-search-row">
+              <span className="catalog-search-icon"><ShoppingCart size={16} /></span>
+              <span>Seleccioná una experiencia para cotizar</span>
+            </div>
+            <div className="catalog-list">
+              {productos.map(p => {
+                const active = selectedProduct?._id === p._id;
+                return (
+                  <button
+                    key={p._id}
+                    type="button"
+                    className={`catalog-item ${active ? 'active' : ''}`}
+                    onClick={() => selectProduct(p)}
+                  >
+                    <span className="catalog-item-thumb">{getIconForType(p.tipo)}</span>
+                    <span className="catalog-item-main">
+                      <span className="catalog-item-title">{p.nombre}</span>
+                      <span className="catalog-item-meta">
+                        <Badge variant="info" style={{ textTransform: 'capitalize' }}>{p.tipo}</Badge>
+                        <span><Calendar size={12} /> {formatDate(p.disponibilidad_desde)}</span>
+                      </span>
+                    </span>
+                    <span className="catalog-item-price">{formatCurrency(p.precio_final)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card className="quote-panel">
+            <CardBody>
+              <div className="quote-panel-header">
+                <div>
+                  <p className="page-kicker">Cotización</p>
+                  <h2>{selectedProduct?.nombre || 'Seleccioná un producto'}</h2>
+                </div>
+                {selectedProduct && <span className="metric-icon">{getIconForType(selectedProduct.tipo)}</span>}
               </div>
-              <CardBody style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, padding: '1.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                  <Badge variant="info" style={{ textTransform: 'capitalize' }}>{p.tipo}</Badge>
-                  <div style={{ color: 'var(--color-primary)' }}>{getIconForType(p.tipo)}</div>
-                </div>
-                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>{p.nombre}</h3>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.75rem', flexGrow: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {p.descripcion}
-                </p>
-                {/* Disponibilidad */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--color-text-soft)', marginBottom: '1rem' }}>
-                  <Calendar size={12} />
-                  <span>Disponible: {formatDate(p.disponibilidad_desde)} — {formatDate(p.disponibilidad_hasta)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
-                  <div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>Precio Final p/ pax</span>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>{formatCurrency(p.precio_final)}</div>
+
+              {selectedProduct ? (
+                <>
+                  <p className="quote-description">{selectedProduct.descripcion}</p>
+                  <div className="quote-info-row">
+                    <span>Precio por pasajero</span>
+                    <strong>{formatCurrency(selectedProduct.precio_final)}</strong>
                   </div>
-                  <Button onClick={() => openQuoteModal(p)}>
-                    <ShoppingCart size={16} /> Cotizar
+                  <Alert variant="info">
+                    Disponible del <strong>{formatDate(selectedProduct.disponibilidad_desde)}</strong> al <strong>{formatDate(selectedProduct.disponibilidad_hasta)}</strong>.
+                  </Alert>
+                  <div className="quote-form-grid">
+                    <Input
+                      type="date"
+                      label="Inicio"
+                      min={minDisponible}
+                      max={maxDisponible}
+                      value={formData.fecha_inicio}
+                      onChange={e => setFormData({ ...formData, fecha_inicio: e.target.value })}
+                    />
+                    <Input
+                      type="date"
+                      label="Fin"
+                      min={formData.fecha_inicio || minDisponible}
+                      max={maxDisponible}
+                      value={formData.fecha_fin}
+                      onChange={e => setFormData({ ...formData, fecha_fin: e.target.value })}
+                    />
+                  </div>
+                  <div className="quote-duration-presets" aria-label="Duración de la cotización">
+                    {QUOTE_DURATION_PRESETS.map(preset => {
+                      const disabled = !canApplyDurationPreset(preset.days);
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => applyDurationPreset(preset.days)}
+                          title={disabled ? 'Fuera de la disponibilidad del producto' : preset.label}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="quote-stepper-row">
+                    <span>Pasajeros</span>
+                    <div className="quote-stepper">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, cantidad_pasajeros: Math.max(1, formData.cantidad_pasajeros - 1) })}
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <strong>{formData.cantidad_pasajeros}</strong>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, cantidad_pasajeros: formData.cantidad_pasajeros + 1 })}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="quote-total-row">
+                    <span>Total estimado</span>
+                    <strong>{formatCurrency(precioFinalEstimado)}</strong>
+                  </div>
+                  {cantidadNoches > 0 && (
+                    <p className="quote-breakdown">
+                      {formatCurrency(selectedProduct?.precio_final)} x {cantidadNoches} noche{cantidadNoches !== 1 ? 's' : ''} x {formData.cantidad_pasajeros} pax
+                    </p>
+                  )}
+                  <Button className="w-full" size="lg" onClick={handleCotizar} isLoading={actionLoading}>
+                    <ShoppingCart size={16} /> Confirmar cotización
                   </Button>
+                </>
+              ) : (
+                <div className="quote-empty">
+                  <ShoppingCart size={22} />
+                  <p>Elegí una experiencia de la lista para ver fechas, pasajeros y total estimado.</p>
                 </div>
-              </CardBody>
-            </Card>
-          ))}
+              )}
+            </CardBody>
+          </Card>
         </div>
       )}
 
-      {/* Modal Cotización */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Crear Cotización"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button onClick={handleCotizar} isLoading={actionLoading}>Confirmar Cotización</Button>
-          </>
-        }
-      >
-        {selectedProduct && (
-          <>
-            <div style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
-              <h4 style={{ margin: '0 0 0.5rem 0' }}>{selectedProduct.nombre}</h4>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Precio Unitario:</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(selectedProduct.precio_final)}</span>
-              </div>
-            </div>
-
-            <Alert variant="info" style={{ marginBottom: '1rem' }}>
-              Disponible del <strong>{formatDate(selectedProduct.disponibilidad_desde)}</strong> al <strong>{formatDate(selectedProduct.disponibilidad_hasta)}</strong>.
-            </Alert>
-          </>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input
-            type="date"
-            label="Fecha Inicio *"
-            min={toDateInputValue(selectedProduct?.disponibilidad_desde)}
-            max={toDateInputValue(selectedProduct?.disponibilidad_hasta)}
-            value={formData.fecha_inicio}
-            onChange={e => setFormData({ ...formData, fecha_inicio: e.target.value })}
-          />
-          <Input
-            type="date"
-            label="Fecha Fin *"
-            min={toDateInputValue(selectedProduct?.disponibilidad_desde)}
-            max={toDateInputValue(selectedProduct?.disponibilidad_hasta)}
-            value={formData.fecha_fin}
-            onChange={e => setFormData({ ...formData, fecha_fin: e.target.value })}
-          />
-        </div>
-        <Input
-          type="number"
-          min="1"
-          label="Cantidad de Pasajeros *"
-          value={formData.cantidad_pasajeros}
-          onChange={e => setFormData({ ...formData, cantidad_pasajeros: Number(e.target.value) })}
-        />
-        <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 600 }}>Total Estimado:</span>
-            <span style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-              {formatCurrency(precioFinalEstimado)}
-            </span>
-          </div>
-          {cantidadNoches > 0 && (
-            <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: 'var(--color-text-soft)', textAlign: 'right' }}>
-              {formatCurrency(selectedProduct?.precio_final)} × {cantidadNoches} noche{cantidadNoches !== 1 ? 's' : ''} × {formData.cantidad_pasajeros} pax
-            </p>
-          )}
-        </div>
-      </Modal>
     </div>
   );
 };

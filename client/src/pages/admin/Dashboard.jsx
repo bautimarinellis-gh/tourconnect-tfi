@@ -5,6 +5,7 @@ import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import reporteService from '../../services/reporteService';
+import '../mayorista/dashboard.css';
 
 export const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -30,59 +31,62 @@ export const AdminDashboard = () => {
   if (loading) return <Spinner center size="lg" />;
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">Dashboard Admin</h1>
+    <div className="dashboard-page">
+      <div className="page-header dashboard-heading">
+        <div>
+          <p className="page-kicker">Administración</p>
+          <h1 className="page-title">Dashboard Admin</h1>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-        <Card>
-          <CardBody style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '1rem', backgroundColor: '#E0E7FF', borderRadius: '50%', color: '#3730A3' }}>
-              <Building2 size={24} />
-            </div>
+      <div className="dashboard-kpi-grid">
+        <Card className="metric-card">
+          <CardBody>
+            <div className="dashboard-kpi-top">
             <div>
-              <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>Total Mayoristas</p>
-              <h3 style={{ margin: 0, fontSize: '1.5rem' }}>{data.kpis?.mayoristas || 0}</h3>
+              <p className="metric-label">Total Mayoristas</p>
+              <h3 className="metric-value">{data.kpis?.mayoristas || 0}</h3>
+            </div>
+            <div className="metric-icon"><Building2 size={18} /></div>
             </div>
           </CardBody>
         </Card>
-        <Card>
-          <CardBody style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '1rem', backgroundColor: '#DCFCE7', borderRadius: '50%', color: '#166534' }}>
-              <Users size={24} />
-            </div>
+        <Card className="metric-card">
+          <CardBody>
+            <div className="dashboard-kpi-top">
             <div>
-              <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>Total Agencias</p>
-              <h3 style={{ margin: 0, fontSize: '1.5rem' }}>{data.kpis?.agencias || 0}</h3>
+              <p className="metric-label">Total Agencias</p>
+              <h3 className="metric-value">{data.kpis?.agencias || 0}</h3>
+            </div>
+            <div className="metric-icon"><Users size={18} /></div>
             </div>
           </CardBody>
         </Card>
-        <Card>
-          <CardBody style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '1rem', backgroundColor: '#FEF3C7', borderRadius: '50%', color: '#92400E' }}>
-              <FileText size={24} />
-            </div>
+        <Card className="metric-card">
+          <CardBody>
+            <div className="dashboard-kpi-top">
             <div>
-              <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>Cotizaciones Pendientes</p>
-              <h3 style={{ margin: 0, fontSize: '1.5rem' }}>{data.kpis?.cotizacionesPendientes || 0}</h3>
+              <p className="metric-label">Cotizaciones Pendientes</p>
+              <h3 className="metric-value">{data.kpis?.cotizacionesPendientes || 0}</h3>
+            </div>
+            <div className="metric-icon"><FileText size={18} /></div>
             </div>
           </CardBody>
         </Card>
-        <Card>
-          <CardBody style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ padding: '1rem', backgroundColor: '#DBEAFE', borderRadius: '50%', color: '#1E40AF' }}>
-              <Calendar size={24} />
-            </div>
+        <Card className="metric-card">
+          <CardBody>
+            <div className="dashboard-kpi-top">
             <div>
-              <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>Total Reservas</p>
-              <h3 style={{ margin: 0, fontSize: '1.5rem' }}>{data.kpis?.reservas || 0}</h3>
+              <p className="metric-label">Total Reservas</p>
+              <h3 className="metric-value">{data.kpis?.reservas || 0}</h3>
+            </div>
+            <div className="metric-icon"><Calendar size={18} /></div>
             </div>
           </CardBody>
         </Card>
       </div>
 
-      <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Últimos Mayoristas Creados</h2>
+      <h2 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Últimos Mayoristas Creados</h2>
       <Table>
         <thead>
           <TableRow>

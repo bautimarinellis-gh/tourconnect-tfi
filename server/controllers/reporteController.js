@@ -9,6 +9,8 @@ const {
   agenciaCollection,
 } = require('../utils/reporteHelpers');
 
+const ESTADOS_INGRESO = ['pago_informado', 'pagada', 'cerrada'];
+
 const getDefaultFechas = (desde, hasta, mesesAtras = 6, paraMesActual = false) => {
   let fechaInicio, fechaFin;
 
@@ -27,6 +29,79 @@ const getDefaultFechas = (desde, hasta, mesesAtras = 6, paraMesActual = false) =
   }
 
   return { fechaInicio, fechaFin };
+};
+
+const pad2 = (value) => String(value).padStart(2, '0');
+
+const parsePeriodoIngresos = (periodo = 'mes', valor) => {
+  const now = new Date();
+  const selected = periodo || 'mes';
+  const defaultValor = selected === 'dia'
+    ? `${now.getUTCFullYear()}-${pad2(now.getUTCMonth() + 1)}-${pad2(now.getUTCDate())}`
+    : selected === 'anio'
+      ? `${now.getUTCFullYear()}`
+      : `${now.getUTCFullYear()}-${pad2(now.getUTCMonth() + 1)}`;
+  const rawValor = valor || defaultValor;
+
+  if (selected === 'dia') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValor)) return null;
+    const [year, month, day] = rawValor.split('-').map(Number);
+    const fechaInicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+    const fechaFin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    if (
+      fechaInicio.getUTCFullYear() !== year ||
+      fechaInicio.getUTCMonth() !== month - 1 ||
+      fechaInicio.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return {
+      periodo: selected,
+      valor: rawValor,
+      fechaInicio,
+      fechaFin,
+      groupId: { $hour: '$created_at' },
+      labelFor: (id) => `${pad2(id)}:00`,
+      fechaFor: (id) => `${rawValor}T${pad2(id)}:00:00.000Z`,
+    };
+  }
+
+  if (selected === 'mes') {
+    if (!/^\d{4}-\d{2}$/.test(rawValor)) return null;
+    const [year, month] = rawValor.split('-').map(Number);
+    const fechaInicio = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
+    const fechaFin = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    if (fechaInicio.getUTCFullYear() !== year || fechaInicio.getUTCMonth() !== month - 1) {
+      return null;
+    }
+    return {
+      periodo: selected,
+      valor: rawValor,
+      fechaInicio,
+      fechaFin,
+      groupId: { $dayOfMonth: '$created_at' },
+      labelFor: (id) => String(id),
+      fechaFor: (id) => `${rawValor}-${pad2(id)}`,
+    };
+  }
+
+  if (selected === 'anio') {
+    if (!/^\d{4}$/.test(rawValor)) return null;
+    const year = Number(rawValor);
+    const fechaInicio = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+    const fechaFin = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+    return {
+      periodo: selected,
+      valor: rawValor,
+      fechaInicio,
+      fechaFin,
+      groupId: { $month: '$created_at' },
+      labelFor: (id) => `${pad2(id)}/${year}`,
+      fechaFor: (id) => `${year}-${pad2(id)}`,
+    };
+  }
+
+  return null;
 };
 
 exports.getAdminDashboard = async (req, res, next) => {
@@ -176,6 +251,59 @@ exports.getIngresosPorAgencia = async (req, res, next) => {
     }));
 
     res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getIngresos = async (req, res, next) => {
+  try {
+    const periodoConfig = parsePeriodoIngresos(req.query.periodo, req.query.valor);
+
+    if (!periodoConfig) {
+      return res.status(400).json({
+        success: false,
+        message: 'Periodo o valor invalido. Use periodo=dia|mes|anio y valor=YYYY-MM-DD|YYYY-MM|YYYY.',
+      });
+    }
+
+    const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
+    const resultados = await Reserva.aggregate([
+      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
+      {
+        $match: {
+          estado: { $in: ESTADOS_INGRESO },
+          created_at: { $gte: periodoConfig.fechaInicio, $lte: periodoConfig.fechaFin },
+        },
+      },
+      {
+        $group: {
+          _id: periodoConfig.groupId,
+          ingresos: { $sum: '$cot.precio_total' },
+          reservas: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const puntos = resultados.map((r) => ({
+      label: periodoConfig.labelFor(r._id),
+      fecha: periodoConfig.fechaFor(r._id),
+      ingresos: r.ingresos ? parseFloat(r.ingresos.toString()) : 0,
+      reservas: r.reservas,
+    }));
+
+    const totalIngresos = puntos.reduce((sum, item) => sum + item.ingresos, 0);
+
+    return res.json({
+      success: true,
+      data: {
+        total_ingresos: totalIngresos,
+        periodo: periodoConfig.periodo,
+        valor: periodoConfig.valor,
+        puntos,
+      },
+    });
   } catch (error) {
     next(error);
   }
