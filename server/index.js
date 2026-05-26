@@ -63,6 +63,9 @@ app.use('/api/v1/reservas', require('./routes/reservaRoute'));
 // Módulo 8 — Reportes
 app.use('/api/v1/reportes', require('./routes/reporteRoute'));
 
+// Módulo 9 — Asistente Inteligente
+app.use('/api/v1/assistant', require('./routes/assistantRoute'));
+
 // ---------------------
 // Manejo de ruta no encontrada
 // ---------------------
