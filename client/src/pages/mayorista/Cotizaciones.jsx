@@ -141,7 +141,7 @@ export const MayoristaCotizaciones = () => {
                   <TableCell>
                     {c.estado === 'pendiente' ? (
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <Button size="sm" variant="success" onClick={() => handleAction(c._id, 'aprobada')} isLoading={actionLoading} style={{ backgroundColor: 'var(--color-success)', color: 'white' }}>
+                        <Button size="sm" variant="success" onClick={() => handleAction(c._id, 'aprobada')} isLoading={actionLoading}>
                           <Check size={16} />
                         </Button>
                         <Button size="sm" variant="danger" onClick={() => { setSelectedCotizacion(c); setIsRejectModalOpen(true); }}>

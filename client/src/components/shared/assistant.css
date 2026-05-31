@@ -434,3 +434,30 @@
     transform: translateY(0);
   }
 }
+
+/* ── Sobrescrituras de Modo Oscuro para el Asistente Inteligente ── */
+[data-theme="dark"] .assistant-header {
+  background: linear-gradient(135deg, #1C2018 0%, #131610 100%);
+  border-bottom: 1px solid var(--color-border);
+}
+
+[data-theme="dark"] .message-row.user .message-bubble {
+  color: #12140F; /* Texto oscuro sobre burbuja primaria clara */
+}
+
+[data-theme="dark"] .assistant-send-btn {
+  color: #12140F; /* Icono oscuro sobre botón primario claro */
+}
+
+[data-theme="dark"] .assistant-send-btn:disabled {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .assistant-input:focus {
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
+}
+
+[data-theme="dark"] .assistant-stat-card {
+  background: linear-gradient(135deg, var(--color-primary-soft) 0%, #131610 100%);
+}
+

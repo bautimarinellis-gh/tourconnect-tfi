@@ -35,12 +35,72 @@
   --shadow-md: 0 10px 24px rgba(32, 35, 24, 0.08);
   --shadow-lg: 0 24px 60px rgba(32, 35, 24, 0.18);
   --app-shell-width: 216px;
+
+  /* Glassmorphic & dynamic background light variables */
+  --glass-bg: rgba(255, 255, 255, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.84);
+  --glass-bg-container: rgba(255, 255, 255, 0.9);
+  --glass-border-container: rgba(255, 255, 255, 0.82);
+  --color-input-bg: rgba(255, 255, 255, 0.9);
+  --metric-card-bg-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 248, 244, 0.86));
+}
+
+[data-theme="dark"] {
+  --color-primary: #F4F6F0;
+  --color-primary-hover: #FFFFFF;
+  --color-primary-soft: #23281E;
+  --color-secondary: #8E9C82;
+  --color-accent: #3ECF8E;
+  --color-bg: #0D0F0A;
+  --color-surface: #131610;
+  --color-surface-subtle: #1C2018;
+  --color-text: #F4F6F0;
+  --color-text-soft: #A2A89A;
+  --color-text-muted: #717669;
+  --color-border: #262B20;
+  --color-border-strong: #373E2E;
+  
+  --color-error: #F04438;
+  --color-error-soft: #2D1412;
+  --color-success: #12805C;
+  --color-success-soft: #0E2920;
+  --color-warning: #F79009;
+  --color-warning-soft: #2D2214;
+  --color-info: #4C72B0;
+  --color-info-soft: #122137;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 10px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.7);
+
+  /* Glassmorphic & dynamic background dark variables */
+  --glass-bg: rgba(19, 22, 16, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-bg-container: rgba(19, 22, 16, 0.86);
+  --glass-border-container: rgba(255, 255, 255, 0.05);
+  --color-input-bg: rgba(28, 32, 24, 0.85);
+  --metric-card-bg-gradient: linear-gradient(180deg, rgba(28, 32, 24, 0.95), rgba(19, 22, 16, 0.85));
 }
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* Global Transitions for Premium Feel */
+body, 
+.navbar-container, 
+.page-container, 
+.card, 
+.table-container, 
+.table-header-cell,
+.table-cell,
+.input-control, 
+.btn-secondary, 
+.nav-item {
+  transition: background 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
 
 body {
@@ -54,6 +114,12 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 360px),
+    linear-gradient(135deg, #0A0C08 0%, #12140F 42%, #1A1C16 100%);
 }
 
 h1, h2, h3, h4, h5, h6 {

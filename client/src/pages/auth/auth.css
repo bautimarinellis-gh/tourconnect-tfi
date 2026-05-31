@@ -2,8 +2,15 @@
   display: flex;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.8), transparent 360px),
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.72), transparent 360px),
     linear-gradient(135deg, #F5F1DE 0%, #E6EBDD 46%, #D6E0D0 100%);
+  transition: background 0.3s ease;
+}
+
+[data-theme="dark"] .auth-layout {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.05), transparent 360px),
+    linear-gradient(135deg, #0A0C08 0%, #12140F 42%, #1A1C16 100%);
 }
 
 .auth-layout.single-col {
@@ -26,12 +33,13 @@
 .auth-form-box {
   width: 100%;
   max-width: 410px;
-  background-color: rgba(255, 255, 255, 0.92);
+  background-color: var(--glass-bg-container);
   padding: 2rem;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--glass-border-container);
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .auth-logo {
@@ -94,8 +102,9 @@
   margin: 1.5rem 1.5rem 1.5rem 0;
   overflow: hidden;
   border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--glass-border-container);
   box-shadow: var(--shadow-lg);
+  transition: border-color 0.3s ease;
 }
 
 @media (min-width: 768px) {

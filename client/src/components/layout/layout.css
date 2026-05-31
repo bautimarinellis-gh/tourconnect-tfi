@@ -20,8 +20,8 @@
   flex-direction: column;
   justify-content: space-between;
   gap: 1.25rem;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(255, 255, 255, 0.84);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: 18px;
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px);
@@ -247,8 +247,8 @@
   max-width: 1340px;
   margin: 0 auto;
   padding: 2rem;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.82);
+  background: var(--glass-bg-container);
+  border: 1px solid var(--glass-border-container);
   border-radius: 22px;
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(18px);
@@ -385,4 +385,9 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* ── Dark Mode Overrides for Layout Elements ── */
+[data-theme="dark"] .avatar {
+  color: #12140F; /* Texto oscuro sobre el fondo claro del avatar */
 }

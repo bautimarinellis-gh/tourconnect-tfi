@@ -54,12 +54,22 @@
   border-color: #991B1B;
 }
 
+.btn-success {
+  background: var(--color-success);
+  color: white;
+  box-shadow: var(--shadow-xs);
+  border-color: var(--color-success);
+}
+.btn-success:hover:not(:disabled) {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
 .btn-ghost {
   background-color: transparent;
   color: var(--color-text-soft);
 }
-.btn-ghost:hover:not(:disabled) {
-  background-color: var(--color-surface-subtle);
   color: var(--color-text);
 }
 
@@ -111,7 +121,7 @@
   font-size: 0.875rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--color-input-bg);
   color: var(--color-text);
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
@@ -177,9 +187,7 @@ select.input-control {
   line-height: 1;
 }
 
-.password-toggle-btn:hover {
-  color: var(--color-text);
-}
+
 
 /* --- Number Stepper --- */
 .stepper-wrapper {
@@ -227,4 +235,12 @@ select.input-control {
   border-left: 1px solid var(--color-border);
   border-right: 1px solid var(--color-border);
   padding: 0.375rem 0;
+}
+
+/* ── Dark Mode Overrides for UI Elements ── */
+[data-theme="dark"] .btn-primary {
+  color: #12140F;
+}
+[data-theme="dark"] .btn-primary:hover:not(:disabled) {
+  color: #12140F;
 }

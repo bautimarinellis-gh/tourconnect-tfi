@@ -166,12 +166,12 @@ export const AgenciaCotizaciones = () => {
                   </TableCell>
                   <TableCell>
                     {c.estado === 'aprobada' ? (
-                      <Button size="sm" onClick={() => { setSelectedCotizacion(c); setBookingError(''); setIsBookingModalOpen(true); }} style={{ backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+                      <Button size="sm" variant="success" onClick={() => { setSelectedCotizacion(c); setBookingError(''); setIsBookingModalOpen(true); }}>
                         <ShoppingBag size={14} /> Generar Reserva
                       </Button>
                     ) : c.estado === 'reserva_generada' ? (
                       <div title="Esta cotización ya fue convertida en reserva." style={{ display: 'inline-block', cursor: 'not-allowed' }}>
-                        <Button size="sm" disabled style={{ pointerEvents: 'none', opacity: 0.5, backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+                        <Button size="sm" variant="success" disabled style={{ pointerEvents: 'none', opacity: 0.5 }}>
                           <ShoppingBag size={14} /> Generar Reserva
                         </Button>
                       </div>
@@ -210,7 +210,7 @@ export const AgenciaCotizaciones = () => {
             <Button variant="ghost" onClick={() => { setIsBookingModalOpen(false); setBookingError(''); setDatosExtra(''); }}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateBooking} isLoading={actionLoading} style={{ backgroundColor: 'var(--color-success)', borderColor: 'var(--color-success)' }}>
+            <Button variant="success" onClick={handleCreateBooking} isLoading={actionLoading}>
               Confirmar Reserva
             </Button>
           </>

@@ -5,6 +5,7 @@ import { useAuth } from './hooks/useAuth';
 import { ProtectedRoute } from './components/shared/ProtectedRoute';
 import { PageWrapper } from './components/layout/PageWrapper';
 import { ToastContainer } from './components/ui/Toast';
+import { ThemeToggle } from './components/ui/ThemeToggle';
 
 // Auth Pages
 import { Login } from './pages/auth/Login';
@@ -102,6 +103,7 @@ function App() {
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <ThemeToggle />
       </AuthProvider>
     </Router>
   );

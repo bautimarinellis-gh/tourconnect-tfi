@@ -34,7 +34,7 @@
 .metric-card {
   min-height: 110px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 248, 244, 0.86)),
+    var(--metric-card-bg-gradient),
     var(--color-surface);
 }
 
