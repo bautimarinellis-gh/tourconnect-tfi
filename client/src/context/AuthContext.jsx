@@ -5,12 +5,12 @@ export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const stored = localStorage.getItem('tourconnect_user');
+    const stored = localStorage.getItem('tourconnect_user_v1');
     if (!stored) return null;
     try {
       return JSON.parse(stored);
     } catch {
-      localStorage.removeItem('tourconnect_user');
+      localStorage.removeItem('tourconnect_user_v1');
       return null;
     }
   });
@@ -18,7 +18,7 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (email, password) => {
     const response = await authService.login(email, password);
     const userData = { ...response.data.usuario };
-    localStorage.setItem('tourconnect_user', JSON.stringify(userData));
+    localStorage.setItem('tourconnect_user_v1', JSON.stringify(userData));
     setUser(userData);
     return userData;
   }, []);
@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error('Logout failed on server', err);
     } finally {
-      localStorage.removeItem('tourconnect_user');
+      localStorage.removeItem('tourconnect_user_v1');
       setUser(null);
       window.location.href = '/login';
     }

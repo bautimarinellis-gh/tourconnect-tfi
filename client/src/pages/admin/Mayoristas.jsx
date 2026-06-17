@@ -225,7 +225,7 @@ export const AdminMayoristas = () => {
               placeholder="Buscar por nombre o razón social..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
-              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--color-text)', fontFamily: 'var(--font-family)' }}
+              style={{ flex: 1, border: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--color-text)', fontFamily: 'var(--font-family)' }}
             />
           </div>
           {mayoristasFiltrados.length === 0 ? (
