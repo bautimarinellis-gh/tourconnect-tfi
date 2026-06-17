@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar, Minus, Plus } from 'lucide-react';
+import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar, Minus, Plus, Search } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -28,6 +28,7 @@ export const AgenciaCatalogo = () => {
   const [loading, setLoading] = useState(true);
   const [filtroTipo, setFiltroTipo] = useState('');
 
+  const [busqueda, setBusqueda] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -77,6 +78,10 @@ export const AgenciaCatalogo = () => {
       setActionLoading(false);
     }
   };
+
+  const productosFiltrados = busqueda.trim()
+    ? productos.filter(p => p.nombre?.toLowerCase().includes(busqueda.toLowerCase()))
+    : productos;
 
   const selectProduct = (producto) => {
     setSelectedProduct(producto);
@@ -155,11 +160,22 @@ export const AgenciaCatalogo = () => {
         <div className="catalog-shell">
           <Card className="catalog-list-card">
             <div className="catalog-search-row">
-              <span className="catalog-search-icon"><ShoppingCart size={16} /></span>
-              <span>Seleccioná una experiencia para cotizar</span>
+              <span className="catalog-search-icon"><Search size={16} /></span>
+              <input
+                type="text"
+                placeholder="Buscar experiencia..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                className="catalog-search-input"
+              />
             </div>
             <div className="catalog-list">
-              {productos.map(p => {
+              {productosFiltrados.length === 0 ? (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
+                  No hay productos que coincidan con "{busqueda}".
+                </div>
+              ) : null}
+              {productosFiltrados.map(p => {
                 const active = selectedProduct?._id === p._id;
                 return (
                   <button

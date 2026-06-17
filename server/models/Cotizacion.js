@@ -65,9 +65,13 @@ cotizacionSchema.virtual('cantidad_noches').get(function () {
   return Math.round((this.fecha_fin - this.fecha_inicio) / 86400000);
 });
 
-// Índices compuestos para queries del Asistente Inteligente
+// Índices compuestos para queries del Asistente Inteligente y reportes
 cotizacionSchema.index({ mayorista_id: 1, created_at: -1 });
 cotizacionSchema.index({ mayorista_id: 1, agencia_id: 1 });
 cotizacionSchema.index({ mayorista_id: 1, estado: 1 });
+// Cron de vencimiento: { estado: 'pendiente', created_at: { $lt: ... } }
+cotizacionSchema.index({ estado: 1, created_at: 1 });
+// Queries de agencia sin mayorista_id (getCotizaciones, getAgenciaDashboard)
+cotizacionSchema.index({ agencia_id: 1, estado: 1, created_at: -1 });
 
 module.exports = mongoose.model('Cotizacion', cotizacionSchema);

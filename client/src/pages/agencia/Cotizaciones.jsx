@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingBag, X } from 'lucide-react';
+import { ShoppingBag, X, Eye } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -13,13 +13,30 @@ import { Input } from '../../components/ui/Input';
 import { formatCurrency, formatDate, formatEstadoCotizacion } from '../../utils/formatters';
 import cotizacionService from '../../services/cotizacionService';
 import reservaService from '../../services/reservaService';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useToast } from '../../components/ui/Toast';
+
+const HORAS_VENCIMIENTO = 72;
+
+const getVencimientoInfo = (cotizacion) => {
+  if (cotizacion.estado !== 'pendiente' || !cotizacion.created_at) return null;
+  const expira = new Date(new Date(cotizacion.created_at).getTime() + HORAS_VENCIMIENTO * 3600 * 1000);
+  const diffMs = expira - Date.now();
+  const diffHs = Math.floor(diffMs / 3600000);
+  return { expira, diffHs, vencido: diffMs <= 0 };
+};
 
 export const AgenciaCotizaciones = () => {
+  const [searchParams] = useSearchParams();
+  const toast = useToast();
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtroEstado, setFiltroEstado] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState(searchParams.get('estado') ?? '');
   const navigate = useNavigate();
+
+  // Modal: Ver detalle
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [detailCotizacion, setDetailCotizacion] = useState(null);
 
   // Modal: Crear reserva
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -34,9 +51,6 @@ export const AgenciaCotizaciones = () => {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMotivo, setCancelMotivo] = useState('');
   const [cancelError, setCancelError] = useState('');
-
-  // Modal: Éxito al cancelar
-  const [isCancelSuccessModalOpen, setIsCancelSuccessModalOpen] = useState(false);
 
   const fetchCotizaciones = async () => {
     setLoading(true);
@@ -88,7 +102,7 @@ export const AgenciaCotizaciones = () => {
       setCancelTarget(null);
       setCancelMotivo('');
       fetchCotizaciones();
-      setIsCancelSuccessModalOpen(true);
+      toast.success('Cotización cancelada exitosamente.');
     } catch (err) {
       const msg = err?.response?.data?.message || 'Error al cancelar la cotización.';
       setCancelError(msg);
@@ -163,35 +177,46 @@ export const AgenciaCotizaciones = () => {
                         Motivo: {c.motivo_rechazo}
                       </div>
                     )}
+                    {(() => {
+                      const v = getVencimientoInfo(c);
+                      if (!v) return null;
+                      if (v.vencido) return null;
+                      if (v.diffHs < 24) return (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-warning)', fontWeight: 600, marginTop: '0.25rem' }}>
+                          ⚠ Vence en {v.diffHs}h
+                        </div>
+                      );
+                      return (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-soft)', marginTop: '0.25rem' }}>
+                          Vence en {Math.ceil(v.diffHs / 24)}d
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
-                    {c.estado === 'aprobada' ? (
-                      <Button size="sm" variant="success" onClick={() => { setSelectedCotizacion(c); setBookingError(''); setIsBookingModalOpen(true); }}>
-                        <ShoppingBag size={14} /> Generar Reserva
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Button size="sm" variant="ghost" onClick={() => { setDetailCotizacion(c); setIsDetailModalOpen(true); }}>
+                        <Eye size={14} />
                       </Button>
-                    ) : c.estado === 'reserva_generada' ? (
-                      <div title="Esta cotización ya fue convertida en reserva." style={{ display: 'inline-block', cursor: 'not-allowed' }}>
-                        <Button size="sm" variant="success" disabled style={{ pointerEvents: 'none', opacity: 0.5 }}>
-                          <ShoppingBag size={14} /> Generar Reserva
+                      {c.estado === 'aprobada' && (
+                        <Button size="sm" variant="success" onClick={() => { setSelectedCotizacion(c); setBookingError(''); setIsBookingModalOpen(true); }}>
+                          <ShoppingBag size={14} /> Reservar
                         </Button>
-                      </div>
-                    ) : c.estado === 'pendiente' ? (
-                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>
-                          Esperando confirmación
-                        </span>
+                      )}
+                      {c.estado === 'reserva_generada' && (
+                        <span style={{ fontSize: '0.8rem', color: 'var(--color-text-soft)' }}>Reserva creada</span>
+                      )}
+                      {c.estado === 'pendiente' && (
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => { setCancelTarget(c); setCancelError(''); setCancelMotivo(''); setIsCancelModalOpen(true); }}
-                          style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}
+                          style={{ color: 'var(--color-error)' }}
                         >
                           <X size={14} /> Cancelar
                         </Button>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>—</span>
-                    )}
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -271,18 +296,59 @@ export const AgenciaCotizaciones = () => {
         </div>
       </Modal>
 
-      {/* Modal: Éxito al cancelar */}
+      {/* Modal: Ver detalle */}
       <Modal
-        isOpen={isCancelSuccessModalOpen}
-        onClose={() => setIsCancelSuccessModalOpen(false)}
-        title="Cotización Cancelada"
+        isOpen={isDetailModalOpen}
+        onClose={() => { setIsDetailModalOpen(false); setDetailCotizacion(null); }}
+        title="Detalle de Cotización"
         footer={
-          <Button onClick={() => setIsCancelSuccessModalOpen(false)}>Cerrar</Button>
+          <Button variant="ghost" onClick={() => { setIsDetailModalOpen(false); setDetailCotizacion(null); }}>Cerrar</Button>
         }
       >
-        <Alert variant="success">
-          La cotización fue cancelada exitosamente.
-        </Alert>
+        {detailCotizacion && (() => {
+          const v = getVencimientoInfo(detailCotizacion);
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9375rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-soft)' }}>ID</span>
+                <span style={{ fontWeight: 500 }}>#{detailCotizacion._id.slice(-6).toUpperCase()}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-soft)' }}>Producto</span>
+                <span style={{ fontWeight: 500 }}>{detailCotizacion.producto_id?.nombre || 'N/A'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-soft)' }}>Fechas</span>
+                <span>{formatDate(detailCotizacion.fecha_inicio)} — {formatDate(detailCotizacion.fecha_fin)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-soft)' }}>Pasajeros</span>
+                <span>{detailCotizacion.pasajeros}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--color-text-soft)' }}>Total</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(detailCotizacion.precio_total)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--color-text-soft)' }}>Estado</span>
+                <Badge variant={detailCotizacion.estado}>{formatEstadoCotizacion(detailCotizacion.estado)}</Badge>
+              </div>
+              {v && !v.vencido && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--color-text-soft)' }}>Vencimiento</span>
+                  <span style={{ color: v.diffHs < 24 ? 'var(--color-warning)' : 'var(--color-text-soft)', fontWeight: v.diffHs < 24 ? 600 : 400 }}>
+                    {v.diffHs < 24 ? `⚠ En ${v.diffHs}h` : `En ${Math.ceil(v.diffHs / 24)}d`}
+                  </span>
+                </div>
+              )}
+              {detailCotizacion.motivo_rechazo && (
+                <Alert variant="error">
+                  <strong>Motivo de rechazo:</strong> {detailCotizacion.motivo_rechazo}
+                </Alert>
+              )}
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );

@@ -133,6 +133,10 @@ export const MayoristaAgenciaDetalle = () => {
                 <p style={{ fontWeight: 500 }}>{agencia.razon_social || '-'}</p>
               </div>
               <div>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>CUIT</p>
+                <p style={{ fontWeight: 500 }}>{agencia.cuit || '-'}</p>
+              </div>
+              <div>
                 <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Teléfono</p>
                 <p style={{ fontWeight: 500 }}>{agencia.telefono || '-'}</p>
               </div>

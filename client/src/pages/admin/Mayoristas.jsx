@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, KeyRound } from 'lucide-react';
+import { Plus, Edit2, Trash2, KeyRound, Search } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -18,6 +18,8 @@ const SUBSCRIPTION_PLANS = [
   { value: 'Professional', label: 'Professional', description: '21 a 100 agencias' },
   { value: 'Enterprise', label: 'Enterprise', description: 'Más de 100 agencias' },
 ];
+
+const PLAN_BADGE_VARIANT = { Starter: 'info', Professional: 'success', Enterprise: 'warning' };
 
 const SubscriptionPlanSelect = ({ label, value, onChange }) => (
   <div className="input-group">
@@ -44,6 +46,7 @@ export const AdminMayoristas = () => {
   const toast = useToast();
   const [mayoristas, setMayoristas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [busqueda, setBusqueda] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMayorista, setEditingMayorista] = useState(null);
   const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', cuit: '', plan_suscripcion: 'Starter', activo: true });
@@ -77,6 +80,13 @@ export const AdminMayoristas = () => {
     fetchMayoristas();
   }, []);
 
+  const mayoristasFiltrados = busqueda.trim()
+    ? mayoristas.filter(m =>
+        m.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        m.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
+      )
+    : mayoristas;
+
   const handleCreate = async () => {
     setFormError('');
     if (!formData.nombre || !formData.cuit || !formData.admin_email || !formData.admin_password) {
@@ -99,6 +109,7 @@ export const AdminMayoristas = () => {
       setIsModalOpen(false);
       setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
       fetchMayoristas();
+      toast.success('Mayorista creado exitosamente.');
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al crear mayorista'));
     } finally {
@@ -138,6 +149,7 @@ export const AdminMayoristas = () => {
       });
       setEditingMayorista(null);
       fetchMayoristas();
+      toast.success('Mayorista actualizado.');
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al actualizar mayorista'));
     } finally {
@@ -162,6 +174,7 @@ export const AdminMayoristas = () => {
       setActivarUsuarioMayorista(null);
       setActivarPassword('');
       fetchMayoristas();
+      toast.success('Usuario activado. Ya puede iniciar sesión.');
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al activar usuario'));
     } finally {
@@ -177,6 +190,7 @@ export const AdminMayoristas = () => {
       await mayoristaService.delete(deletingMayorista._id);
       setDeletingMayorista(null);
       fetchMayoristas();
+      toast.success('Mayorista desactivado.');
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al eliminar mayorista'));
     } finally {
@@ -196,52 +210,89 @@ export const AdminMayoristas = () => {
       </div>
 
       {mayoristas.length === 0 ? (
-        <EmptyState 
-          title="No hay mayoristas" 
+        <EmptyState
+          title="No hay mayoristas"
           description="Comienza creando el primer mayorista en la plataforma."
           action={<Button onClick={() => { setIsModalOpen(true); setFormError(''); }}>Crear Mayorista</Button>}
         />
       ) : (
         <Card>
-          <Table>
-            <thead>
-              <TableRow>
-                <TableCell isHeader>Nombre</TableCell>
-                <TableCell isHeader>Razón Social</TableCell>
-                <TableCell isHeader>Agencias Activas</TableCell>
-                <TableCell isHeader>Estado</TableCell>
-                <TableCell isHeader>Acciones</TableCell>
-              </TableRow>
-            </thead>
-            <tbody>
-              {mayoristas.map(m => (
-                <TableRow key={m._id}>
-                  <TableCell>
-                    <div style={{ fontWeight: 500 }}>{m.nombre}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{m.usuario_id?.email ?? m.email_contacto ?? '-'}</div>
-                  </TableCell>
-                  <TableCell>{m.razon_social || '-'}</TableCell>
-                  <TableCell>{m.kpis?.agencias_activas ?? m.agencias_activas ?? 0}</TableCell>
-                  <TableCell>
-                    <Badge variant={m.activo ? 'success' : 'error'}>{m.activo ? 'Activo' : 'Inactivo'}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(m)} title="Editar"><Edit2 size={16} /></Button>
-                    {m.usuario_id && m.usuario_id.activo !== true && (
-                      <Button variant="ghost" size="sm" onClick={() => { setActivarUsuarioMayorista(m); setActivarPassword(''); setFormError(''); }} title="Configurar contraseña"><KeyRound size={16} /></Button>
-                    )}
-                    <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDelete(m)} title="Eliminar"><Trash2 size={16} /></Button>
-                  </TableCell>
+          <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <Search size={15} style={{ color: 'var(--color-text-soft)', flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o razón social..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: '0.875rem', color: 'var(--color-text)', fontFamily: 'var(--font-family)' }}
+            />
+          </div>
+          {mayoristasFiltrados.length === 0 ? (
+            <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
+              Sin resultados para "{busqueda}".
+            </div>
+          ) : (
+            <Table>
+              <thead>
+                <TableRow>
+                  <TableCell isHeader>Nombre</TableCell>
+                  <TableCell isHeader>Razón Social</TableCell>
+                  <TableCell isHeader>Plan</TableCell>
+                  <TableCell isHeader>Agencias / Reservas</TableCell>
+                  <TableCell isHeader>Estado</TableCell>
+                  <TableCell isHeader>Acciones</TableCell>
                 </TableRow>
-              ))}
-            </tbody>
-          </Table>
+              </thead>
+              <tbody>
+                {mayoristasFiltrados.map(m => {
+                  const sinAcceso = !m.usuario_id || m.usuario_id.activo !== true;
+                  return (
+                    <TableRow key={m._id}>
+                      <TableCell>
+                        <div style={{ fontWeight: 500 }}>{m.nombre}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap', marginTop: '0.125rem' }}>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>
+                            {m.usuario_id?.email ?? m.email_contacto ?? '-'}
+                          </span>
+                          {sinAcceso && (
+                            <Badge variant="warning" style={{ fontSize: '0.65rem' }}>Sin acceso</Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{m.razon_social || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant={PLAN_BADGE_VARIANT[m.plan_suscripcion] ?? 'info'}>
+                          {m.plan_suscripcion || 'Starter'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div style={{ fontWeight: 500 }}>{m.kpis?.agencias_activas ?? 0} agencias</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>
+                          {m.kpis?.reservas_totales ?? 0} reservas
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={m.activo ? 'success' : 'error'}>{m.activo ? 'Activo' : 'Inactivo'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(m)} title="Editar"><Edit2 size={16} /></Button>
+                        {sinAcceso && m.usuario_id && (
+                          <Button variant="ghost" size="sm" onClick={() => { setActivarUsuarioMayorista(m); setActivarPassword(''); setFormError(''); }} title="Configurar contraseña"><KeyRound size={16} /></Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDelete(m)} title="Desactivar"><Trash2 size={16} /></Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </tbody>
+            </Table>
+          )}
         </Card>
       )}
 
-      <Modal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
         title="Crear Nuevo Mayorista"
         footer={
           <>
@@ -251,7 +302,7 @@ export const AdminMayoristas = () => {
         }
       >
         {formError && <Alert variant="error">{formError}</Alert>}
-        
+
         <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Datos de la Empresa</h4>
         <Input label="Nombre de Fantasía *" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
         <Input label="Razón Social" value={formData.razon_social} onChange={e => setFormData({...formData, razon_social: e.target.value})} />
@@ -286,7 +337,7 @@ export const AdminMayoristas = () => {
           <Input label="Nombre de Fantasía *" value={editFormData.nombre} onChange={e => setEditFormData({...editFormData, nombre: e.target.value})} />
           <Input label="Razón Social" value={editFormData.razon_social} onChange={e => setEditFormData({...editFormData, razon_social: e.target.value})} />
           <Input label="CUIT *" value={editFormData.cuit} onChange={e => setEditFormData({...editFormData, cuit: e.target.value})} />
-          <SubscriptionPlanSelect label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({...editFormData, plan_suscripcion: e.target.value})} />
+          <SubscriptionPlanSelect label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({...editFormData, plan_suscripcion: e.target.value })} />
           <Input label="Teléfono" value={editFormData.telefono} onChange={e => setEditFormData({...editFormData, telefono: e.target.value})} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <input
@@ -326,20 +377,24 @@ export const AdminMayoristas = () => {
       <Modal
         isOpen={!!deletingMayorista}
         onClose={() => { setDeletingMayorista(null); setFormError(''); }}
-        title="Eliminar Mayorista"
+        title="Desactivar Mayorista"
         footer={
           <>
             <Button variant="ghost" onClick={() => { setDeletingMayorista(null); setFormError(''); }}>Cancelar</Button>
-            <Button variant="danger" onClick={confirmDelete} isLoading={saving}>Eliminar</Button>
+            <Button variant="danger" onClick={confirmDelete} isLoading={saving}>Desactivar</Button>
           </>
         }
       >
         {formError && <Alert variant="error">{formError}</Alert>}
         {deletingMayorista && (
-          <p>
-            ¿Estás seguro de que deseas desactivar <strong>{deletingMayorista.nombre}</strong>? 
-            Se desactivarán también todas sus agencias y el usuario asociado.
-          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <p style={{ margin: 0 }}>
+              ¿Estás seguro de que deseas desactivar <strong>{deletingMayorista.nombre}</strong>?
+            </p>
+            <Alert variant="warning">
+              Se desactivarán también todas sus agencias ({deletingMayorista.kpis?.agencias_activas ?? 0} activas) y el usuario administrador asociado.
+            </Alert>
+          </div>
         )}
       </Modal>
     </div>

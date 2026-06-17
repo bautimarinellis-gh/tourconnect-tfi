@@ -7,6 +7,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Alert } from '../../components/ui/Alert';
+import { useToast } from '../../components/ui/Toast';
 import { formatCurrency, formatDateTime, formatDate, formatEstadoReserva } from '../../utils/formatters';
 import reservaService from '../../services/reservaService';
 
@@ -20,12 +22,14 @@ const MOTIVOS_RAPIDOS = ['Monto incorrecto', 'No recibí el pago', 'Datos incorr
 
 export const MayoristaReservaDetalle = () => {
   const { id } = useParams();
+  const toast = useToast();
   const [reserva, setReserva] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentData, setPaymentData] = useState({ monto: '', metodo: 'transferencia', comprobante: '' });
@@ -53,16 +57,18 @@ export const MayoristaReservaDetalle = () => {
 
   const handleCancelar = async () => {
     if (!cancelReason.trim()) {
+      setCancelError('El motivo de cancelación es obligatorio.');
       return;
     }
     setActionLoading(true);
+    setCancelError('');
     try {
       await reservaService.cancelar(id, cancelReason);
       setIsCancelModalOpen(false);
       setCancelReason('');
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al cancelar');
+      setCancelError(err.response?.data?.message || 'Error al cancelar la reserva.');
     } finally {
       setActionLoading(false);
     }
@@ -74,7 +80,7 @@ export const MayoristaReservaDetalle = () => {
       await reservaService.cerrar(id);
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al cerrar');
+      toast.error(err.response?.data?.message || 'Error al cerrar la reserva.');
     } finally {
       setActionLoading(false);
     }
@@ -95,7 +101,7 @@ export const MayoristaReservaDetalle = () => {
       setPaymentData({ monto: '', metodo: 'transferencia', comprobante: '' });
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al registrar pago');
+      toast.error(err.response?.data?.message || 'Error al registrar el pago.');
     } finally {
       setActionLoading(false);
     }
@@ -108,7 +114,7 @@ export const MayoristaReservaDetalle = () => {
       setIsConfirmModalOpen(false);
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al confirmar pago');
+      toast.error(err.response?.data?.message || 'Error al confirmar el pago.');
     } finally {
       setActionLoading(false);
     }
@@ -334,21 +340,24 @@ export const MayoristaReservaDetalle = () => {
       {/* Modal Cancelar */}
       <Modal
         isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
+        onClose={() => { setIsCancelModalOpen(false); setCancelReason(''); setCancelError(''); }}
         title="Cancelar Reserva"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setIsCancelModalOpen(false)}>Atrás</Button>
+            <Button variant="ghost" onClick={() => { setIsCancelModalOpen(false); setCancelReason(''); setCancelError(''); }}>Atrás</Button>
             <Button variant="danger" onClick={handleCancelar} isLoading={actionLoading}>Confirmar Cancelación</Button>
           </>
         }
       >
-        <Input
-          label="Motivo de la cancelación *"
-          value={cancelReason}
-          onChange={e => setCancelReason(e.target.value)}
-          placeholder="Ingresá el motivo de cancelación"
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {cancelError && <Alert variant="error">{cancelError}</Alert>}
+          <Input
+            label="Motivo de la cancelación *"
+            value={cancelReason}
+            onChange={e => { setCancelReason(e.target.value); setCancelError(''); }}
+            placeholder="Ingresá el motivo de cancelación"
+          />
+        </div>
       </Modal>
 
       {/* Modal Registrar Pago (flujo antiguo) */}

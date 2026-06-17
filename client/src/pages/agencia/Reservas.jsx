@@ -47,6 +47,7 @@ export const AgenciaReservas = () => {
           options={[
             { label: 'Todos los estados', value: '' },
             { label: 'Pendiente de Pago', value: 'pendiente_pago' },
+            { label: 'Pago Informado', value: 'pago_informado' },
             { label: 'Pagada', value: 'pagada' },
             { label: 'Cerrada', value: 'cerrada' },
             { label: 'Cancelada', value: 'cancelada' },
@@ -99,7 +100,7 @@ export const AgenciaReservas = () => {
                   </TableCell>
                   <TableCell>
                     <Link to={`/agencia/reservas/${r._id}`}>
-                      <Button variant="ghost" size="sm"><Eye size={16} /></Button>
+                      <Button variant="ghost" size="sm"><Eye size={16} /> Ver detalles</Button>
                     </Link>
                   </TableCell>
                 </TableRow>

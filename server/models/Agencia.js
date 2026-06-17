@@ -10,6 +10,8 @@ const agenciaSchema = new mongoose.Schema({
 });
 
 agenciaSchema.index({ mayorista_id: 1 });
+// Cubre countDocuments({ mayorista_id, activo: true }) en getMayoristas y getMayoristaById
+agenciaSchema.index({ mayorista_id: 1, activo: 1 });
 
 agenciaSchema.set('toJSON', {
   transform(_doc, ret) {

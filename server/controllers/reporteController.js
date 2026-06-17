@@ -557,7 +557,7 @@ exports.getAgenciaDashboard = async (req, res, next) => {
       'cot.agencia_id': agenciaId,
     });
 
-    const [reservasActivasAgg, gastoMesData, cotizacionesPendientes, historialData] =
+    const [reservasActivasAgg, gastoMesData, cotizacionesPendientes, cotizacionesAprobadas, historialData] =
       await Promise.all([
         Reserva.aggregate([
           ...cotLookup,
@@ -578,6 +578,11 @@ exports.getAgenciaDashboard = async (req, res, next) => {
           mayorista_id: mayoristaId,
           agencia_id: agenciaId,
           estado: 'pendiente',
+        }),
+        Cotizacion.countDocuments({
+          mayorista_id: mayoristaId,
+          agencia_id: agenciaId,
+          estado: 'aprobada',
         }),
         Reserva.aggregate([
           ...cotLookup,
@@ -638,6 +643,7 @@ exports.getAgenciaDashboard = async (req, res, next) => {
         reservas_activas: reservasActivasAgg[0]?.total ?? 0,
         gasto_mes: gasto_total_mes,
         cotizaciones_pendientes: cotizacionesPendientes,
+        cotizaciones_aprobadas: cotizacionesAprobadas,
         historial_reservas: historial,
       },
     });

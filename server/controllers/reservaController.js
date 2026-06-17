@@ -151,11 +151,12 @@ exports.getReservaById = async (req, res, next) => {
       return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
-    const historial = await HistorialEstadoReserva.find({ reserva_id: id })
-      .populate('usuario_id', 'email rol')
-      .sort({ created_at: 1 });
-
-    const pagos = await Pago.find({ reserva_id: id }).sort({ created_at: 1 });
+    const [historial, pagos] = await Promise.all([
+      HistorialEstadoReserva.find({ reserva_id: id })
+        .populate('usuario_id', 'email rol')
+        .sort({ created_at: 1 }),
+      Pago.find({ reserva_id: id }).sort({ created_at: 1 }),
+    ]);
 
     const ultimoRechazo = extraerUltimoRechazo(historial);
     const pagoPendiente =

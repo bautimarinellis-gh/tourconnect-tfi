@@ -147,8 +147,8 @@ exports.getCotizacionById = async (req, res, next) => {
     const { rol, mayorista_id, agencia_id } = req.usuario;
 
     const cotizacion = await Cotizacion.findById(id)
-      .populate('agencia_id')
-      .populate('producto_id')
+      .populate('agencia_id', 'nombre razon_social cuit telefono activo')
+      .populate('producto_id', 'nombre tipo precio_base descripcion disponibilidad_desde disponibilidad_hasta activo')
       .populate('mayorista_id', 'nombre razon_social');
 
     if (!cotizacion) {

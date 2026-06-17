@@ -29,6 +29,10 @@ export const MayoristaCotizaciones = () => {
   const [detailCotizacion, setDetailCotizacion] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
+  // Modal: Confirmar aprobación
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null);
+
   // Modal: Éxito al confirmar
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -139,20 +143,21 @@ export const MayoristaCotizaciones = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    {c.estado === 'pendiente' ? (
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <Button size="sm" variant="success" onClick={() => handleAction(c._id, 'aprobada')} isLoading={actionLoading}>
-                          <Check size={16} />
-                        </Button>
-                        <Button size="sm" variant="danger" onClick={() => { setSelectedCotizacion(c); setIsRejectModalOpen(true); }}>
-                          <X size={16} />
-                        </Button>
-                      </div>
-                    ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <Button variant="ghost" size="sm" onClick={() => { setDetailCotizacion(c); setIsDetailModalOpen(true); }}>
                         <Eye size={16} />
                       </Button>
-                    )}
+                      {c.estado === 'pendiente' && (
+                        <>
+                          <Button size="sm" variant="success" onClick={() => { setApproveTarget(c); setIsApproveModalOpen(true); }}>
+                            <Check size={16} />
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => { setSelectedCotizacion(c); setIsRejectModalOpen(true); }}>
+                            <X size={16} />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -160,6 +165,40 @@ export const MayoristaCotizaciones = () => {
           </Table>
         </Card>
       )}
+
+      {/* Modal: Confirmar aprobación */}
+      <Modal
+        isOpen={isApproveModalOpen}
+        onClose={() => { setIsApproveModalOpen(false); setApproveTarget(null); }}
+        title="Aprobar Cotización"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setIsApproveModalOpen(false); setApproveTarget(null); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="success"
+              onClick={() => { handleAction(approveTarget._id, 'aprobada'); setIsApproveModalOpen(false); setApproveTarget(null); }}
+              isLoading={actionLoading}
+            >
+              <Check size={16} /> Confirmar Aprobación
+            </Button>
+          </>
+        }
+      >
+        {approveTarget && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9375rem' }}>
+            <p style={{ margin: 0 }}>
+              ¿Confirmás la aprobación de la cotización{' '}
+              <strong>#{approveTarget._id.slice(-6).toUpperCase()}</strong> de{' '}
+              <strong>{approveTarget.agencia_id?.nombre || 'la agencia'}</strong>?
+            </p>
+            <div style={{ padding: '0.75rem 1rem', background: 'var(--color-success-soft)', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', color: 'var(--color-success)' }}>
+              Al aprobar, la agencia podrá generar la reserva. Esta acción no se puede deshacer.
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Modal: Rechazar */}
       <Modal

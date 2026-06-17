@@ -41,7 +41,8 @@ const personaSchema = new mongoose.Schema(
   }
 );
 
-personaSchema.index({ activo: 1 });
+// Índice de activo eliminado — baja cardinalidad (boolean), MongoDB lo ignora en práctica.
+// Las subclases (Agencia) definen sus propios compound indexes más selectivos.
 
 personaSchema.set('toJSON', {
   transform(_doc, ret) {

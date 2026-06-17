@@ -460,13 +460,13 @@ export const MayoristaProductos = () => {
                     gap: '0.75rem',
                     alignItems: 'flex-start',
                     padding: '1rem',
-                    backgroundColor: '#FEF3C7',
-                    border: '1px solid #F59E0B',
+                    backgroundColor: 'var(--color-warning-soft)',
+                    border: '1px solid var(--color-warning)',
                     borderRadius: 'var(--radius-sm)',
-                    color: '#92400E',
+                    color: 'var(--color-warning)',
                   }}>
                     <AlertTriangle size={20} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
-                    <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.5 }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.5, color: 'var(--color-text)' }}>
                       <strong>¡Atención!</strong> Este producto está vinculado a{' '}
                       <strong>{deleteAgenciasCount} agencia{deleteAgenciasCount !== 1 ? 's' : ''}</strong>.
                       Al eliminarlo, dejará de estar disponible para {deleteAgenciasCount !== 1 ? 'ellas' : 'ella'}.

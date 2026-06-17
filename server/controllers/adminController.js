@@ -24,43 +24,41 @@ const validarPlanSuscripcion = (plan) => {
  */
 exports.getMayoristas = async (req, res, next) => {
   try {
-    const mayoristas = await Mayorista.find()
-      .populate('usuario_id', 'email activo')
-      .lean();
-
     const cotizacionCollection = Cotizacion.collection.name;
 
-    const result = await Promise.all(
-      mayoristas.map(async (m) => {
-        const agenciasCount = await Agencia.countDocuments({ mayorista_id: m._id, activo: true });
-        const reservasAgg = await Reserva.aggregate([
-          {
-            $lookup: {
-              from: cotizacionCollection,
-              localField: 'cotizacion_id',
-              foreignField: '_id',
-              as: 'cot',
-            },
+    // 3 queries en paralelo en vez de 2N+1 queries secuenciales
+    const [mayoristas, agenciasAgg, reservasAgg] = await Promise.all([
+      Mayorista.find().populate('usuario_id', 'email activo').lean(),
+      Agencia.aggregate([
+        { $match: { activo: true } },
+        { $group: { _id: '$mayorista_id', count: { $sum: 1 } } },
+      ]),
+      Reserva.aggregate([
+        {
+          $lookup: {
+            from: cotizacionCollection,
+            localField: 'cotizacion_id',
+            foreignField: '_id',
+            as: 'cot',
           },
-          { $unwind: '$cot' },
-          { $match: { 'cot.mayorista_id': m._id } },
-          { $count: 'total' },
-        ]);
-        const reservasCount = reservasAgg[0]?.total ?? 0;
-        return {
-          ...m,
-          kpis: {
-            agencias_activas: agenciasCount,
-            reservas_totales: reservasCount,
-          },
-        };
-      })
-    );
+        },
+        { $unwind: '$cot' },
+        { $group: { _id: '$cot.mayorista_id', count: { $sum: 1 } } },
+      ]),
+    ]);
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    const agenciasMap = new Map(agenciasAgg.map((a) => [a._id.toString(), a.count]));
+    const reservasMap = new Map(reservasAgg.map((r) => [r._id.toString(), r.count]));
+
+    const result = mayoristas.map((m) => ({
+      ...m,
+      kpis: {
+        agencias_activas: agenciasMap.get(m._id.toString()) ?? 0,
+        reservas_totales: reservasMap.get(m._id.toString()) ?? 0,
+      },
+    }));
+
+    res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }

@@ -25,6 +25,10 @@ const reservaSchema = new mongoose.Schema(
   }
 );
 
+// Índices para filtros frecuentes en listados y aggregations de reportes
+reservaSchema.index({ estado: 1 });
+reservaSchema.index({ estado: 1, created_at: -1 });
+
 reservaSchema.set('toJSON', {
   transform(_doc, ret) {
     delete ret.__v;

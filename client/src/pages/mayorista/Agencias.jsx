@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Eye, Pencil, Trash2, AlertTriangle, FileText, CalendarCheck } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, AlertTriangle, FileText, CalendarCheck, Search } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -15,6 +15,7 @@ import agenciaService from '../../services/agenciaService';
 
 export const MayoristaAgencias = () => {
   const [agencias, setAgencias] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -160,6 +161,13 @@ export const MayoristaAgencias = () => {
     }
   };
 
+  const agenciasFiltradas = busqueda.trim()
+    ? agencias.filter(ag =>
+        ag.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        ag.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
+      )
+    : agencias;
+
   if (loading) return <Spinner center size="lg" />;
 
   return (
@@ -171,12 +179,26 @@ export const MayoristaAgencias = () => {
         </Button>
       </div>
 
+      <div style={{ marginBottom: '1.5rem', maxWidth: '360px', position: 'relative' }}>
+        <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-soft)', pointerEvents: 'none' }} />
+        <input
+          type="text"
+          placeholder="Buscar por nombre o razón social..."
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+          className="input-control"
+          style={{ paddingLeft: '2.25rem' }}
+        />
+      </div>
+
       {agencias.length === 0 ? (
         <EmptyState
           title="No hay agencias"
           description="Aún no ha registrado ninguna agencia en su panel de mayorista."
           action={<Button onClick={() => setIsCreateModalOpen(true)}>Registrar Agencia</Button>}
         />
+      ) : agenciasFiltradas.length === 0 ? (
+        <EmptyState title="Sin resultados" description={`No hay agencias que coincidan con "${busqueda}".`} />
       ) : (
         <Card>
           <Table>
@@ -190,7 +212,7 @@ export const MayoristaAgencias = () => {
               </TableRow>
             </thead>
             <tbody>
-              {agencias.map(ag => (
+              {agenciasFiltradas.map(ag => (
                 <TableRow key={ag._id}>
                   <TableCell>
                     <div style={{ fontWeight: 500 }}>{ag.nombre}</div>

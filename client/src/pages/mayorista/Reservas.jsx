@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Eye } from 'lucide-react';
+import { Eye, Search } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -16,6 +16,7 @@ export const MayoristaReservas = () => {
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState(searchParams.get('estado') ?? '');
+  const [filtroAgencia, setFiltroAgencia] = useState('');
 
   const fetchReservas = async () => {
     setLoading(true);
@@ -33,6 +34,14 @@ export const MayoristaReservas = () => {
     fetchReservas();
   }, [filtroEstado]);
 
+  const reservasFiltradas = reservas.filter(r => {
+    if (filtroAgencia.trim()) {
+      const nombre = r.agencia_id?.nombre?.toLowerCase() ?? '';
+      if (!nombre.includes(filtroAgencia.toLowerCase())) return false;
+    }
+    return true;
+  });
+
   if (loading && reservas.length === 0) return <Spinner center size="lg" />;
 
   return (
@@ -41,7 +50,8 @@ export const MayoristaReservas = () => {
         <h1 className="page-title">Administrar Reservas</h1>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', maxWidth: '400px' }}>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap', maxWidth: '700px' }}>
+        <div style={{ flex: '0 0 220px' }}>
         <Select
           value={filtroEstado}
           onChange={e => setFiltroEstado(e.target.value)}
@@ -54,10 +64,24 @@ export const MayoristaReservas = () => {
             { label: 'Cancelada', value: 'cancelada' },
           ]}
         />
+        </div>
+        <div style={{ flex: '1 1 200px', position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-soft)', pointerEvents: 'none' }} />
+          <input
+            type="text"
+            placeholder="Buscar por agencia..."
+            value={filtroAgencia}
+            onChange={e => setFiltroAgencia(e.target.value)}
+            className="input-control"
+            style={{ paddingLeft: '2.25rem' }}
+          />
+        </div>
       </div>
 
       {reservas.length === 0 ? (
         <EmptyState title="No hay reservas" description="No se encontraron reservas con los filtros actuales." />
+      ) : reservasFiltradas.length === 0 ? (
+        <EmptyState title="Sin resultados" description={`No hay reservas de agencias que contengan "${filtroAgencia}".`} />
       ) : (
         <Card>
           <Table>
@@ -74,7 +98,7 @@ export const MayoristaReservas = () => {
               </TableRow>
             </thead>
             <tbody>
-              {reservas.map(r => (
+              {reservasFiltradas.map(r => (
                 <TableRow key={r._id}>
                   <TableCell>
                     <div style={{ fontWeight: 600 }}>#{r._id.slice(-6).toUpperCase()}</div>
