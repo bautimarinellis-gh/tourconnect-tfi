@@ -17,6 +17,7 @@ export const MayoristaAgencias = () => {
   const [agencias, setAgencias] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const navigate = useNavigate();
 
   // --- Crear ---
@@ -49,11 +50,13 @@ export const MayoristaAgencias = () => {
 
   const fetchAgencias = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await agenciaService.getAll();
       setAgencias(data);
     } catch (err) {
       console.error(err);
+      setFetchError(err.response?.data?.message || 'Error al cargar las agencias. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -172,6 +175,7 @@ export const MayoristaAgencias = () => {
 
   return (
     <div>
+      {fetchError && <Alert variant="error" style={{ marginBottom: '1.5rem' }}>{fetchError}</Alert>}
       <div className="page-header">
         <h1 className="page-title">Agencias Asignadas</h1>
         <Button onClick={() => setIsCreateModalOpen(true)}>

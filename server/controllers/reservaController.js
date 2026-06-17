@@ -447,6 +447,10 @@ exports.createPago = async (req, res, next) => {
       return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
+    if (['cerrada', 'cancelada'].includes(reserva.estado)) {
+      return res.status(400).json({ success: false, message: 'No se pueden registrar pagos en una reserva cerrada o cancelada.' });
+    }
+
     const pago = await Pago.create({
       reserva_id: reserva._id,
       registrado_por: usuario_id,

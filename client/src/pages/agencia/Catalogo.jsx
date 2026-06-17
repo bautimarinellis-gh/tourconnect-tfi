@@ -33,6 +33,7 @@ export const AgenciaCatalogo = () => {
   const toast = useToast();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('');
 
   const [busqueda, setBusqueda] = useState('');
@@ -46,11 +47,13 @@ export const AgenciaCatalogo = () => {
 
   const fetchCatalogo = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await productoService.getCatalogo(filtroTipo ? { tipo: filtroTipo } : {});
       setProductos(data);
     } catch (err) {
       console.error(err);
+      setFetchError(err.response?.data?.message || 'Error al cargar el catálogo. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -96,6 +99,8 @@ export const AgenciaCatalogo = () => {
   };
 
   if (loading && productos.length === 0) return <Spinner center size="lg" />;
+
+  if (fetchError) return <Alert variant="error" style={{ margin: '2rem' }}>{fetchError}</Alert>;
 
   const minDisponible = toDateInputValue(selectedProduct?.disponibilidad_desde);
   const maxDisponible = toDateInputValue(selectedProduct?.disponibilidad_hasta);

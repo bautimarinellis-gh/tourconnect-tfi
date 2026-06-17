@@ -83,6 +83,7 @@ const getIconForType = (tipo) => {
 export const MayoristaProductos = () => {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('');
 
   // --- Crear ---
@@ -113,11 +114,13 @@ export const MayoristaProductos = () => {
 
   const fetchProductos = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await productoService.getAll(filtroTipo ? { tipo: filtroTipo } : {});
       setProductos(data);
     } catch (err) {
       console.error(err);
+      setFetchError(err.response?.data?.message || 'Error al cargar los productos. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -309,6 +312,7 @@ export const MayoristaProductos = () => {
 
   return (
     <div>
+      {fetchError && <Alert variant="error" style={{ marginBottom: '1.5rem' }}>{fetchError}</Alert>}
       <div className="page-header">
         <h1 className="page-title">Catálogo de Productos</h1>
         <Button onClick={handleOpenModal}>

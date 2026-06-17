@@ -5,7 +5,6 @@ const {
   setPassword,
   forgotPassword,
   resetPassword,
-  resetPasswordSimple,
   me,
   logout,
 } = require('../controllers/authController');
@@ -17,7 +16,6 @@ router.post('/login', login);
 router.post('/set-password', setPassword);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
-router.post('/reset-password-simple', resetPasswordSimple);
 
 // Rutas protegidas (requieren JWT válido)
 router.get('/me', auth, me);

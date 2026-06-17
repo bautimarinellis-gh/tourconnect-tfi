@@ -358,38 +358,6 @@ const me = async (req, res, next) => {
 };
 
 /**
- * POST /api/v1/auth/reset-password-simple
- * Resetea la contraseña directamente por email (solo para testing).
- * NO usar en producción — no verifica identidad.
- */
-const resetPasswordSimple = async (req, res, next) => {
-  try {
-    const { email, nueva_password } = req.body;
-
-    if (!email || !nueva_password) {
-      return res.status(400).json({ error: 'Email y nueva contraseña son obligatorios.' });
-    }
-
-    if (nueva_password.length < 8) {
-      return res.status(400).json({ error: 'Contraseña muy corta' });
-    }
-
-    const usuario = await Usuario.findOne({ email }).select('+password_hash');
-
-    if (!usuario) {
-      return res.status(404).json({ error: 'Email no encontrado' });
-    }
-
-    usuario.password_hash = await Usuario.hashPassword(nueva_password);
-    await usuario.save();
-
-    res.json({ mensaje: 'Contraseña actualizada exitosamente' });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
  * POST /api/v1/auth/logout
  * Invalida el token actual.
  */
@@ -419,7 +387,6 @@ module.exports = {
   setPassword,
   forgotPassword,
   resetPassword,
-  resetPasswordSimple,
   me,
   logout,
   tokenBlacklist,
