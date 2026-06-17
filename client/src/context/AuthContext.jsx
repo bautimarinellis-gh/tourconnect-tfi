@@ -1,23 +1,19 @@
-import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useCallback, useMemo } from 'react';
 import authService from '../services/authService';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('tourconnect_user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem('tourconnect_user');
-      }
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem('tourconnect_user');
+    if (!stored) return null;
+    try {
+      return JSON.parse(stored);
+    } catch {
+      localStorage.removeItem('tourconnect_user');
+      return null;
     }
-    setLoading(false);
-  }, []);
+  });
 
   const login = useCallback(async (email, password) => {
     const response = await authService.login(email, password);
@@ -39,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const value = useMemo(() => ({ user, login, logout, loading }), [user, login, logout, loading]);
+  const value = useMemo(() => ({ user, login, logout, loading: false }), [user, login, logout]);
 
   return (
     <AuthContext.Provider value={value}>
