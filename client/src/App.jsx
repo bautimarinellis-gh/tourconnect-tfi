@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/shared/ProtectedRoute';
 import { PageWrapper } from './components/layout/PageWrapper';
 import { ToastContainer } from './components/ui/Toast';
 import { ThemeToggle } from './components/ui/ThemeToggle';
+import { Spinner } from './components/ui/Spinner';
 
 // Auth Pages
 import { Login } from './pages/auth/Login';
@@ -22,7 +23,6 @@ import { MayoristaAgencias } from './pages/mayorista/Agencias';
 import { MayoristaAgenciaDetalle } from './pages/mayorista/AgenciaDetalle';
 import { MayoristaProductos } from './pages/mayorista/Productos';
 import { MayoristaCotizaciones } from './pages/mayorista/Cotizaciones';
-import { MayoristaReportes } from './pages/mayorista/Reportes';
 import { MayoristaReservas } from './pages/mayorista/Reservas';
 import { MayoristaReservaDetalle } from './pages/mayorista/ReservaDetalle';
 
@@ -32,6 +32,10 @@ import { AgenciaCatalogo } from './pages/agencia/Catalogo';
 import { AgenciaCotizaciones } from './pages/agencia/Cotizaciones';
 import { AgenciaReservas } from './pages/agencia/Reservas';
 import { AgenciaReservaDetalle } from './pages/agencia/ReservaDetalle';
+
+const MayoristaReportes = React.lazy(() =>
+  import('./pages/mayorista/Reportes').then(m => ({ default: m.MayoristaReportes }))
+);
 
 const RootRedirect = () => {
   const { user, loading } = useAuth();
@@ -80,7 +84,11 @@ function App() {
                   <Route path="cotizaciones" element={<MayoristaCotizaciones />} />
                   <Route path="reservas" element={<MayoristaReservas />} />
                   <Route path="reservas/:id" element={<MayoristaReservaDetalle />} />
-                  <Route path="reportes" element={<MayoristaReportes />} />
+                  <Route path="reportes" element={
+                    <React.Suspense fallback={<Spinner center size="lg" />}>
+                      <MayoristaReportes />
+                    </React.Suspense>
+                  } />
                 </Routes>
               </PageWrapper>
             } />
