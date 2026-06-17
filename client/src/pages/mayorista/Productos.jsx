@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Pencil, Trash2, Tag, Hotel, Map, Calendar as CalendarIcon, Package as PackageIcon, AlertTriangle } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -83,7 +83,7 @@ export const MayoristaProductos = () => {
   const set = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
   const setEdit = (key, value) => setEditForm(prev => ({ ...prev, [key]: value }));
 
-  const fetchProductos = async () => {
+  const fetchProductos = useCallback(async () => {
     setLoading(true);
     try {
       const data = await productoService.getAll(filtroTipo ? { tipo: filtroTipo } : {});
@@ -93,11 +93,11 @@ export const MayoristaProductos = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtroTipo]);
 
   useEffect(() => {
     fetchProductos();
-  }, [filtroTipo]);
+  }, [fetchProductos]);
 
   // --- Handlers: Crear ---
   const handleOpenModal = () => {

@@ -51,8 +51,8 @@ export const AdminDashboard = () => {
       </div>
 
       <div className="dashboard-kpi-grid">
-        {kpis.map((kpi, i) => (
-          <Card key={i} className="metric-card">
+        {kpis.map((kpi) => (
+          <Card key={kpi.label} className="metric-card">
             <CardBody>
               <div className="dashboard-kpi-top">
                 <div>

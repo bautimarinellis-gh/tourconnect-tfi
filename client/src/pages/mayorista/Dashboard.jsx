@@ -48,8 +48,8 @@ export const MayoristaDashboard = () => {
       </div>
 
       <div className="dashboard-kpi-grid">
-        {kpis.map((kpi, index) => (
-          <Card key={index} className="metric-card">
+        {kpis.map((kpi) => (
+          <Card key={kpi.label} className="metric-card">
             <CardBody>
               <div className="dashboard-kpi-top">
                 <div>

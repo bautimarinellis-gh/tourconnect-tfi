@@ -13,8 +13,8 @@ export const Select = React.forwardRef(({ label, error, options = [], placeholde
         {placeholder && !options.some(o => String(o.value) === '') && (
           <option value="" disabled>{placeholder}</option>
         )}
-        {options.map((opt, i) => (
-          <option key={i} value={opt.value}>{opt.label}</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
       {error && <span className="input-error-message">{error}</span>}

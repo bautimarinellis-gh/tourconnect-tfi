@@ -18,20 +18,19 @@ export const MayoristaReservas = () => {
   const [filtroEstado, setFiltroEstado] = useState(searchParams.get('estado') ?? '');
   const [filtroAgencia, setFiltroAgencia] = useState('');
 
-  const fetchReservas = async () => {
-    setLoading(true);
-    try {
-      const data = await reservaService.getAll(filtroEstado ? { estado: filtroEstado } : {});
-      setReservas(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchReservas();
+    const doFetch = async () => {
+      setLoading(true);
+      try {
+        const data = await reservaService.getAll(filtroEstado ? { estado: filtroEstado } : {});
+        setReservas(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    doFetch();
   }, [filtroEstado]);
 
   const reservasFiltradas = reservas.filter(r => {

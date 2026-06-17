@@ -16,20 +16,19 @@ export const AgenciaReservas = () => {
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('');
 
-  const fetchReservas = async () => {
-    setLoading(true);
-    try {
-      const data = await reservaService.getAll(filtroEstado ? { estado: filtroEstado } : {});
-      setReservas(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchReservas();
+    const doFetch = async () => {
+      setLoading(true);
+      try {
+        const data = await reservaService.getAll(filtroEstado ? { estado: filtroEstado } : {});
+        setReservas(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    doFetch();
   }, [filtroEstado]);
 
   if (loading && reservas.length === 0) return <Spinner center size="lg" />;

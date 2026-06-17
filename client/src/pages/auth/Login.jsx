@@ -59,10 +59,11 @@ export const Login = () => {
               placeholder="nombre@ejemplo.com"
             />
             <div className="password-header">
-              <label className="input-label" style={{marginBottom: 0}}>Contraseña</label>
+              <label className="input-label" htmlFor="login-password" style={{marginBottom: 0}}>Contraseña</label>
               <Link to="/reset-password" className="auth-link">¿Olvidó su contraseña?</Link>
             </div>
             <PasswordInput
+              id="login-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

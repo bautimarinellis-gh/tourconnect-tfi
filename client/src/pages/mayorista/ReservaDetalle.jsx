@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Check, X, CreditCard, Lock, AlertTriangle } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
@@ -39,7 +39,7 @@ export const MayoristaReservaDetalle = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [modalError, setModalError] = useState('');
 
-  const fetchReserva = async () => {
+  const fetchReserva = useCallback(async () => {
     setLoading(true);
     try {
       const data = await reservaService.getById(id);
@@ -49,11 +49,11 @@ export const MayoristaReservaDetalle = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchReserva();
-  }, [id]);
+  }, [fetchReserva]);
 
   const handleCancelar = async () => {
     if (!cancelReason.trim()) {
@@ -273,8 +273,8 @@ export const MayoristaReservaDetalle = () => {
             <CardBody>
               {pagos.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pagos.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                  {pagos.map((p) => (
+                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
                       <div>
                         <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>{formatCurrency(toFloat(p.monto))}</p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0, textTransform: 'capitalize' }}>
@@ -321,8 +321,8 @@ export const MayoristaReservaDetalle = () => {
             <CardBody>
               <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', backgroundColor: 'var(--color-border)' }}></div>
-                {(reserva.historial ?? []).map((h, i) => (
-                  <div key={i} style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                {(reserva.historial ?? []).map((h) => (
+                  <div key={h._id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
                     <div style={{ position: 'absolute', left: '-1.5rem', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-surface)' }}></div>
                     <div style={{ fontWeight: 600 }}>{formatEstadoReserva(h.estado_nuevo)}</div>
                     {h.comentario && (
@@ -381,8 +381,9 @@ export const MayoristaReservaDetalle = () => {
             placeholder={formatCurrency(precioFinal)}
           />
           <div>
-            <label className="input-label">Método de pago</label>
+            <label className="input-label" htmlFor="mayorista-metodo-pago">Método de pago</label>
             <select
+              id="mayorista-metodo-pago"
               className="input-control"
               value={paymentData.metodo}
               onChange={e => setPaymentData({ ...paymentData, metodo: e.target.value })}

@@ -182,8 +182,8 @@ export const AgenciaReservaDetalle = () => {
             <CardBody>
               {pagos.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pagos.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-sm)' }}>
+                  {pagos.map((p) => (
+                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-sm)' }}>
                       <div>
                         <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>{formatCurrency(toFloat(p.monto))}</p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0, textTransform: 'capitalize' }}>
@@ -271,8 +271,8 @@ export const AgenciaReservaDetalle = () => {
             <CardBody>
               <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', backgroundColor: 'var(--color-border)' }}></div>
-                {(reserva.historial ?? []).map((h, i) => (
-                  <div key={i} style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                {(reserva.historial ?? []).map((h) => (
+                  <div key={h._id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
                     <div style={{ position: 'absolute', left: '-1.5rem', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-surface)' }}></div>
                     <div style={{ fontWeight: 600, textTransform: 'capitalize' }}>{formatEstadoReserva(h.estado_nuevo)}</div>
                     {h.comentario && (
@@ -303,8 +303,9 @@ export const AgenciaReservaDetalle = () => {
           {error && <Alert variant="error">{error}</Alert>}
 
           <div>
-            <label className="input-label">Método de pago *</label>
+            <label className="input-label" htmlFor="agencia-metodo-pago">Método de pago *</label>
             <select
+              id="agencia-metodo-pago"
               className="input-control"
               value={pagoForm.metodo}
               onChange={e => setPagoForm({ ...pagoForm, metodo: e.target.value })}

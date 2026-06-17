@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Check, X, Eye } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -37,7 +37,7 @@ export const MayoristaCotizaciones = () => {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  const fetchCotizaciones = async () => {
+  const fetchCotizaciones = useCallback(async () => {
     setLoading(true);
     try {
       const data = await cotizacionService.getAll(filtroEstado ? { estado: filtroEstado } : {});
@@ -47,11 +47,11 @@ export const MayoristaCotizaciones = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtroEstado]);
 
   useEffect(() => {
     fetchCotizaciones();
-  }, [filtroEstado]);
+  }, [fetchCotizaciones]);
 
   const handleAction = async (id, status, reason = '') => {
     if (status === 'rechazada' && !reason) {
