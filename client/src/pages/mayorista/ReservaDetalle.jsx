@@ -452,6 +452,7 @@ export const MayoristaReservaDetalle = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
               {MOTIVOS_RAPIDOS.map(m => (
                 <button
+                  type="button"
                   key={m}
                   onClick={() => setRejectReason(m)}
                   style={{

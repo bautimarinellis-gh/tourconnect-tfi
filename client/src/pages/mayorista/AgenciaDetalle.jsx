@@ -91,7 +91,8 @@ export const MayoristaAgenciaDetalle = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
-        <button 
+        <button
+          type="button"
           onClick={() => setActiveTab('info')}
           style={{ 
             padding: '0.75rem 1rem', 
@@ -105,7 +106,8 @@ export const MayoristaAgenciaDetalle = () => {
         >
           Información
         </button>
-        <button 
+        <button
+          type="button"
           onClick={() => setActiveTab('products')}
           style={{ 
             padding: '0.75rem 1rem', 

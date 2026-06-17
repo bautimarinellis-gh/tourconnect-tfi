@@ -99,8 +99,9 @@ export const Navbar = () => {
             <span>{activeLink?.name || 'Panel'}</span>
           </div>
           <div className="user-menu-container" ref={dropdownRef}>
-            <button 
-              className="user-menu-btn" 
+            <button
+              type="button"
+              className="user-menu-btn"
               onClick={() => setShowDropdown(!showDropdown)}
             >
               <div className="avatar">
@@ -117,7 +118,8 @@ export const Navbar = () => {
                   <p className="dropdown-role"><Shield size={12} /> {roleLabel}</p>
                 </div>
                 <div className="dropdown-divider"></div>
-                <button 
+                <button
+                  type="button"
                   className="dropdown-item text-danger"
                   onClick={() => {
                     setShowDropdown(false);

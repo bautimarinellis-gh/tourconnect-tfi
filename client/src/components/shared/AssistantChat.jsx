@@ -76,6 +76,7 @@ function UnknownSuggestions({ suggestions, onSelect }) {
     <div className="unknown-intent-suggestions">
       {suggestions.slice(0, 5).map((s) => (
         <button
+          type="button"
           key={s.intent}
           className="unknown-suggestion-chip"
           onClick={() => onSelect(s.example)}
@@ -275,6 +276,7 @@ export function AssistantChat() {
           <div className="assistant-suggestion-label">Probá preguntar:</div>
           {INITIAL_SUGGESTIONS.map((s) => (
             <button
+              type="button"
               key={s}
               className="suggestion-chip"
               onClick={() => handleSuggestionClick(s)}
@@ -300,6 +302,7 @@ export function AssistantChat() {
           maxLength={300}
         />
         <button
+          type="button"
           className="assistant-send-btn"
           onClick={() => sendQuery(input)}
           disabled={isLoading || !input.trim()}
