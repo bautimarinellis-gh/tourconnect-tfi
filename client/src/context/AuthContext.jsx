@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
 import authService from '../services/authService';
 
 export const AuthContext = createContext();
@@ -19,15 +19,15 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     const response = await authService.login(email, password);
     const userData = { ...response.data.usuario };
     localStorage.setItem('tourconnect_user', JSON.stringify(userData));
     setUser(userData);
     return userData;
-  };
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await authService.logout();
     } catch (err) {
@@ -37,10 +37,12 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       window.location.href = '/login';
     }
-  };
+  }, []);
+
+  const value = useMemo(() => ({ user, login, logout, loading }), [user, login, logout, loading]);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

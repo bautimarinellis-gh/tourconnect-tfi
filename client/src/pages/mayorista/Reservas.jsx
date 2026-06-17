@@ -68,6 +68,7 @@ export const MayoristaReservas = () => {
           <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-soft)', pointerEvents: 'none' }} />
           <input
             type="text"
+            aria-label="Buscar por agencia"
             placeholder="Buscar por agencia..."
             value={filtroAgencia}
             onChange={e => setFiltroAgencia(e.target.value)}

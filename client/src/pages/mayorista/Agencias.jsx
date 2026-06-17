@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Eye, Pencil, Trash2, AlertTriangle, FileText, CalendarCheck, Search } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
@@ -29,7 +29,7 @@ export const MayoristaAgencias = () => {
   const [createSaving, setCreateSaving] = useState(false);
 
   // --- Editar ---
-  const [editAgencia, setEditAgencia] = useState(null);
+  const editAgenciaRef = useRef(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({ nombre: '', razon_social: '', telefono: '' });
   const [editError, setEditError] = useState('');
@@ -98,7 +98,7 @@ export const MayoristaAgencias = () => {
 
   // --- Handlers: Editar ---
   const handleOpenEdit = (ag) => {
-    setEditAgencia(ag);
+    editAgenciaRef.current = ag;
     setEditForm({ nombre: ag.nombre || '', razon_social: ag.razon_social || '', telefono: ag.telefono || '' });
     setEditError('');
     setIsEditModalOpen(true);
@@ -112,9 +112,9 @@ export const MayoristaAgencias = () => {
     }
     setEditSaving(true);
     try {
-      const updated = await agenciaService.update(editAgencia._id, editForm);
+      const updated = await agenciaService.update(editAgenciaRef.current._id, editForm);
       setAgencias(prev => prev.map(ag =>
-        ag._id === editAgencia._id ? { ...ag, ...updated.data } : ag
+        ag._id === editAgenciaRef.current._id ? { ...ag, ...updated.data } : ag
       ));
       setIsEditModalOpen(false);
     } catch (err) {
@@ -183,6 +183,7 @@ export const MayoristaAgencias = () => {
         <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-soft)', pointerEvents: 'none' }} />
         <input
           type="text"
+          aria-label="Buscar agencia"
           placeholder="Buscar por nombre o razón social..."
           value={busqueda}
           onChange={e => setBusqueda(e.target.value)}

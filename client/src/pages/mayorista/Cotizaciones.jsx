@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Check, X, Eye } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -19,7 +19,7 @@ export const MayoristaCotizaciones = () => {
   const [filtroEstado, setFiltroEstado] = useState('');
   
   // Modal: Rechazar
-  const [selectedCotizacion, setSelectedCotizacion] = useState(null);
+  const selectedCotizacionRef = useRef(null);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
@@ -152,7 +152,7 @@ export const MayoristaCotizaciones = () => {
                           <Button size="sm" variant="success" onClick={() => { setApproveTarget(c); setIsApproveModalOpen(true); }}>
                             <Check size={16} />
                           </Button>
-                          <Button size="sm" variant="danger" onClick={() => { setSelectedCotizacion(c); setIsRejectModalOpen(true); }}>
+                          <Button size="sm" variant="danger" onClick={() => { selectedCotizacionRef.current = c; setIsRejectModalOpen(true); }}>
                             <X size={16} />
                           </Button>
                         </>
@@ -211,7 +211,7 @@ export const MayoristaCotizaciones = () => {
               Cancelar
             </Button>
             <Button
-              onClick={() => handleAction(selectedCotizacion._id, 'rechazada', rejectReason)}
+              onClick={() => handleAction(selectedCotizacionRef.current._id, 'rechazada', rejectReason)}
               isLoading={actionLoading}
               style={{ backgroundColor: 'var(--color-error, #DC2626)', borderColor: 'var(--color-error, #DC2626)' }}
             >

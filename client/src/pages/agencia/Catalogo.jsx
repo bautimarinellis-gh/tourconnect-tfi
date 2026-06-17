@@ -163,6 +163,7 @@ export const AgenciaCatalogo = () => {
               <span className="catalog-search-icon"><Search size={16} /></span>
               <input
                 type="text"
+                aria-label="Buscar experiencia"
                 placeholder="Buscar experiencia..."
                 value={busqueda}
                 onChange={e => setBusqueda(e.target.value)}

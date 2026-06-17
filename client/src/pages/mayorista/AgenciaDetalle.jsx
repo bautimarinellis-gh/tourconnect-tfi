@@ -178,8 +178,9 @@ export const MayoristaAgenciaDetalle = () => {
                 return (
                   <TableRow key={p._id}>
                     <TableCell>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
+                        aria-label={`Habilitar ${p.nombre}`}
                         checked={state.habilitado}
                         onChange={(e) => setProductStates({...productStates, [p._id]: {...state, habilitado: e.target.checked}})}
                         style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}

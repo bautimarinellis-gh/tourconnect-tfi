@@ -221,6 +221,7 @@ export const AdminMayoristas = () => {
             <Search size={15} style={{ color: 'var(--color-text-soft)', flexShrink: 0 }} />
             <input
               type="text"
+              aria-label="Buscar mayorista"
               placeholder="Buscar por nombre o razón social..."
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}

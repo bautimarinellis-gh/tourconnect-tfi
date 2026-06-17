@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Pencil, Trash2, Tag, Hotel, Map, Calendar as CalendarIcon, Package as PackageIcon, AlertTriangle } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -73,7 +73,7 @@ export const MayoristaProductos = () => {
   const [deleteError, setDeleteError] = useState('');
 
   // --- Editar ---
-  const [editProducto, setEditProducto] = useState(null);
+  const editProductoRef = useRef(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTipo, setEditTipo] = useState('hotel');
   const [editForm, setEditForm] = useState(INITIAL_FORM);
@@ -156,7 +156,7 @@ export const MayoristaProductos = () => {
 
   // --- Handlers: Editar ---
   const handleOpenEdit = (p) => {
-    setEditProducto(p);
+    editProductoRef.current = p;
     setEditTipo(p.tipo);
     setEditForm({
       nombre: p.nombre || '',
@@ -192,9 +192,9 @@ export const MayoristaProductos = () => {
     }
     setEditSaving(true);
     try {
-      const result = await productoService.update(editProducto._id, buildPayload(editTipo, editForm));
+      const result = await productoService.update(editProductoRef.current._id, buildPayload(editTipo, editForm));
       setProductos(prev => prev.map(p =>
-        p._id === editProducto._id ? { ...p, ...result.data } : p
+        p._id === editProductoRef.current._id ? { ...p, ...result.data } : p
       ));
       setIsEditModalOpen(false);
     } catch (err) {

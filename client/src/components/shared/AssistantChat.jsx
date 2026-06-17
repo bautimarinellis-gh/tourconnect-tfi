@@ -292,6 +292,7 @@ export function AssistantChat() {
       <div className="assistant-input-area">
         <textarea
           ref={inputRef}
+          aria-label="Escribir mensaje al asistente"
           className="assistant-input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
