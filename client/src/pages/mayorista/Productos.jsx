@@ -52,6 +52,34 @@ const getAvailabilitySummary = (form) => {
   return `Disponible por ${days} día${days !== 1 ? 's' : ''}.`;
 };
 
+const buildPayload = (tipo, form) => {
+  const payload = {
+    tipo,
+    nombre: form.nombre,
+    descripcion: form.descripcion,
+    precio_base: Number(form.precio_base),
+    disponibilidad_desde: form.disponibilidad_desde,
+    disponibilidad_hasta: form.disponibilidad_hasta,
+  };
+  if (tipo === 'hotel') {
+    payload.direccion = form.hotel_direccion;
+    payload.estrellas = Number(form.hotel_estrellas);
+  } else if (tipo === 'actividad') {
+    payload.duracion_horas = Number(form.actividad_duracion);
+    payload.cupo_maximo = Number(form.actividad_cupo);
+  } else if (tipo === 'paquete') {
+    payload.itinerario = form.paquete_itinerario;
+  }
+  return payload;
+};
+
+const getIconForType = (tipo) => {
+  if (tipo === 'hotel') return <Hotel />;
+  if (tipo === 'actividad') return <Map />;
+  if (tipo === 'paquete') return <PackageIcon />;
+  return <Tag />;
+};
+
 export const MayoristaProductos = () => {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,27 +133,6 @@ export const MayoristaProductos = () => {
     setTipoProducto('hotel');
     setFormError('');
     setIsCreateModalOpen(true);
-  };
-
-  const buildPayload = (tipo, form) => {
-    const payload = {
-      tipo,
-      nombre: form.nombre,
-      descripcion: form.descripcion,
-      precio_base: Number(form.precio_base),
-      disponibilidad_desde: form.disponibilidad_desde,
-      disponibilidad_hasta: form.disponibilidad_hasta,
-    };
-    if (tipo === 'hotel') {
-      payload.direccion = form.hotel_direccion;
-      payload.estrellas = Number(form.hotel_estrellas);
-    } else if (tipo === 'actividad') {
-      payload.duracion_horas = Number(form.actividad_duracion);
-      payload.cupo_maximo = Number(form.actividad_cupo);
-    } else if (tipo === 'paquete') {
-      payload.itinerario = form.paquete_itinerario;
-    }
-    return payload;
   };
 
   const handleCreate = async () => {
@@ -236,13 +243,6 @@ export const MayoristaProductos = () => {
     } finally {
       setDeleting(false);
     }
-  };
-
-  const getIconForType = (tipo) => {
-    if (tipo === 'hotel') return <Hotel />;
-    if (tipo === 'actividad') return <Map />;
-    if (tipo === 'paquete') return <PackageIcon />;
-    return <Tag />;
   };
 
   const tipoLabel = { hotel: 'Hotel', actividad: 'Actividad', paquete: 'Paquete' };

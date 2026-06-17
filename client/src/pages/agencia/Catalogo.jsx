@@ -22,6 +22,13 @@ const QUOTE_DURATION_PRESETS = [
   { label: '14 días', days: 14 },
 ];
 
+const getIconForType = (tipo) => {
+  if (tipo === 'hotel') return <Hotel />;
+  if (tipo === 'actividad') return <Map />;
+  if (tipo === 'paquete') return <PackageIcon />;
+  return <Tag />;
+};
+
 export const AgenciaCatalogo = () => {
   const toast = useToast();
   const [productos, setProductos] = useState([]);
@@ -86,13 +93,6 @@ export const AgenciaCatalogo = () => {
   const selectProduct = (producto) => {
     setSelectedProduct(producto);
     setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
-  };
-
-  const getIconForType = (tipo) => {
-    if (tipo === 'hotel') return <Hotel />;
-    if (tipo === 'actividad') return <Map />;
-    if (tipo === 'paquete') return <PackageIcon />;
-    return <Tag />;
   };
 
   if (loading && productos.length === 0) return <Spinner center size="lg" />;
