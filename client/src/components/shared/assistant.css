@@ -389,6 +389,47 @@
   cursor: not-allowed;
 }
 
+/* ── Clear chat button (en el header) ── */
+.clear-chat-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.clear-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
+  color: white;
+}
+
+/* ── Retry button (dentro de burbuja de error) ── */
+.retry-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--color-error);
+  font-size: 12px;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.retry-btn:hover {
+  background: var(--color-error);
+  color: white;
+}
+
 /* ── Unknown intent / sugerencias inline ── */
 .unknown-intent-suggestions {
   display: flex;

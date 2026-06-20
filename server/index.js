@@ -3,6 +3,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const helmet = require('helmet');
 const connectDB = require('./config/db');
 
 // Cargar variables de entorno
@@ -14,13 +15,15 @@ const app = express();
 // ---------------------
 // Middlewares globales
 // ---------------------
+app.use(helmet());
+
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
 }));
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Logger HTTP solo en desarrollo
 if (process.env.NODE_ENV !== 'production') {

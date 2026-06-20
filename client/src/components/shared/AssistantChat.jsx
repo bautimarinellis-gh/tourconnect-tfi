@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, ChevronRight } from 'lucide-react';
+import { Send, Sparkles, ChevronRight, X } from 'lucide-react';
 import assistantService from '../../services/assistantService';
 import './assistant.css';
 
@@ -91,7 +91,7 @@ function UnknownSuggestions({ suggestions, onSelect }) {
 
 // ─── Burbuja de mensaje ────────────────────────────────────────────
 
-function MessageBubble({ msg, onSuggestionClick }) {
+function MessageBubble({ msg, onSuggestionClick, onRetry }) {
   const isUser = msg.role === 'user';
 
   if (isUser) {
@@ -110,6 +110,17 @@ function MessageBubble({ msg, onSuggestionClick }) {
     <div className="message-row assistant">
       <div className={`message-bubble${isError ? ' error' : ''}`}>
         {msg.content}
+
+        {/* Botón de reintento en errores de red / servidor */}
+        {isError && msg.retryQuery && (
+          <button
+            type="button"
+            className="retry-btn"
+            onClick={() => onRetry(msg.retryQuery)}
+          >
+            Reintentar
+          </button>
+        )}
 
         {/* Visualización de datos */}
         {!isError && !isUnknown && msg.visualization === 'stat' && msg.stat && (
@@ -144,7 +155,10 @@ export function AssistantChat() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const showSuggestions = messages.length === 0;
+  const lastMsg = messages[messages.length - 1];
+  const showSuggestions =
+    messages.length === 0 ||
+    (!isLoading && lastMsg?.role === 'assistant');
 
   // Auto-scroll al último mensaje
   useEffect(() => {
@@ -187,13 +201,13 @@ export function AssistantChat() {
         visualization: res.visualization,
         data: res.data,
         stat: res.stat,
-        summary: res.data?.length > 0 ? null : null, // summary ya va en content
         columns: res.columns || [],
         columnLabels: res.columnLabels || {},
         suggestions: res.suggestions,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
     } catch (err) {
       const errorMsg = err?.response?.data?.message || err.message || 'Ocurrió un error al procesar tu consulta.';
       setMessages((prev) => [
@@ -203,6 +217,7 @@ export function AssistantChat() {
           content: errorMsg,
           id: Date.now() + 1,
           isError: true,
+          retryQuery: trimmed,
         },
       ]);
     } finally {
@@ -233,7 +248,16 @@ export function AssistantChat() {
           <div className="assistant-header-title">Asistente Inteligente</div>
           <div className="assistant-header-subtitle">Consultá tus datos en lenguaje natural</div>
         </div>
-        <span className="assistant-header-badge">BETA</span>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            className="clear-chat-btn"
+            onClick={() => setMessages([])}
+            title="Limpiar conversación"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
 
       {/* ── Mensajes ── */}
@@ -252,6 +276,7 @@ export function AssistantChat() {
               key={msg.id}
               msg={msg}
               onSuggestionClick={handleSuggestionClick}
+              onRetry={sendQuery}
             />
           ))
         )}

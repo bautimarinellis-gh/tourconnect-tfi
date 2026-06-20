@@ -682,7 +682,7 @@ exports.rechazarPago = async (req, res, next) => {
       });
     }
 
-    await Pago.deleteMany({ reserva_id: reserva._id }).session(session);
+    await Pago.deleteOne({ reserva_id: reserva._id }).session(session);
 
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pendiente_pago';
