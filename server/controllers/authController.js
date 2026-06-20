@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Usuario = require('../models/Usuario');
 const { enviarEmail } = require('../utils/mailer');
 const { resolverContextoPersona, enriquecerUsuario } = require('../utils/personaContext');
+const { registrarAuditoria } = require('../utils/auditService');
 
 // ---------------------
 // Helpers
@@ -54,6 +55,14 @@ const login = async (req, res, next) => {
     const usuario = await Usuario.findOne({ email }).select('+password_hash');
 
     if (!usuario) {
+      await registrarAuditoria({
+        req,
+        accion: 'LOGIN_FALLIDO',
+        usuario_id: null,
+        mayorista_id: null,
+        resultado: 'fallido',
+        detalle: { email_intentado: email, motivo: 'email_no_encontrado' },
+      });
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas.',
@@ -62,6 +71,14 @@ const login = async (req, res, next) => {
 
     // Verificar contraseña
     if (!usuario.password_hash) {
+      await registrarAuditoria({
+        req,
+        accion: 'LOGIN_FALLIDO',
+        usuario_id: usuario._id,
+        mayorista_id: null,
+        resultado: 'fallido',
+        detalle: { email_intentado: email, motivo: 'sin_password_configurado' },
+      });
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas.',
@@ -71,6 +88,14 @@ const login = async (req, res, next) => {
     const passwordValido = await usuario.compararPassword(password);
 
     if (!passwordValido) {
+      await registrarAuditoria({
+        req,
+        accion: 'LOGIN_FALLIDO',
+        usuario_id: usuario._id,
+        mayorista_id: null,
+        resultado: 'fallido',
+        detalle: { email_intentado: email, motivo: 'credenciales_invalidas' },
+      });
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas.',
@@ -79,6 +104,14 @@ const login = async (req, res, next) => {
 
     // Verificar que la cuenta de usuario esté activa
     if (!usuario.activo) {
+      await registrarAuditoria({
+        req,
+        accion: 'LOGIN_FALLIDO',
+        usuario_id: usuario._id,
+        mayorista_id: null,
+        resultado: 'fallido',
+        detalle: { email_intentado: email, motivo: 'cuenta_inactiva' },
+      });
       return res.status(403).json({
         success: false,
         message: 'Tu cuenta no está activa. Revisá tu email de invitación.',
@@ -89,12 +122,28 @@ const login = async (req, res, next) => {
 
     if (usuario.rol === 'mayorista') {
       if (!contexto.persona) {
+        await registrarAuditoria({
+          req,
+          accion: 'LOGIN_FALLIDO',
+          usuario_id: usuario._id,
+          mayorista_id: null,
+          resultado: 'fallido',
+          detalle: { email_intentado: email, motivo: 'perfil_mayorista_no_encontrado' },
+        });
         return res.status(403).json({
           success: false,
           message: 'No se encontró el perfil de mayorista asociado.',
         });
       }
       if (contexto.persona.activo !== true) {
+        await registrarAuditoria({
+          req,
+          accion: 'LOGIN_FALLIDO',
+          usuario_id: usuario._id,
+          mayorista_id: contexto.mayorista_id ?? null,
+          resultado: 'fallido',
+          detalle: { email_intentado: email, motivo: 'mayorista_desactivado' },
+        });
         return res.status(403).json({
           success: false,
           message: 'El mayorista está desactivado. Contactá al administrador.',
@@ -102,12 +151,29 @@ const login = async (req, res, next) => {
       }
     } else if (usuario.rol === 'agencia') {
       if (!contexto.persona) {
+        await registrarAuditoria({
+          req,
+          accion: 'LOGIN_FALLIDO',
+          usuario_id: usuario._id,
+          mayorista_id: contexto.mayorista_id ?? null,
+          resultado: 'fallido',
+          detalle: { email_intentado: email, motivo: 'perfil_agencia_no_encontrado' },
+        });
         return res.status(403).json({
           success: false,
           message: 'No se encontró el perfil de agencia asociado.',
         });
       }
       if (contexto.persona.activo !== true) {
+        await registrarAuditoria({
+          req,
+          accion: 'LOGIN_FALLIDO',
+          usuario_id: usuario._id,
+          mayorista_id: contexto.mayorista_id ?? null,
+          agencia_id: contexto.agencia_id ?? null,
+          resultado: 'fallido',
+          detalle: { email_intentado: email, motivo: 'agencia_desactivada' },
+        });
         return res.status(403).json({
           success: false,
           message: 'La agencia está desactivada. Contactá al administrador.',
@@ -116,6 +182,15 @@ const login = async (req, res, next) => {
     }
 
     const token = generarToken(usuario, contexto);
+
+    registrarAuditoria({
+      req,
+      accion: 'LOGIN_EXITOSO',
+      usuario_id: usuario._id,
+      mayorista_id: contexto.mayorista_id ?? null,
+      agencia_id: contexto.agencia_id ?? null,
+      detalle: { rol: usuario.rol },
+    });
 
     res.cookie('token', token, {
       httpOnly: true,
@@ -184,6 +259,15 @@ const setPassword = async (req, res, next) => {
     usuario.invite_token_expires = undefined;
     await usuario.save();
 
+    registrarAuditoria({
+      req,
+      accion: 'SET_PASSWORD',
+      usuario_id: usuario._id,
+      mayorista_id: null,
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+    });
+
     res.json({
       success: true,
       data: {
@@ -227,6 +311,16 @@ const forgotPassword = async (req, res, next) => {
     usuario.reset_token = resetToken;
     usuario.reset_token_expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 horas
     await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'RESET_PASSWORD_SOLICITADO',
+      usuario_id: usuario._id,
+      mayorista_id: null,
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email },
+    });
 
     // Enviar email de reset
     const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
@@ -320,6 +414,15 @@ const resetPassword = async (req, res, next) => {
     usuario.reset_token_expires = undefined;
     await usuario.save();
 
+    registrarAuditoria({
+      req,
+      accion: 'RESET_PASSWORD',
+      usuario_id: usuario._id,
+      mayorista_id: null,
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+    });
+
     res.json({
       success: true,
       data: {
@@ -367,6 +470,8 @@ const logout = (req, res) => {
   if (token) {
     tokenBlacklist.add(token);
   }
+
+  registrarAuditoria({ req, accion: 'LOGOUT' });
 
   res.clearCookie('token', {
     httpOnly: true,

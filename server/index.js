@@ -69,6 +69,9 @@ app.use('/api/v1/reportes', require('./routes/reporteRoute'));
 // Módulo 9 — Asistente Inteligente
 app.use('/api/v1/assistant', require('./routes/assistantRoute'));
 
+// Módulo 10 — Auditoría transversal
+app.use('/api/v1/auditoria', require('./routes/auditoriaRoute'));
+
 // ---------------------
 // Manejo de ruta no encontrada
 // ---------------------

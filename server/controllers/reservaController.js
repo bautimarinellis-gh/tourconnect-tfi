@@ -4,6 +4,7 @@ const Cotizacion = require('../models/Cotizacion');
 const HistorialEstadoReserva = require('../models/HistorialEstadoReserva');
 const Pago = require('../models/Pago');
 const { registrarCambioEstado } = require('../utils/historialEstadoReserva');
+const { registrarAuditoria } = require('../utils/auditService');
 const {
   COTIZACION_POPULATE,
   enriquecerReserva,
@@ -121,6 +122,14 @@ exports.createReserva = async (req, res, next) => {
     session.endSession();
 
     const reservaPoblada = await Reserva.findById(reserva._id).populate(COTIZACION_POPULATE);
+
+    registrarAuditoria({
+      req,
+      accion: 'RESERVA_CREADA',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { cotizacion_id },
+    });
 
     res.status(201).json({
       success: true,
@@ -246,6 +255,15 @@ exports.pagarReserva = async (req, res, next) => {
     session.endSession();
 
     const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+
+    registrarAuditoria({
+      req,
+      accion: 'PAGO_CONFIRMADO',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { monto: monto ?? null },
+    });
+
     res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
@@ -296,6 +314,14 @@ exports.cerrarReserva = async (req, res, next) => {
     session.endSession();
 
     const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+
+    registrarAuditoria({
+      req,
+      accion: 'RESERVA_CERRADA',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+    });
+
     res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
@@ -373,6 +399,15 @@ exports.cancelarReserva = async (req, res, next) => {
     session.endSession();
 
     const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+
+    registrarAuditoria({
+      req,
+      accion: 'RESERVA_CANCELADA',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { motivo_cancelacion },
+    });
+
     res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
@@ -559,6 +594,14 @@ exports.informarPago = async (req, res, next) => {
     const pagos = await Pago.find({ reserva_id: id }).sort({ created_at: 1 });
     const pagoPendiente = pagos[pagos.length - 1];
 
+    registrarAuditoria({
+      req,
+      accion: 'PAGO_INFORMADO',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { monto: montoInformado, metodo, fecha_pago },
+    });
+
     res.status(200).json({
       success: true,
       data: enriquecerReserva(actualizada, {
@@ -635,6 +678,15 @@ exports.confirmarPago = async (req, res, next) => {
     session.endSession();
 
     const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+
+    registrarAuditoria({
+      req,
+      accion: 'PAGO_CONFIRMADO',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { monto: pagoPendiente.monto },
+    });
+
     res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
     await session.abortTransaction();
@@ -701,6 +753,15 @@ exports.rechazarPago = async (req, res, next) => {
     session.endSession();
 
     const actualizada = await Reserva.findById(id).populate(COTIZACION_POPULATE);
+
+    registrarAuditoria({
+      req,
+      accion: 'PAGO_RECHAZADO',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { motivo: motivo.trim() },
+    });
+
     res.status(200).json({
       success: true,
       data: enriquecerReserva(actualizada, {

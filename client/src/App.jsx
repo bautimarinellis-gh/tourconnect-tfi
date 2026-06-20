@@ -16,8 +16,10 @@ import { ResetPassword } from './pages/auth/ResetPassword';
 // Admin Pages
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { AdminMayoristas } from './pages/admin/Mayoristas';
+import AdminAuditoria from './pages/admin/Auditoria';
 
 // Mayorista Pages
+import MayoristaAuditoria from './pages/mayorista/Auditoria';
 import { MayoristaDashboard } from './pages/mayorista/Dashboard';
 import { MayoristaAgencias } from './pages/mayorista/Agencias';
 import { MayoristaAgenciaDetalle } from './pages/mayorista/AgenciaDetalle';
@@ -27,6 +29,7 @@ import { MayoristaReservas } from './pages/mayorista/Reservas';
 import { MayoristaReservaDetalle } from './pages/mayorista/ReservaDetalle';
 
 // Agencia Pages
+import AgenciaAuditoria from './pages/agencia/Auditoria';
 import { AgenciaDashboard } from './pages/agencia/Dashboard';
 import { AgenciaCatalogo } from './pages/agencia/Catalogo';
 import { AgenciaCotizaciones } from './pages/agencia/Cotizaciones';
@@ -67,6 +70,7 @@ function App() {
                 <Routes>
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="mayoristas" element={<AdminMayoristas />} />
+                  <Route path="auditoria" element={<AdminAuditoria />} />
                 </Routes>
               </PageWrapper>
             } />
@@ -84,6 +88,7 @@ function App() {
                   <Route path="cotizaciones" element={<MayoristaCotizaciones />} />
                   <Route path="reservas" element={<MayoristaReservas />} />
                   <Route path="reservas/:id" element={<MayoristaReservaDetalle />} />
+                  <Route path="auditoria" element={<MayoristaAuditoria />} />
                   <Route path="reportes" element={
                     <React.Suspense fallback={<Spinner center size="lg" />}>
                       <MayoristaReportes />
@@ -104,6 +109,7 @@ function App() {
                   <Route path="cotizaciones" element={<AgenciaCotizaciones />} />
                   <Route path="reservas" element={<AgenciaReservas />} />
                   <Route path="reservas/:id" element={<AgenciaReservaDetalle />} />
+                  <Route path="auditoria" element={<AgenciaAuditoria />} />
                 </Routes>
               </PageWrapper>
             } />

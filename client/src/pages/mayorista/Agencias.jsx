@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Eye, Pencil, Trash2, AlertTriangle, FileText, CalendarCheck, Search } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, RefreshCw, AlertTriangle, FileText, CalendarCheck, Search } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -47,6 +47,12 @@ export const MayoristaAgencias = () => {
   const [isBlockedModalOpen, setIsBlockedModalOpen] = useState(false);
   const [blockedAgencia, setBlockedAgencia] = useState(null);
   const [blockedDetalles, setBlockedDetalles] = useState({ cotizaciones_activas: 0, reservas_activas: 0 });
+
+  // --- Reactivar ---
+  const [reactivarAgencia, setReactivarAgencia] = useState(null);
+  const [isReactivarModalOpen, setIsReactivarModalOpen] = useState(false);
+  const [reactivarSaving, setReactivarSaving] = useState(false);
+  const [reactivarError, setReactivarError] = useState('');
 
   const fetchAgencias = async () => {
     setLoading(true);
@@ -164,6 +170,29 @@ export const MayoristaAgencias = () => {
     }
   };
 
+  // --- Handlers: Reactivar ---
+  const handleOpenReactivar = (ag) => {
+    setReactivarAgencia(ag);
+    setReactivarError('');
+    setIsReactivarModalOpen(true);
+  };
+
+  const handleReactivar = async () => {
+    setReactivarSaving(true);
+    setReactivarError('');
+    try {
+      await agenciaService.reactivar(reactivarAgencia._id);
+      setAgencias(prev => prev.map(ag =>
+        ag._id === reactivarAgencia._id ? { ...ag, activo: true } : ag
+      ));
+      setIsReactivarModalOpen(false);
+    } catch (err) {
+      setReactivarError(err.response?.data?.message || 'Error al reactivar la agencia.');
+    } finally {
+      setReactivarSaving(false);
+    }
+  };
+
   const agenciasFiltradas = busqueda.trim()
     ? agencias.filter(ag =>
         ag.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -236,15 +265,25 @@ export const MayoristaAgencias = () => {
                       <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(ag)}>
                         <Pencil size={15} /> Editar
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        style={{ color: 'var(--color-error)' }}
-                        onClick={() => handleOpenDelete(ag)}
-                        disabled={!ag.activo}
-                      >
-                        <Trash2 size={15} /> Eliminar
-                      </Button>
+                      {ag.activo ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={{ color: 'var(--color-error)' }}
+                          onClick={() => handleOpenDelete(ag)}
+                        >
+                          <Trash2 size={15} /> Desactivar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={{ color: 'var(--color-success)' }}
+                          onClick={() => handleOpenReactivar(ag)}
+                        >
+                          <RefreshCw size={15} /> Reactivar
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -371,6 +410,27 @@ export const MayoristaAgencias = () => {
               Sin operaciones activas. La agencia puede ser desactivada.
             </Alert>
           )}
+        </div>
+      </Modal>
+
+      {/* Modal: Confirmar reactivación */}
+      <Modal
+        isOpen={isReactivarModalOpen}
+        onClose={() => setIsReactivarModalOpen(false)}
+        title="Reactivar Agencia"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsReactivarModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleReactivar} isLoading={reactivarSaving}>Confirmar reactivación</Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>
+            ¿Estás seguro que querés reactivar <strong>{reactivarAgencia?.nombre}</strong>?
+            La agencia y su usuario asociado volverán a tener acceso al sistema.
+          </p>
+          {reactivarError && <Alert variant="error">{reactivarError}</Alert>}
         </div>
       </Modal>
 

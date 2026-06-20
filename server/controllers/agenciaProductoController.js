@@ -1,6 +1,7 @@
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Agencia = require('../models/Agencia');
 const Producto = require('../models/Producto');
+const { registrarAuditoria } = require('../utils/auditService');
 
 /**
  * Helper para validar que la agencia pertenezca al mayorista actual
@@ -138,6 +139,18 @@ exports.syncProductosAgencia = async (req, res, next) => {
       await AgenciaProducto.insertMany(nuevasRelaciones);
     }
 
+    registrarAuditoria({
+      req,
+      accion: 'PRODUCTOS_AGENCIA_SYNC',
+      entidad_afectada: 'AgenciaProducto',
+      entidad_id: agenciaId,
+      detalle: {
+        agencia_id: agenciaId,
+        cantidad_productos: productos.length,
+        productos: productos.map(p => ({ producto_id: p.producto_id, markup: p.markup_porcentaje })),
+      },
+    });
+
     res.status(200).json({
       success: true,
       data: { mensaje: 'Productos sincronizados correctamente', total: productos.length },
@@ -178,10 +191,26 @@ exports.updateProductoAgencia = async (req, res, next) => {
       });
     }
 
+    const markupAnterior = mapping.markup_porcentaje;
     if (markup_porcentaje !== undefined) mapping.markup_porcentaje = markup_porcentaje;
     if (habilitado !== undefined) mapping.habilitado = habilitado;
 
     await mapping.save();
+
+    if (markup_porcentaje !== undefined) {
+      registrarAuditoria({
+        req,
+        accion: 'MARKUP_ACTUALIZADO',
+        entidad_afectada: 'AgenciaProducto',
+        entidad_id: mapping._id,
+        detalle: {
+          agencia_id: agenciaId,
+          producto_id: productoId,
+          before: { markup_porcentaje: markupAnterior },
+          after: { markup_porcentaje: mapping.markup_porcentaje },
+        },
+      });
+    }
 
     res.status(200).json({
       success: true,

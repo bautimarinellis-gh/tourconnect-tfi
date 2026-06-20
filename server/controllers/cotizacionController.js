@@ -2,6 +2,7 @@ const Cotizacion = require('../models/Cotizacion');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Producto = require('../models/Producto');
 const { calcularPrecioTotal } = require('../utils/precioCalculator');
+const { registrarAuditoria } = require('../utils/auditService');
 
 // @desc    Obtener todas las cotizaciones
 // @route   GET /api/v1/cotizaciones
@@ -129,6 +130,14 @@ exports.createCotizacion = async (req, res, next) => {
       estado: 'pendiente',
     });
 
+    registrarAuditoria({
+      req,
+      accion: 'COTIZACION_CREADA',
+      entidad_afectada: 'Cotizacion',
+      entidad_id: cotizacion._id,
+      detalle: { producto_id, pasajeros, precio_total, fecha_inicio, fecha_fin },
+    });
+
     res.status(201).json({
       success: true,
       data: cotizacion
@@ -234,6 +243,14 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
     }
     await cotizacion.save();
 
+    registrarAuditoria({
+      req,
+      accion: estado === 'aprobada' ? 'COTIZACION_APROBADA' : 'COTIZACION_RECHAZADA',
+      entidad_afectada: 'Cotizacion',
+      entidad_id: cotizacion._id,
+      detalle: estado === 'rechazada' ? { motivo_rechazo, agencia_id: cotizacion.agencia_id } : { agencia_id: cotizacion.agencia_id },
+    });
+
     res.status(200).json({
       success: true,
       data: cotizacion,
@@ -276,6 +293,14 @@ exports.confirmarCotizacion = async (req, res, next) => {
 
     cotizacion.estado = 'aprobada';
     await cotizacion.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'COTIZACION_APROBADA',
+      entidad_afectada: 'Cotizacion',
+      entidad_id: cotizacion._id,
+      detalle: { agencia_id: cotizacion.agencia_id },
+    });
 
     res.status(200).json({
       success: true,
@@ -329,6 +354,14 @@ exports.rechazarCotizacion = async (req, res, next) => {
     cotizacion.motivo_rechazo = motivo_rechazo;
     await cotizacion.save();
 
+    registrarAuditoria({
+      req,
+      accion: 'COTIZACION_RECHAZADA',
+      entidad_afectada: 'Cotizacion',
+      entidad_id: cotizacion._id,
+      detalle: { motivo_rechazo, agencia_id: cotizacion.agencia_id },
+    });
+
     res.status(200).json({
       success: true,
       data: cotizacion
@@ -370,6 +403,13 @@ exports.cancelarCotizacion = async (req, res, next) => {
 
     cotizacion.estado = 'cancelada';
     await cotizacion.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'COTIZACION_CANCELADA',
+      entidad_afectada: 'Cotizacion',
+      entidad_id: cotizacion._id,
+    });
 
     res.status(200).json({
       success: true,

@@ -8,6 +8,7 @@ const {
   updateAgencia,
   deleteAgencia,
   verificarDesactivacion,
+  reactivarAgencia,
 } = require('../controllers/agenciaController');
 
 const {
@@ -33,6 +34,7 @@ router.route('/')
   .post(createAgencia);
 
 router.get('/:id/verificar-desactivacion', verificarDesactivacion);
+router.patch('/:id/reactivar', reactivarAgencia);
 
 router.route('/:id')
   .get(getAgencia)

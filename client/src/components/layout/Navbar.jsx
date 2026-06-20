@@ -13,6 +13,7 @@ import {
   PanelLeft,
   Plane,
   Shield,
+  ShieldCheck,
   ShoppingBag,
   Users,
 } from 'lucide-react';
@@ -39,7 +40,8 @@ export const Navbar = () => {
   if (user?.rol === 'admin') {
     links = [
       { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-      { name: 'Mayoristas', path: '/admin/mayoristas', icon: Building2 }
+      { name: 'Mayoristas', path: '/admin/mayoristas', icon: Building2 },
+      { name: 'Auditoría', path: '/admin/auditoria', icon: ShieldCheck },
     ];
   } else if (user?.rol === 'mayorista') {
     links = [
@@ -48,14 +50,16 @@ export const Navbar = () => {
       { name: 'Productos', path: '/mayorista/productos', icon: Package },
       { name: 'Cotizaciones', path: '/mayorista/cotizaciones', icon: FileText },
       { name: 'Reservas', path: '/mayorista/reservas', icon: ClipboardList },
-      { name: 'Reportes', path: '/mayorista/reportes', icon: FileBarChart }
+      { name: 'Reportes', path: '/mayorista/reportes', icon: FileBarChart },
+      { name: 'Auditoría', path: '/mayorista/auditoria', icon: ShieldCheck },
     ];
   } else if (user?.rol === 'agencia') {
     links = [
       { name: 'Dashboard', path: '/agencia/dashboard', icon: LayoutDashboard },
       { name: 'Catálogo', path: '/agencia/catalogo', icon: Map },
       { name: 'Cotizaciones', path: '/agencia/cotizaciones', icon: ShoppingBag },
-      { name: 'Reservas', path: '/agencia/reservas', icon: ClipboardList }
+      { name: 'Reservas', path: '/agencia/reservas', icon: ClipboardList },
+      { name: 'Auditoría', path: '/agencia/auditoria', icon: ShieldCheck },
     ];
   }
 

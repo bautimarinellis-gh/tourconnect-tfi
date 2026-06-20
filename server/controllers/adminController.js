@@ -8,6 +8,7 @@ const Producto = require('../models/Producto');
 const Cotizacion = require('../models/Cotizacion');
 const { enviarEmail } = require('../utils/mailer');
 const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
+const { registrarAuditoria } = require('../utils/auditService');
 
 const validarPlanSuscripcion = (plan) => {
   if (!SUBSCRIPTION_PLAN_NAMES.includes(plan)) {
@@ -127,6 +128,21 @@ exports.crearMayorista = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_CREADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: nuevoMayorista._id,
+      detalle: { nombre, email, plan_suscripcion: planSuscripcion },
+    });
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_CREADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: nuevoUsuario._id,
+      detalle: { email, rol: 'mayorista', con_invitacion: !tienePassword },
+    });
+
     // 6. Enviar email de invitación (solo si no se configuró password)
     if (!tienePassword && inviteToken) {
       const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/set-password/${inviteToken}`;
@@ -233,6 +249,14 @@ exports.updateMayorista = async (req, res, next) => {
       }
     }
 
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_ACTUALIZADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: mayorista._id,
+      detalle: { cambios: updateFields },
+    });
+
     const updated = await Mayorista.findById(id).populate('usuario_id', 'email activo');
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -303,6 +327,14 @@ exports.deleteMayorista = async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_DESACTIVADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: mayorista._id,
+      detalle: { nombre: mayorista.nombre },
+    });
 
     res.json({
       success: true,
