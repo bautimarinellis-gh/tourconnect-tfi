@@ -6,6 +6,7 @@ import { PasswordInput } from '../../components/ui/PasswordInput';
 import { Alert } from '../../components/ui/Alert';
 import authService from '../../services/authService';
 import './auth.css';
+import logoImg from '/logo.png';
 
 export const ResetPassword = () => {
   const [email, setEmail] = useState('');
@@ -58,7 +59,7 @@ export const ResetPassword = () => {
     <div className="auth-layout">
       <div className="auth-form-container">
         <div className="auth-form-box">
-          <div className="auth-logo">TourConnect</div>
+          <img src={logoImg} alt="TourConnect" className="auth-logo-img" />
           <h1 className="auth-title">Resetear contraseña</h1>
           <p className="auth-subtitle">Ingresa tu email y tu nueva contraseña</p>
 

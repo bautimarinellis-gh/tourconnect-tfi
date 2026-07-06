@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { Alert } from '../../components/ui/Alert';
 import './auth.css';
+import logoImg from '/logo.png';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -43,7 +44,7 @@ export const Login = () => {
     <div className="auth-layout">
       <div className="auth-form-container">
         <div className="auth-form-box">
-          <div className="auth-logo">TourConnect</div>
+          <img src={logoImg} alt="TourConnect" className="auth-logo-img" />
           <h1 className="auth-title">Bienvenido de nuevo</h1>
           <p className="auth-subtitle">Ingrese sus credenciales para acceder a su cuenta</p>
 

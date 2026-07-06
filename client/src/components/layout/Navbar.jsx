@@ -11,7 +11,6 @@ import {
   Map,
   Package,
   PanelLeft,
-  Plane,
   Shield,
   ShieldCheck,
   ShoppingBag,
@@ -19,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import './layout.css';
+import logoImg from '/logo.png';
 
 export const Navbar = () => {
   const { user, logout } = useAuth();
@@ -76,8 +76,7 @@ export const Navbar = () => {
       <div className="navbar-container">
         <div className="navbar-left">
           <Link to="/" className="navbar-logo">
-            <span className="logo-mark"><Plane size={17} /></span>
-            <span className="logo-text">TourConnect</span>
+            <img src={logoImg} alt="TourConnect" className="navbar-logo-img" />
           </Link>
           <div className="workspace-switcher">
             <BriefcaseBusiness size={14} />
