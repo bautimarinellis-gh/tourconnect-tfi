@@ -47,6 +47,8 @@ function getFechaDesde(time_range) {
     }
     case 'current_year':
       return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    case 'all_time':
+      return new Date('2000-01-01T00:00:00.000Z');
     case 'last_30_days':
     default: {
       const d = new Date();
@@ -56,7 +58,13 @@ function getFechaDesde(time_range) {
   }
 }
 
-function timeRangeLabel(time_range) {
+function timeRangeLabel(params) {
+  const { time_range, month, year } = typeof params === 'string' ? { time_range: params } : params;
+  if (time_range === 'specific_month' && month && year) {
+    const MONTH_NAMES = ['enero','febrero','marzo','abril','mayo','junio','julio',
+      'agosto','septiembre','octubre','noviembre','diciembre'];
+    return `${MONTH_NAMES[month - 1]} ${year}`;
+  }
   const labels = {
     today: 'hoy',
     last_7_days: 'los últimos 7 días',
@@ -65,8 +73,24 @@ function timeRangeLabel(time_range) {
     last_90_days: 'los últimos 90 días',
     last_6_months: 'los últimos 6 meses',
     current_year: 'el año actual',
+    all_time: 'todo el historial',
   };
   return labels[time_range] || 'los últimos 30 días';
+}
+
+/**
+ * Retorna { fechaDesde, fechaHasta } según los params.
+ * Para specific_month: fechaHasta es el último instante del mes.
+ * Para el resto: fechaHasta es null (sin límite superior).
+ */
+function getDateRange(params) {
+  const { time_range, month, year } = params;
+  if (time_range === 'specific_month' && month && year) {
+    const fechaDesde = new Date(Date.UTC(year, month - 1, 1));
+    const fechaHasta = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    return { fechaDesde, fechaHasta };
+  }
+  return { fechaDesde: getFechaDesde(time_range), fechaHasta: null };
 }
 
 function formatMonto(val) {
@@ -84,8 +108,9 @@ function formatMonto(val) {
  * Retorna las N agencias con más reservas o mayor facturación.
  */
 async function handleTopAgencias(params, mayoristaId) {
-  const { limit = 5, time_range = 'last_30_days', orderBy = 'reservas' } = params;
-  const fechaDesde = getFechaDesde(time_range);
+  const { limit = 5, orderBy = 'reservas' } = params;
+  const { fechaDesde, fechaHasta } = getDateRange(params);
+  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
   const sortField = orderBy === 'facturacion' ? 'monto_total' : 'cantidad_reservas';
 
   const pipeline = [
@@ -93,7 +118,7 @@ async function handleTopAgencias(params, mayoristaId) {
     {
       $match: {
         estado: { $ne: 'cancelada' },
-        created_at: { $gte: fechaDesde },
+        created_at: dateFilter,
       },
     },
     {
@@ -137,7 +162,7 @@ async function handleTopAgencias(params, mayoristaId) {
 
   return {
     data,
-    summary: `Top ${data.length} agencias en ${timeRangeLabel(time_range)}. `
+    summary: `Top ${data.length} agencias en ${timeRangeLabel(params)}. `
       + `${totalReservas} reservas, $${totalFacturado.toLocaleString('es-AR')} facturados.`,
     columns: ['agencia', 'reservas', 'facturacion'],
     columnLabels: { agencia: 'Agencia', reservas: 'Reservas', facturacion: 'Facturación ($)' },
@@ -149,13 +174,13 @@ async function handleTopAgencias(params, mayoristaId) {
  * Lista de cotizaciones en estado "pendiente" del mayorista.
  */
 async function handleCotizacionesPendientes(params, mayoristaId) {
-  const { limit = 10, time_range = 'last_30_days' } = params;
-  const fechaDesde = getFechaDesde(time_range);
+  const { limit = 10 } = params;
+  const { fechaDesde, fechaHasta } = getDateRange(params);
 
   const cotizaciones = await Cotizacion.find({
     mayorista_id: mayoristaId,
     estado: 'pendiente',
-    created_at: { $gte: fechaDesde },
+    created_at: { $gte: fechaDesde, ...(fechaHasta && { $lte: fechaHasta }) },
   })
     .sort({ created_at: -1 })
     .limit(Math.min(limit, 50))
@@ -173,7 +198,7 @@ async function handleCotizacionesPendientes(params, mayoristaId) {
 
   return {
     data,
-    summary: `${data.length} cotizaciones pendientes en ${timeRangeLabel(time_range)}.`,
+    summary: `${data.length} cotizaciones pendientes en ${timeRangeLabel(params)}.`,
     columns: ['agencia', 'producto', 'pasajeros', 'monto', 'fecha'],
     columnLabels: {
       agencia: 'Agencia', producto: 'Producto',
@@ -234,15 +259,15 @@ async function handleAgenciasInactivas(params, mayoristaId) {
  * Total de ingresos (reservas no canceladas) en el período.
  */
 async function handleIngresosPeriodo(params, mayoristaId) {
-  const { time_range = 'last_30_days' } = params;
-  const fechaDesde = getFechaDesde(time_range);
+  const { fechaDesde, fechaHasta } = getDateRange(params);
+  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
 
   const resultado = await Reserva.aggregate([
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
     {
       $match: {
         estado: { $in: ['pago_informado', 'pagada', 'cerrada'] },
-        created_at: { $gte: fechaDesde },
+        created_at: dateFilter,
       },
     },
     {
@@ -259,10 +284,10 @@ async function handleIngresosPeriodo(params, mayoristaId) {
 
   return {
     data: [{ label: 'Total ingresos', valor: totalIngresos, reservas: totalReservas }],
-    summary: `$${totalIngresos.toLocaleString('es-AR')} en ingresos durante ${timeRangeLabel(time_range)} (${totalReservas} reservas confirmadas).`,
+    summary: `$${totalIngresos.toLocaleString('es-AR')} en ingresos durante ${timeRangeLabel(params)} (${totalReservas} reservas confirmadas).`,
     stat: {
       value: `$${totalIngresos.toLocaleString('es-AR')}`,
-      label: `Ingresos en ${timeRangeLabel(time_range)}`,
+      label: `Ingresos en ${timeRangeLabel(params)}`,
       sub: `${totalReservas} reservas confirmadas`,
     },
     columns: [],
@@ -275,8 +300,8 @@ async function handleIngresosPeriodo(params, mayoristaId) {
  * Resumen de reservas agrupadas por estado.
  */
 async function handleReservasPorEstado(params, mayoristaId) {
-  const { time_range = 'last_30_days' } = params;
-  const fechaDesde = getFechaDesde(time_range);
+  const { fechaDesde, fechaHasta } = getDateRange(params);
+  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
 
   const estadoLabels = {
     pendiente_pago: 'Pendiente de pago',
@@ -288,7 +313,7 @@ async function handleReservasPorEstado(params, mayoristaId) {
 
   const resultado = await Reserva.aggregate([
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
-    { $match: { created_at: { $gte: fechaDesde } } },
+    { $match: { created_at: dateFilter } },
     { $group: { _id: '$estado', cantidad: { $sum: 1 } } },
     { $sort: { cantidad: -1 } },
   ]);
@@ -302,7 +327,7 @@ async function handleReservasPorEstado(params, mayoristaId) {
 
   return {
     data,
-    summary: `${total} reservas en total en ${timeRangeLabel(time_range)}, distribuidas en ${data.length} estados.`,
+    summary: `${total} reservas en total en ${timeRangeLabel(params)}, distribuidas en ${data.length} estados.`,
     columns: ['estado', 'cantidad'],
     columnLabels: { estado: 'Estado', cantidad: 'Cantidad' },
   };
@@ -313,15 +338,16 @@ async function handleReservasPorEstado(params, mayoristaId) {
  * Top N productos más reservados en el período.
  */
 async function handleProductoTop(params, mayoristaId) {
-  const { limit = 5, time_range = 'last_30_days' } = params;
-  const fechaDesde = getFechaDesde(time_range);
+  const { limit = 5 } = params;
+  const { fechaDesde, fechaHasta } = getDateRange(params);
+  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
 
   const pipeline = [
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
     {
       $match: {
         estado: { $ne: 'cancelada' },
-        created_at: { $gte: fechaDesde },
+        created_at: dateFilter,
       },
     },
     {
@@ -364,7 +390,7 @@ async function handleProductoTop(params, mayoristaId) {
 
   return {
     data,
-    summary: `Top ${data.length} productos por reservas en ${timeRangeLabel(time_range)}.`,
+    summary: `Top ${data.length} productos por reservas en ${timeRangeLabel(params)}.`,
     columns: ['producto', 'tipo', 'reservas', 'facturacion'],
     columnLabels: {
       producto: 'Producto', tipo: 'Tipo',

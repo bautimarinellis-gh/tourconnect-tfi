@@ -105,6 +105,18 @@ function extractParams(query, intentName, defaultParams) {
       params.time_range = 'last_6_months';
     } else if (/este\s+ano|ano\s+actual|anio\s+actual/.test(normalized)) {
       params.time_range = 'current_year';
+    } else if (/\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/.test(normalized)) {
+      // Mes específico: "de mayo", "en enero 2024", "del mes de marzo"
+      const MONTH_NAMES = ['enero','febrero','marzo','abril','mayo','junio','julio',
+        'agosto','septiembre','octubre','noviembre','diciembre'];
+      const mMatch = normalized.match(/\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/);
+      const yMatch = normalized.match(/\b(20\d{2})\b/);
+      params.time_range = 'specific_month';
+      params.month = MONTH_NAMES.indexOf(mMatch[1]) + 1;
+      params.year = yMatch ? parseInt(yMatch[1], 10) : new Date().getFullYear();
+    } else if (/todo|todos|siempre|historico|completo|desde.+inicio|sin.+filtro/.test(normalized)) {
+      // Historial completo: "todo", "siempre", "histórico", "desde el inicio"
+      params.time_range = 'all_time';
     }
     // Default: last_30_days (ya seteado en defaultParams)
   }

@@ -144,9 +144,9 @@ export function AssistantChat() {
   const inputRef = useRef(null);
   const showSuggestions = messages.length === 0;
 
-  // Auto-scroll al último mensaje
+  // Auto-scroll al último mensaje (solo cuando ya hay mensajes o se está cargando)
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (messagesEndRef.current && (messages.length > 0 || isLoading)) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading]);
