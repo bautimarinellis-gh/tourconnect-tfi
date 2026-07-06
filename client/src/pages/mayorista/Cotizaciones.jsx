@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Check, X, Eye } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -19,7 +19,7 @@ export const MayoristaCotizaciones = () => {
   const [filtroEstado, setFiltroEstado] = useState('');
   
   // Modal: Rechazar
-  const [selectedCotizacion, setSelectedCotizacion] = useState(null);
+  const selectedCotizacionRef = useRef(null);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
@@ -29,11 +29,15 @@ export const MayoristaCotizaciones = () => {
   const [detailCotizacion, setDetailCotizacion] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
+  // Modal: Confirmar aprobación
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
+  const [approveTarget, setApproveTarget] = useState(null);
+
   // Modal: Éxito al confirmar
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  const fetchCotizaciones = async () => {
+  const fetchCotizaciones = useCallback(async () => {
     setLoading(true);
     try {
       const data = await cotizacionService.getAll(filtroEstado ? { estado: filtroEstado } : {});
@@ -43,11 +47,11 @@ export const MayoristaCotizaciones = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtroEstado]);
 
   useEffect(() => {
     fetchCotizaciones();
-  }, [filtroEstado]);
+  }, [fetchCotizaciones]);
 
   const handleAction = async (id, status, reason = '') => {
     if (status === 'rechazada' && !reason) {
@@ -139,20 +143,21 @@ export const MayoristaCotizaciones = () => {
                     )}
                   </TableCell>
                   <TableCell>
-                    {c.estado === 'pendiente' ? (
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <Button size="sm" variant="success" onClick={() => handleAction(c._id, 'aprobada')} isLoading={actionLoading}>
-                          <Check size={16} />
-                        </Button>
-                        <Button size="sm" variant="danger" onClick={() => { setSelectedCotizacion(c); setIsRejectModalOpen(true); }}>
-                          <X size={16} />
-                        </Button>
-                      </div>
-                    ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       <Button variant="ghost" size="sm" onClick={() => { setDetailCotizacion(c); setIsDetailModalOpen(true); }}>
                         <Eye size={16} />
                       </Button>
-                    )}
+                      {c.estado === 'pendiente' && (
+                        <>
+                          <Button size="sm" variant="success" onClick={() => { setApproveTarget(c); setIsApproveModalOpen(true); }}>
+                            <Check size={16} />
+                          </Button>
+                          <Button size="sm" variant="danger" onClick={() => { selectedCotizacionRef.current = c; setIsRejectModalOpen(true); }}>
+                            <X size={16} />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -160,6 +165,40 @@ export const MayoristaCotizaciones = () => {
           </Table>
         </Card>
       )}
+
+      {/* Modal: Confirmar aprobación */}
+      <Modal
+        isOpen={isApproveModalOpen}
+        onClose={() => { setIsApproveModalOpen(false); setApproveTarget(null); }}
+        title="Aprobar Cotización"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setIsApproveModalOpen(false); setApproveTarget(null); }}>
+              Cancelar
+            </Button>
+            <Button
+              variant="success"
+              onClick={() => { handleAction(approveTarget._id, 'aprobada'); setIsApproveModalOpen(false); setApproveTarget(null); }}
+              isLoading={actionLoading}
+            >
+              <Check size={16} /> Confirmar Aprobación
+            </Button>
+          </>
+        }
+      >
+        {approveTarget && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9375rem' }}>
+            <p style={{ margin: 0 }}>
+              ¿Confirmás la aprobación de la cotización{' '}
+              <strong>#{approveTarget._id.slice(-6).toUpperCase()}</strong> de{' '}
+              <strong>{approveTarget.agencia_id?.nombre || 'la agencia'}</strong>?
+            </p>
+            <div style={{ padding: '0.75rem 1rem', background: 'var(--color-success-soft)', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', color: 'var(--color-success)' }}>
+              Al aprobar, la agencia podrá generar la reserva. Esta acción no se puede deshacer.
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* Modal: Rechazar */}
       <Modal
@@ -172,7 +211,7 @@ export const MayoristaCotizaciones = () => {
               Cancelar
             </Button>
             <Button
-              onClick={() => handleAction(selectedCotizacion._id, 'rechazada', rejectReason)}
+              onClick={() => handleAction(selectedCotizacionRef.current._id, 'rechazada', rejectReason)}
               isLoading={actionLoading}
               style={{ backgroundColor: 'var(--color-error, #DC2626)', borderColor: 'var(--color-error, #DC2626)' }}
             >

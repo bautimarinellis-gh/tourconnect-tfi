@@ -21,7 +21,7 @@ export const todayDateInput = () => {
   ].join('-');
 };
 
-export const formatDateInput = (date) => {
+const formatDateInput = (date) => {
   if (!date) return '';
   return [
     date.getFullYear(),
@@ -37,7 +37,7 @@ export const addDays = (dateInput, days) => {
   return formatDateInput(date);
 };
 
-export const addMonths = (dateInput, months) => {
+const addMonths = (dateInput, months) => {
   const date = parseDateInput(dateInput);
   if (!date) return '';
   date.setMonth(date.getMonth() + months);

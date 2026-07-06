@@ -102,7 +102,7 @@ const getXAxisInterval = (periodo) => {
 
 export const MayoristaReportes = () => {
   const [periodo, setPeriodo] = useState('mes');
-  const [valor, setValor] = useState(getDefaultValor('mes'));
+  const [valor, setValor] = useState(() => getDefaultValor('mes'));
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
     ingresos: { total_ingresos: 0, puntos: [] },

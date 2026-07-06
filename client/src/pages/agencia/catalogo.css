@@ -37,7 +37,22 @@
 
 .catalog-search-icon {
   display: inline-flex;
+  flex-shrink: 0;
   color: var(--color-text-soft);
+}
+
+.catalog-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  font-family: var(--font-family);
+}
+
+.catalog-search-input::placeholder {
+  color: var(--color-text-muted);
 }
 
 .catalog-list {

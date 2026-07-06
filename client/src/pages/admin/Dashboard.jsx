@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, Calendar, FileText } from 'lucide-react';
+import { Users, Building2, Calendar, FileText, ArrowRight } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
+import { Link } from 'react-router-dom';
 import reporteService from '../../services/reporteService';
 import '../mayorista/dashboard.css';
 
@@ -30,6 +31,13 @@ export const AdminDashboard = () => {
 
   if (loading) return <Spinner center size="lg" />;
 
+  const kpis = [
+    { label: 'Total Mayoristas', value: data.kpis?.mayoristas || 0, icon: <Building2 size={18} />, link: '/admin/mayoristas' },
+    { label: 'Total Agencias Activas', value: data.kpis?.agencias || 0, icon: <Users size={18} />, link: null },
+    { label: 'Cotizaciones Pendientes', value: data.kpis?.cotizacionesPendientes || 0, icon: <FileText size={18} />, link: null },
+    { label: 'Total Reservas', value: data.kpis?.reservas || 0, icon: <Calendar size={18} />, link: null },
+  ];
+
   return (
     <div className="dashboard-page">
       <div className="page-header dashboard-heading">
@@ -37,81 +45,65 @@ export const AdminDashboard = () => {
           <p className="page-kicker">Administración</p>
           <h1 className="page-title">Dashboard Admin</h1>
         </div>
+        <Link className="dashboard-quick-link" to="/admin/mayoristas">
+          Ver mayoristas <ArrowRight size={14} />
+        </Link>
       </div>
 
       <div className="dashboard-kpi-grid">
-        <Card className="metric-card">
-          <CardBody>
-            <div className="dashboard-kpi-top">
-            <div>
-              <p className="metric-label">Total Mayoristas</p>
-              <h3 className="metric-value">{data.kpis?.mayoristas || 0}</h3>
-            </div>
-            <div className="metric-icon"><Building2 size={18} /></div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card className="metric-card">
-          <CardBody>
-            <div className="dashboard-kpi-top">
-            <div>
-              <p className="metric-label">Total Agencias</p>
-              <h3 className="metric-value">{data.kpis?.agencias || 0}</h3>
-            </div>
-            <div className="metric-icon"><Users size={18} /></div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card className="metric-card">
-          <CardBody>
-            <div className="dashboard-kpi-top">
-            <div>
-              <p className="metric-label">Cotizaciones Pendientes</p>
-              <h3 className="metric-value">{data.kpis?.cotizacionesPendientes || 0}</h3>
-            </div>
-            <div className="metric-icon"><FileText size={18} /></div>
-            </div>
-          </CardBody>
-        </Card>
-        <Card className="metric-card">
-          <CardBody>
-            <div className="dashboard-kpi-top">
-            <div>
-              <p className="metric-label">Total Reservas</p>
-              <h3 className="metric-value">{data.kpis?.reservas || 0}</h3>
-            </div>
-            <div className="metric-icon"><Calendar size={18} /></div>
-            </div>
-          </CardBody>
-        </Card>
+        {kpis.map((kpi) => (
+          <Card key={kpi.label} className="metric-card">
+            <CardBody>
+              <div className="dashboard-kpi-top">
+                <div>
+                  <p className="metric-label">{kpi.label}</p>
+                  <h3 className="metric-value">{kpi.value}</h3>
+                </div>
+                <div className="metric-icon">{kpi.icon}</div>
+              </div>
+              {kpi.link && (
+                <Link to={kpi.link} className="dashboard-card-link">
+                  Ver detalles <ArrowRight size={13} />
+                </Link>
+              )}
+            </CardBody>
+          </Card>
+        ))}
       </div>
 
-      <h2 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Últimos Mayoristas Creados</h2>
-      <Table>
-        <thead>
-          <TableRow>
-            <TableCell isHeader>Nombre</TableCell>
-            <TableCell isHeader>Email</TableCell>
-            <TableCell isHeader>Estado</TableCell>
-          </TableRow>
-        </thead>
-        <tbody>
-          {data.ultimosMayoristas?.map(m => (
-            <TableRow key={m._id}>
-              <TableCell>{m.nombre}</TableCell>
-              <TableCell>{m.email_contacto}</TableCell>
-              <TableCell>
-                <Badge variant={m.activo ? 'success' : 'error'}>{m.activo ? 'Activo' : 'Inactivo'}</Badge>
-              </TableCell>
-            </TableRow>
-          ))}
-          {(!data.ultimosMayoristas || data.ultimosMayoristas.length === 0) && (
+      <Card>
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>Últimos Mayoristas Creados</h2>
+          <Link to="/admin/mayoristas" className="dashboard-quick-link" style={{ fontSize: '0.8125rem' }}>
+            Ver todos <ArrowRight size={13} />
+          </Link>
+        </div>
+        <Table>
+          <thead>
             <TableRow>
-              <TableCell colSpan={3} style={{ textAlign: 'center' }}>No hay datos disponibles</TableCell>
+              <TableCell isHeader>Nombre</TableCell>
+              <TableCell isHeader>Email</TableCell>
+              <TableCell isHeader>Estado</TableCell>
             </TableRow>
-          )}
-        </tbody>
-      </Table>
+          </thead>
+          <tbody>
+            {data.ultimosMayoristas?.map(m => (
+              <TableRow key={m._id}>
+                <TableCell>{m.nombre}</TableCell>
+                <TableCell>{m.email_contacto}</TableCell>
+                <TableCell>
+                  <Badge variant={m.activo ? 'success' : 'error'}>{m.activo ? 'Activo' : 'Inactivo'}</Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+            {(!data.ultimosMayoristas || data.ultimosMayoristas.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={3} style={{ textAlign: 'center', color: 'var(--color-text-soft)' }}>No hay datos disponibles</TableCell>
+              </TableRow>
+            )}
+          </tbody>
+        </Table>
+      </Card>
     </div>
   );
 };

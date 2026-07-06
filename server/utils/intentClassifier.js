@@ -15,9 +15,13 @@
 const intentCatalog = require('./intentCatalog');
 
 // Umbral mínimo de confidence para aceptar un intent.
-// Con la fórmula basada en tokens, un match de 2 keywords de peso 3
-// sobre una query de 4 tokens da: 6/(4*3) = 0.5 — muy por encima.
-const CONFIDENCE_THRESHOLD = 0.08;
+// 0.20 requiere que las keywords matcheadas representen al menos el 20% del máximo
+// alcanzable para esa query — evita matches por una sola keyword débil en queries largas.
+const CONFIDENCE_THRESHOLD = 0.20;
+
+// Score bruto mínimo independiente del threshold.
+// Previene que una keyword de peso 1 en una query de 2-3 tokens pase solo por ratio.
+const MIN_SCORE = 2;
 
 /**
  * Normaliza un texto para comparación:
@@ -93,7 +97,13 @@ function extractParams(query, intentName, defaultParams) {
 
   // Extraer rango de tiempo
   if ('time_range' in params) {
-    if (/hoy|dia|dias?\s+de\s+hoy/.test(normalized)) {
+    if (/\bayer\b/.test(normalized)) {
+      params.time_range = 'yesterday';
+    } else if (/la\s+semana\s+pasada/.test(normalized)) {
+      params.time_range = 'last_week';
+    } else if (/el\s+mes\s+pasado|mes\s+anterior/.test(normalized)) {
+      params.time_range = 'last_month';
+    } else if (/hoy|dia|dias?\s+de\s+hoy/.test(normalized)) {
       params.time_range = 'today';
     } else if (/esta\s+semana|ultimos?\s+7\s+dias?|semana/.test(normalized)) {
       params.time_range = 'last_7_days';
@@ -175,7 +185,11 @@ function classify(query, context = {}) {
 
     const { score, confidence, matched } = scoreIntent(intentDef, tokens);
 
-    if (confidence > bestConfidence || (confidence === bestConfidence && score > bestScore)) {
+    if (
+      confidence > bestConfidence ||
+      (confidence === bestConfidence && score > bestScore) ||
+      (confidence === bestConfidence && score === bestScore && matched.length > bestMatched.length)
+    ) {
       bestIntent = intentName;
       bestScore = score;
       bestConfidence = confidence;
@@ -183,8 +197,8 @@ function classify(query, context = {}) {
     }
   }
 
-  // Si no supera el umbral mínimo, retornar unknown
-  if (bestConfidence < CONFIDENCE_THRESHOLD || bestScore === 0) {
+  // Si no supera el umbral mínimo o el score bruto es insuficiente, retornar unknown
+  if (bestConfidence < CONFIDENCE_THRESHOLD || bestScore < MIN_SCORE) {
     return {
       intent: 'unknown',
       confidence: bestConfidence,

@@ -23,38 +23,22 @@ const {
 
 function getFechaDesde(time_range) {
   const now = new Date();
+  const y = now.getUTCFullYear();
+  const mo = now.getUTCMonth();
+  const d = now.getUTCDate();
+
   switch (time_range) {
-    case 'today': {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      return d;
-    }
-    case 'last_7_days': {
-      const d = new Date();
-      d.setDate(d.getDate() - 7);
-      return d;
-    }
-    case 'current_month':
-      return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    case 'last_90_days': {
-      const d = new Date();
-      d.setDate(d.getDate() - 90);
-      return d;
-    }
-    case 'last_6_months': {
-      const d = new Date();
-      d.setMonth(d.getMonth() - 6);
-      return d;
-    }
-    case 'current_year':
-      return new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
-    case 'all_time':
-      return new Date('2000-01-01T00:00:00.000Z');
-    case 'last_30_days':
-    default: {
-      const d = new Date();
-      d.setDate(d.getDate() - 30);
-      return d;
-    }
+    case 'today':         return new Date(Date.UTC(y, mo, d));
+    case 'yesterday':     return new Date(Date.UTC(y, mo, d - 1));
+    case 'last_7_days':   return new Date(Date.UTC(y, mo, d - 7));
+    case 'last_week':     return new Date(Date.UTC(y, mo, d - 7));
+    case 'current_month': return new Date(Date.UTC(y, mo, 1));
+    case 'last_month':    return new Date(Date.UTC(y, mo - 1, 1));
+    case 'last_90_days':  return new Date(Date.UTC(y, mo, d - 90));
+    case 'last_6_months': return new Date(Date.UTC(y, mo - 6, d));
+    case 'current_year':  return new Date(Date.UTC(y, 0, 1));
+    case 'all_time':      return new Date('2000-01-01T00:00:00.000Z');
+    default:              return new Date(Date.UTC(y, mo, d - 30)); // last_30_days
   }
 }
 
@@ -66,14 +50,17 @@ function timeRangeLabel(params) {
     return `${MONTH_NAMES[month - 1]} ${year}`;
   }
   const labels = {
-    today: 'hoy',
-    last_7_days: 'los últimos 7 días',
+    today:         'hoy',
+    yesterday:     'desde ayer',
+    last_7_days:   'los últimos 7 días',
+    last_week:     'la semana pasada',
     current_month: 'el mes actual',
-    last_30_days: 'los últimos 30 días',
-    last_90_days: 'los últimos 90 días',
+    last_month:    'desde el mes pasado',
+    last_30_days:  'los últimos 30 días',
+    last_90_days:  'los últimos 90 días',
     last_6_months: 'los últimos 6 meses',
-    current_year: 'el año actual',
-    all_time: 'todo el historial',
+    current_year:  'el año actual',
+    all_time:      'todo el historial',
   };
   return labels[time_range] || 'los últimos 30 días';
 }
@@ -95,7 +82,9 @@ function getDateRange(params) {
 
 function formatMonto(val) {
   if (!val) return 0;
-  const n = typeof val.toString === 'function' ? parseFloat(val.toString()) : Number(val);
+  const n = val instanceof mongoose.Types.Decimal128
+    ? parseFloat(val.toString())
+    : Number(val);
   return isNaN(n) ? 0 : n;
 }
 
@@ -177,23 +166,52 @@ async function handleCotizacionesPendientes(params, mayoristaId) {
   const { limit = 10 } = params;
   const { fechaDesde, fechaHasta } = getDateRange(params);
 
-  const cotizaciones = await Cotizacion.find({
-    mayorista_id: mayoristaId,
-    estado: 'pendiente',
-    created_at: { $gte: fechaDesde, ...(fechaHasta && { $lte: fechaHasta }) },
-  })
-    .sort({ created_at: -1 })
-    .limit(Math.min(limit, 50))
-    .populate('agencia_id', 'nombre')
-    .populate('producto_id', 'nombre')
-    .lean();
+  const rows = await Cotizacion.aggregate([
+    {
+      $match: {
+        mayorista_id: mayoristaId,
+        estado: 'pendiente',
+        created_at: { $gte: fechaDesde, ...(fechaHasta && { $lte: fechaHasta }) },
+      },
+    },
+    { $sort: { created_at: -1 } },
+    { $limit: Math.min(limit, 20) },
+    {
+      $lookup: {
+        from: agenciaCollection(),
+        localField: 'agencia_id',
+        foreignField: '_id',
+        as: 'agencia_info',
+      },
+    },
+    { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: productoCollection(),
+        localField: 'producto_id',
+        foreignField: '_id',
+        as: 'producto_info',
+      },
+    },
+    { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        agencia: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
+        producto: { $ifNull: ['$producto_info.nombre', 'Producto desconocido'] },
+        pasajeros: 1,
+        monto: '$precio_total',
+        fecha: '$created_at',
+      },
+    },
+  ]);
 
-  const data = cotizaciones.map((c) => ({
-    agencia: c.agencia_id?.nombre || 'Agencia desconocida',
-    producto: c.producto_id?.nombre || 'Producto desconocido',
+  const data = rows.map((c) => ({
+    agencia: c.agencia,
+    producto: c.producto,
     pasajeros: c.pasajeros,
-    monto: formatMonto(c.precio_total),
-    fecha: c.created_at ? new Date(c.created_at).toLocaleDateString('es-AR') : '-',
+    monto: formatMonto(c.monto),
+    fecha: c.fecha ? new Date(c.fecha).toLocaleDateString('es-AR') : '-',
   }));
 
   return {
@@ -312,8 +330,8 @@ async function handleReservasPorEstado(params, mayoristaId) {
   };
 
   const resultado = await Reserva.aggregate([
-    ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
     { $match: { created_at: dateFilter } },
+    ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
     { $group: { _id: '$estado', cantidad: { $sum: 1 } } },
     { $sort: { cantidad: -1 } },
   ]);

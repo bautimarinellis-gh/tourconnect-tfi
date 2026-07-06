@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Check, X, CreditCard, Lock, AlertTriangle } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
@@ -7,6 +7,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Alert } from '../../components/ui/Alert';
+import { useToast } from '../../components/ui/Toast';
 import { formatCurrency, formatDateTime, formatDate, formatEstadoReserva } from '../../utils/formatters';
 import reservaService from '../../services/reservaService';
 
@@ -20,12 +22,14 @@ const MOTIVOS_RAPIDOS = ['Monto incorrecto', 'No recibí el pago', 'Datos incorr
 
 export const MayoristaReservaDetalle = () => {
   const { id } = useParams();
+  const toast = useToast();
   const [reserva, setReserva] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [cancelError, setCancelError] = useState('');
 
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentData, setPaymentData] = useState({ monto: '', metodo: 'transferencia', comprobante: '' });
@@ -35,7 +39,7 @@ export const MayoristaReservaDetalle = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [modalError, setModalError] = useState('');
 
-  const fetchReserva = async () => {
+  const fetchReserva = useCallback(async () => {
     setLoading(true);
     try {
       const data = await reservaService.getById(id);
@@ -45,24 +49,26 @@ export const MayoristaReservaDetalle = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchReserva();
-  }, [id]);
+  }, [fetchReserva]);
 
   const handleCancelar = async () => {
     if (!cancelReason.trim()) {
+      setCancelError('El motivo de cancelación es obligatorio.');
       return;
     }
     setActionLoading(true);
+    setCancelError('');
     try {
       await reservaService.cancelar(id, cancelReason);
       setIsCancelModalOpen(false);
       setCancelReason('');
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al cancelar');
+      setCancelError(err.response?.data?.message || 'Error al cancelar la reserva.');
     } finally {
       setActionLoading(false);
     }
@@ -74,7 +80,7 @@ export const MayoristaReservaDetalle = () => {
       await reservaService.cerrar(id);
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al cerrar');
+      toast.error(err.response?.data?.message || 'Error al cerrar la reserva.');
     } finally {
       setActionLoading(false);
     }
@@ -95,7 +101,7 @@ export const MayoristaReservaDetalle = () => {
       setPaymentData({ monto: '', metodo: 'transferencia', comprobante: '' });
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al registrar pago');
+      toast.error(err.response?.data?.message || 'Error al registrar el pago.');
     } finally {
       setActionLoading(false);
     }
@@ -108,7 +114,7 @@ export const MayoristaReservaDetalle = () => {
       setIsConfirmModalOpen(false);
       fetchReserva();
     } catch (err) {
-      alert(err.response?.data?.message || 'Error al confirmar pago');
+      toast.error(err.response?.data?.message || 'Error al confirmar el pago.');
     } finally {
       setActionLoading(false);
     }
@@ -267,8 +273,8 @@ export const MayoristaReservaDetalle = () => {
             <CardBody>
               {pagos.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pagos.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                  {pagos.map((p) => (
+                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
                       <div>
                         <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>{formatCurrency(toFloat(p.monto))}</p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0, textTransform: 'capitalize' }}>
@@ -315,8 +321,8 @@ export const MayoristaReservaDetalle = () => {
             <CardBody>
               <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', backgroundColor: 'var(--color-border)' }}></div>
-                {(reserva.historial ?? []).map((h, i) => (
-                  <div key={i} style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                {(reserva.historial ?? []).map((h) => (
+                  <div key={h._id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
                     <div style={{ position: 'absolute', left: '-1.5rem', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-surface)' }}></div>
                     <div style={{ fontWeight: 600 }}>{formatEstadoReserva(h.estado_nuevo)}</div>
                     {h.comentario && (
@@ -334,21 +340,24 @@ export const MayoristaReservaDetalle = () => {
       {/* Modal Cancelar */}
       <Modal
         isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
+        onClose={() => { setIsCancelModalOpen(false); setCancelReason(''); setCancelError(''); }}
         title="Cancelar Reserva"
         footer={
           <>
-            <Button variant="ghost" onClick={() => setIsCancelModalOpen(false)}>Atrás</Button>
+            <Button variant="ghost" onClick={() => { setIsCancelModalOpen(false); setCancelReason(''); setCancelError(''); }}>Atrás</Button>
             <Button variant="danger" onClick={handleCancelar} isLoading={actionLoading}>Confirmar Cancelación</Button>
           </>
         }
       >
-        <Input
-          label="Motivo de la cancelación *"
-          value={cancelReason}
-          onChange={e => setCancelReason(e.target.value)}
-          placeholder="Ingresá el motivo de cancelación"
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {cancelError && <Alert variant="error">{cancelError}</Alert>}
+          <Input
+            label="Motivo de la cancelación *"
+            value={cancelReason}
+            onChange={e => { setCancelReason(e.target.value); setCancelError(''); }}
+            placeholder="Ingresá el motivo de cancelación"
+          />
+        </div>
       </Modal>
 
       {/* Modal Registrar Pago (flujo antiguo) */}
@@ -372,8 +381,9 @@ export const MayoristaReservaDetalle = () => {
             placeholder={formatCurrency(precioFinal)}
           />
           <div>
-            <label className="input-label">Método de pago</label>
+            <label className="input-label" htmlFor="mayorista-metodo-pago">Método de pago</label>
             <select
+              id="mayorista-metodo-pago"
               className="input-control"
               value={paymentData.metodo}
               onChange={e => setPaymentData({ ...paymentData, metodo: e.target.value })}
@@ -442,6 +452,7 @@ export const MayoristaReservaDetalle = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
               {MOTIVOS_RAPIDOS.map(m => (
                 <button
+                  type="button"
                   key={m}
                   onClick={() => setRejectReason(m)}
                   style={{

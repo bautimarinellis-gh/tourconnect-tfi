@@ -8,6 +8,7 @@ const Cotizacion = require('../models/Cotizacion');
 const Reserva = require('../models/Reserva');
 const { enviarInvitacion } = require('../utils/mailer');
 const { getSubscriptionPlan } = require('../utils/subscriptionPlans');
+const { registrarAuditoria } = require('../utils/auditService');
 
 /**
  * @route   GET /api/v1/agencias
@@ -144,6 +145,21 @@ exports.createAgencia = async (req, res, next) => {
     // Confirmar transacción
     await session.commitTransaction();
     session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'AGENCIA_CREADA',
+      entidad_afectada: 'Agencia',
+      entidad_id: nuevaAgencia._id,
+      detalle: { nombre, email },
+    });
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_CREADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: nuevoUsuario._id,
+      detalle: { email, rol: 'agencia', con_invitacion: !tienePassword },
+    });
 
     res.status(201).json({
       success: true,
@@ -314,6 +330,91 @@ exports.verificarDesactivacion = async (req, res, next) => {
 };
 
 /**
+ * @route   PATCH /api/v1/agencias/:id/reactivar
+ * @desc    Reactiva una agencia desactivada y su usuario asociado
+ * @access  Private (Mayorista)
+ */
+exports.reactivarAgencia = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const agencia = await Agencia.findOne({
+      _id: req.params.id,
+      mayorista_id: req.usuario.mayorista_id,
+    }).session(session);
+
+    if (!agencia) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Agencia no encontrada.' });
+    }
+
+    if (agencia.activo) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'La agencia ya está activa.' });
+    }
+
+    // Verificar límite de plan antes de reactivar
+    const mayorista = await Mayorista.findById(req.usuario.mayorista_id).session(session);
+    if (mayorista) {
+      const plan = getSubscriptionPlan(mayorista.plan_suscripcion);
+      if (plan.maxAgencias !== null) {
+        const agenciasActivas = await Agencia.countDocuments({
+          mayorista_id: req.usuario.mayorista_id,
+          activo: true,
+        }).session(session);
+
+        if (agenciasActivas >= plan.maxAgencias) {
+          await session.abortTransaction();
+          session.endSession();
+          return res.status(403).json({
+            success: false,
+            message: `El plan ${plan.label} permite hasta ${plan.maxAgencias} agencias activas. Actualizá el plan para reactivar esta agencia.`,
+          });
+        }
+      }
+    }
+
+    agencia.activo = true;
+    await agencia.save({ session });
+
+    const usuario = await Usuario.findById(agencia.usuario_id).session(session);
+    if (usuario) {
+      usuario.activo = true;
+      await usuario.save({ session });
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'AGENCIA_REACTIVADA',
+      entidad_afectada: 'Agencia',
+      entidad_id: agencia._id,
+      detalle: { nombre: agencia.nombre },
+    });
+    if (usuario) {
+      registrarAuditoria({
+        req,
+        accion: 'USUARIO_REACTIVADO',
+        entidad_afectada: 'Usuario',
+        entidad_id: usuario._id,
+        detalle: { email: usuario.email, rol: 'agencia' },
+      });
+    }
+
+    res.status(200).json({ success: true, data: {} });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    next(error);
+  }
+};
+
+/**
  * @route   DELETE /api/v1/agencias/:id
  * @desc    Desactiva la agencia y su usuario asociado
  * @access  Private (Mayorista)
@@ -364,6 +465,23 @@ exports.deleteAgencia = async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'AGENCIA_DESACTIVADA',
+      entidad_afectada: 'Agencia',
+      entidad_id: agencia._id,
+      detalle: { nombre: agencia.nombre },
+    });
+    if (usuario) {
+      registrarAuditoria({
+        req,
+        accion: 'USUARIO_DESACTIVADO',
+        entidad_afectada: 'Usuario',
+        entidad_id: usuario._id,
+        detalle: { email: usuario.email, rol: 'agencia' },
+      });
+    }
 
     res.status(200).json({
       success: true,

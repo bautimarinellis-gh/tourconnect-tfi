@@ -71,7 +71,7 @@ export const ToastContainer = () => {
             <p className="toast-title">{toast.title || titles[toast.variant]}</p>
             <p className="toast-message">{toast.message}</p>
           </div>
-          <button className="toast-close" onClick={() => dismiss(toast.id)}>
+          <button type="button" className="toast-close" onClick={() => dismiss(toast.id)}>
             <X size={16} />
           </button>
         </div>

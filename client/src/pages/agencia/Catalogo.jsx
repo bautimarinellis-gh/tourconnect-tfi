@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar, Minus, Plus } from 'lucide-react';
+import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar, Minus, Plus, Search } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -22,12 +22,21 @@ const QUOTE_DURATION_PRESETS = [
   { label: '14 días', days: 14 },
 ];
 
+const getIconForType = (tipo) => {
+  if (tipo === 'hotel') return <Hotel />;
+  if (tipo === 'actividad') return <Map />;
+  if (tipo === 'paquete') return <PackageIcon />;
+  return <Tag />;
+};
+
 export const AgenciaCatalogo = () => {
   const toast = useToast();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('');
 
+  const [busqueda, setBusqueda] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -38,11 +47,13 @@ export const AgenciaCatalogo = () => {
 
   const fetchCatalogo = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await productoService.getCatalogo(filtroTipo ? { tipo: filtroTipo } : {});
       setProductos(data);
     } catch (err) {
       console.error(err);
+      setFetchError(err.response?.data?.message || 'Error al cargar el catálogo. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -78,19 +89,18 @@ export const AgenciaCatalogo = () => {
     }
   };
 
+  const productosFiltrados = busqueda.trim()
+    ? productos.filter(p => p.nombre?.toLowerCase().includes(busqueda.toLowerCase()))
+    : productos;
+
   const selectProduct = (producto) => {
     setSelectedProduct(producto);
     setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
   };
 
-  const getIconForType = (tipo) => {
-    if (tipo === 'hotel') return <Hotel />;
-    if (tipo === 'actividad') return <Map />;
-    if (tipo === 'paquete') return <PackageIcon />;
-    return <Tag />;
-  };
-
   if (loading && productos.length === 0) return <Spinner center size="lg" />;
+
+  if (fetchError) return <Alert variant="error" style={{ margin: '2rem' }}>{fetchError}</Alert>;
 
   const minDisponible = toDateInputValue(selectedProduct?.disponibilidad_desde);
   const maxDisponible = toDateInputValue(selectedProduct?.disponibilidad_hasta);
@@ -155,11 +165,23 @@ export const AgenciaCatalogo = () => {
         <div className="catalog-shell">
           <Card className="catalog-list-card">
             <div className="catalog-search-row">
-              <span className="catalog-search-icon"><ShoppingCart size={16} /></span>
-              <span>Seleccioná una experiencia para cotizar</span>
+              <span className="catalog-search-icon"><Search size={16} /></span>
+              <input
+                type="text"
+                aria-label="Buscar experiencia"
+                placeholder="Buscar experiencia..."
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                className="catalog-search-input"
+              />
             </div>
             <div className="catalog-list">
-              {productos.map(p => {
+              {productosFiltrados.length === 0 ? (
+                <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
+                  No hay productos que coincidan con "{busqueda}".
+                </div>
+              ) : null}
+              {productosFiltrados.map(p => {
                 const active = selectedProduct?._id === p._id;
                 return (
                   <button

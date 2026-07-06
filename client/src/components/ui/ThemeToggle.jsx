@@ -8,8 +8,9 @@ export const ThemeToggle = () => {
   const isDark = theme === 'dark';
 
   return (
-    <button 
-      className="theme-toggle-btn" 
+    <button
+      type="button"
+      className="theme-toggle-btn"
       onClick={toggleTheme} 
       title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
       aria-label="Cambiar tema de la página"
@@ -23,4 +24,3 @@ export const ThemeToggle = () => {
     </button>
   );
 };
-export default ThemeToggle;

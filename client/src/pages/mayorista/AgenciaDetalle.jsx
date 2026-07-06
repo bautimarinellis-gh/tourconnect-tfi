@@ -91,7 +91,8 @@ export const MayoristaAgenciaDetalle = () => {
       </div>
 
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--color-border)' }}>
-        <button 
+        <button
+          type="button"
           onClick={() => setActiveTab('info')}
           style={{ 
             padding: '0.75rem 1rem', 
@@ -105,7 +106,8 @@ export const MayoristaAgenciaDetalle = () => {
         >
           Información
         </button>
-        <button 
+        <button
+          type="button"
           onClick={() => setActiveTab('products')}
           style={{ 
             padding: '0.75rem 1rem', 
@@ -131,6 +133,10 @@ export const MayoristaAgenciaDetalle = () => {
               <div>
                 <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Razón Social</p>
                 <p style={{ fontWeight: 500 }}>{agencia.razon_social || '-'}</p>
+              </div>
+              <div>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>CUIT</p>
+                <p style={{ fontWeight: 500 }}>{agencia.cuit || '-'}</p>
               </div>
               <div>
                 <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Teléfono</p>
@@ -172,8 +178,9 @@ export const MayoristaAgenciaDetalle = () => {
                 return (
                   <TableRow key={p._id}>
                     <TableCell>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
+                        aria-label={`Habilitar ${p.nombre}`}
                         checked={state.habilitado}
                         onChange={(e) => setProductStates({...productStates, [p._id]: {...state, habilitado: e.target.checked}})}
                         style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }}

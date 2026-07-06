@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Alert } from '../../components/ui/Alert';
 import { formatCurrency, formatDateTime, formatDate, formatEstadoReserva } from '../../utils/formatters';
 import reservaService from '../../services/reservaService';
 
@@ -134,16 +135,16 @@ export const AgenciaReservaDetalle = () => {
 
           {/* Estado de pago informado */}
           {reserva.estado === 'pago_informado' && pid && (
-            <Card style={{ marginBottom: '1.5rem', borderColor: '#F59E0B', borderWidth: '2px' }}>
+            <Card style={{ marginBottom: '1.5rem', borderColor: 'var(--color-warning)', borderWidth: '2px' }}>
               <CardBody>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <Clock size={20} style={{ color: '#D97706' }} />
-                  <h3 style={{ margin: 0, color: '#92400E' }}>Pago en Verificación</h3>
+                  <Clock size={20} style={{ color: 'var(--color-warning)' }} />
+                  <h3 style={{ margin: 0, color: 'var(--color-warning)' }}>Pago en Verificación</h3>
                 </div>
                 <p style={{ color: 'var(--color-text-soft)', margin: '0 0 1rem 0', fontSize: '0.875rem' }}>
                   El mayorista está verificando tu pago. Te notificaremos cuando sea confirmado.
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: '#FFFBEB', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', background: 'var(--color-warning-soft)', padding: '1rem', borderRadius: 'var(--radius-sm)' }}>
                   <div>
                     <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Método</p>
                     <p style={{ fontWeight: 500, margin: 0, textTransform: 'capitalize' }}>{pid.metodo}</p>
@@ -181,8 +182,8 @@ export const AgenciaReservaDetalle = () => {
             <CardBody>
               {pagos.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pagos.map((p, i) => (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: '#F8FAFC', borderRadius: 'var(--radius-sm)' }}>
+                  {pagos.map((p) => (
+                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-sm)' }}>
                       <div>
                         <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>{formatCurrency(toFloat(p.monto))}</p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0, textTransform: 'capitalize' }}>
@@ -229,13 +230,13 @@ export const AgenciaReservaDetalle = () => {
             <Card style={{ marginBottom: '1.5rem' }}>
               <CardBody>
                 {rechazo && (
-                  <div style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem 1rem', background: '#FEE2E2', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', alignItems: 'flex-start' }}>
-                    <AlertCircle size={18} style={{ color: '#DC2626', flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ display: 'flex', gap: '0.75rem', padding: '0.75rem 1rem', background: 'var(--color-error-soft)', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', alignItems: 'flex-start' }}>
+                    <AlertCircle size={18} style={{ color: 'var(--color-error)', flexShrink: 0, marginTop: '2px' }} />
                     <div>
-                      <p style={{ fontWeight: 600, color: '#991B1B', margin: '0 0 0.25rem', fontSize: '0.875rem' }}>Pago rechazado</p>
-                      <p style={{ color: '#991B1B', margin: 0, fontSize: '0.875rem' }}>{rechazo.motivo}</p>
+                      <p style={{ fontWeight: 600, color: 'var(--color-error)', margin: '0 0 0.25rem', fontSize: '0.875rem' }}>Pago rechazado</p>
+                      <p style={{ color: 'var(--color-error)', margin: 0, fontSize: '0.875rem' }}>{rechazo.motivo}</p>
                       {rechazo.rechazado_at && (
-                        <p style={{ color: '#B91C1C', margin: '0.25rem 0 0', fontSize: '0.75rem' }}>{formatDateTime(rechazo.rechazado_at)}</p>
+                        <p style={{ color: 'var(--color-error)', margin: '0.25rem 0 0', fontSize: '0.75rem' }}>{formatDateTime(rechazo.rechazado_at)}</p>
                       )}
                     </div>
                   </div>
@@ -251,12 +252,12 @@ export const AgenciaReservaDetalle = () => {
           )}
 
           {reserva.estado === 'pagada' && (
-            <Card style={{ marginBottom: '1.5rem', borderColor: '#22C55E' }}>
+            <Card style={{ marginBottom: '1.5rem', borderColor: 'var(--color-success)' }}>
               <CardBody>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <CheckCircle size={20} style={{ color: '#16A34A' }} />
+                  <CheckCircle size={20} style={{ color: 'var(--color-success)' }} />
                   <div>
-                    <p style={{ fontWeight: 600, color: '#166534', margin: 0 }}>Pago confirmado</p>
+                    <p style={{ fontWeight: 600, color: 'var(--color-success)', margin: 0 }}>Pago confirmado</p>
                     <p style={{ color: 'var(--color-text-soft)', margin: 0, fontSize: '0.875rem' }}>El mayorista verificó y confirmó tu pago.</p>
                   </div>
                 </div>
@@ -270,8 +271,8 @@ export const AgenciaReservaDetalle = () => {
             <CardBody>
               <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
                 <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', backgroundColor: 'var(--color-border)' }}></div>
-                {(reserva.historial ?? []).map((h, i) => (
-                  <div key={i} style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                {(reserva.historial ?? []).map((h) => (
+                  <div key={h._id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
                     <div style={{ position: 'absolute', left: '-1.5rem', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-surface)' }}></div>
                     <div style={{ fontWeight: 600, textTransform: 'capitalize' }}>{formatEstadoReserva(h.estado_nuevo)}</div>
                     {h.comentario && (
@@ -299,15 +300,12 @@ export const AgenciaReservaDetalle = () => {
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {error && (
-            <div style={{ padding: '0.75rem 1rem', background: '#FEE2E2', borderRadius: 'var(--radius-sm)', color: '#991B1B', fontSize: '0.875rem' }}>
-              {error}
-            </div>
-          )}
+          {error && <Alert variant="error">{error}</Alert>}
 
           <div>
-            <label className="input-label">Método de pago *</label>
+            <label className="input-label" htmlFor="agencia-metodo-pago">Método de pago *</label>
             <select
+              id="agencia-metodo-pago"
               className="input-control"
               value={pagoForm.metodo}
               onChange={e => setPagoForm({ ...pagoForm, metodo: e.target.value })}

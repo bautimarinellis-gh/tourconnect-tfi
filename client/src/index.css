@@ -39,8 +39,8 @@
   /* Glassmorphic & dynamic background light variables */
   --glass-bg: rgba(255, 255, 255, 0.88);
   --glass-border: rgba(255, 255, 255, 0.84);
-  --glass-bg-container: rgba(255, 255, 255, 0.9);
-  --glass-border-container: rgba(255, 255, 255, 0.82);
+  --glass-bg-container: rgba(255, 255, 255, 0.97);
+  --glass-border-container: rgba(255, 255, 255, 0.9);
   --color-input-bg: rgba(255, 255, 255, 0.9);
   --metric-card-bg-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 248, 244, 0.86));
 }
@@ -77,8 +77,8 @@
   /* Glassmorphic & dynamic background dark variables */
   --glass-bg: rgba(19, 22, 16, 0.82);
   --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-bg-container: rgba(19, 22, 16, 0.86);
-  --glass-border-container: rgba(255, 255, 255, 0.05);
+  --glass-bg-container: rgba(19, 22, 16, 0.97);
+  --glass-border-container: rgba(255, 255, 255, 0.06);
   --color-input-bg: rgba(28, 32, 24, 0.85);
   --metric-card-bg-gradient: linear-gradient(180deg, rgba(28, 32, 24, 0.95), rgba(19, 22, 16, 0.85));
 }
@@ -89,18 +89,17 @@
   box-sizing: border-box;
 }
 
-/* Global Transitions for Premium Feel */
-body, 
-.navbar-container, 
-.page-container, 
-.card, 
-.table-container, 
-.table-header-cell,
-.table-cell,
-.input-control, 
-.btn-secondary, 
+/* Global Transitions for theme switching — table cells excluded intentionally
+   (many instances per page; animating all simultaneously blocks the main thread) */
+body,
+.navbar-container,
+.page-container,
+.card,
+.table-container,
+.input-control,
+.btn-secondary,
 .nav-item {
-  transition: background 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+  transition: background 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 body {

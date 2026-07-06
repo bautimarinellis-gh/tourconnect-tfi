@@ -1,14 +1,13 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(23, 24, 17, 0.45);
+  background: rgba(23, 24, 17, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 1.25rem;
-  backdrop-filter: blur(8px);
-  animation: fadeIn 0.2s ease-out;
+  animation: fadeIn 0.15s ease-out;
 }
 
 .modal-content {
@@ -16,7 +15,7 @@
   z-index: 1;
   background-color: var(--color-surface);
   border-radius: 16px;
-  box-shadow: 
+  box-shadow:
     0 10px 30px -10px rgba(23, 24, 17, 0.3),
     0 30px 60px -15px rgba(23, 24, 17, 0.2);
   border: 1px solid var(--color-border);
@@ -25,7 +24,8 @@
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
 }
 
 .modal-header {

@@ -8,6 +8,7 @@ const Producto = require('../models/Producto');
 const Cotizacion = require('../models/Cotizacion');
 const { enviarEmail } = require('../utils/mailer');
 const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
+const { registrarAuditoria } = require('../utils/auditService');
 
 const validarPlanSuscripcion = (plan) => {
   if (!SUBSCRIPTION_PLAN_NAMES.includes(plan)) {
@@ -24,43 +25,41 @@ const validarPlanSuscripcion = (plan) => {
  */
 exports.getMayoristas = async (req, res, next) => {
   try {
-    const mayoristas = await Mayorista.find()
-      .populate('usuario_id', 'email activo')
-      .lean();
-
     const cotizacionCollection = Cotizacion.collection.name;
 
-    const result = await Promise.all(
-      mayoristas.map(async (m) => {
-        const agenciasCount = await Agencia.countDocuments({ mayorista_id: m._id, activo: true });
-        const reservasAgg = await Reserva.aggregate([
-          {
-            $lookup: {
-              from: cotizacionCollection,
-              localField: 'cotizacion_id',
-              foreignField: '_id',
-              as: 'cot',
-            },
+    // 3 queries en paralelo en vez de 2N+1 queries secuenciales
+    const [mayoristas, agenciasAgg, reservasAgg] = await Promise.all([
+      Mayorista.find().populate('usuario_id', 'email activo').lean(),
+      Agencia.aggregate([
+        { $match: { activo: true } },
+        { $group: { _id: '$mayorista_id', count: { $sum: 1 } } },
+      ]),
+      Reserva.aggregate([
+        {
+          $lookup: {
+            from: cotizacionCollection,
+            localField: 'cotizacion_id',
+            foreignField: '_id',
+            as: 'cot',
           },
-          { $unwind: '$cot' },
-          { $match: { 'cot.mayorista_id': m._id } },
-          { $count: 'total' },
-        ]);
-        const reservasCount = reservasAgg[0]?.total ?? 0;
-        return {
-          ...m,
-          kpis: {
-            agencias_activas: agenciasCount,
-            reservas_totales: reservasCount,
-          },
-        };
-      })
-    );
+        },
+        { $unwind: '$cot' },
+        { $group: { _id: '$cot.mayorista_id', count: { $sum: 1 } } },
+      ]),
+    ]);
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    const agenciasMap = new Map(agenciasAgg.map((a) => [a._id.toString(), a.count]));
+    const reservasMap = new Map(reservasAgg.map((r) => [r._id.toString(), r.count]));
+
+    const result = mayoristas.map((m) => ({
+      ...m,
+      kpis: {
+        agencias_activas: agenciasMap.get(m._id.toString()) ?? 0,
+        reservas_totales: reservasMap.get(m._id.toString()) ?? 0,
+      },
+    }));
+
+    res.json({ success: true, data: result });
   } catch (error) {
     next(error);
   }
@@ -128,6 +127,21 @@ exports.crearMayorista = async (req, res, next) => {
     // Commit de la transacción
     await session.commitTransaction();
     session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_CREADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: nuevoMayorista._id,
+      detalle: { nombre, email, plan_suscripcion: planSuscripcion },
+    });
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_CREADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: nuevoUsuario._id,
+      detalle: { email, rol: 'mayorista', con_invitacion: !tienePassword },
+    });
 
     // 6. Enviar email de invitación (solo si no se configuró password)
     if (!tienePassword && inviteToken) {
@@ -235,6 +249,14 @@ exports.updateMayorista = async (req, res, next) => {
       }
     }
 
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_ACTUALIZADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: mayorista._id,
+      detalle: { cambios: updateFields },
+    });
+
     const updated = await Mayorista.findById(id).populate('usuario_id', 'email activo');
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -305,6 +327,14 @@ exports.deleteMayorista = async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_DESACTIVADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: mayorista._id,
+      detalle: { nombre: mayorista.nombre },
+    });
 
     res.json({
       success: true,

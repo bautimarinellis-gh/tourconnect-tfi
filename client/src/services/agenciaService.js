@@ -8,6 +8,7 @@ const agenciaService = {
   delete: (id) => api.delete(`/agencias/${id}`).then(r => r.data),
   updateProducts: (id, data) => api.put(`/agencias/${id}/productos`, data).then(r => r.data),
   verificarDesactivacion: (id) => api.get(`/agencias/${id}/verificar-desactivacion`).then(r => r.data?.data),
+  reactivar: (id) => api.patch(`/agencias/${id}/reactivar`).then(r => r.data),
 };
 
 export default agenciaService;

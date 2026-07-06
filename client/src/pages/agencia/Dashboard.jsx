@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, DollarSign, FileText, ArrowRight } from 'lucide-react';
+import { Calendar, DollarSign, FileText, ArrowRight, CheckCircle } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { Link } from 'react-router-dom';
+import { formatCurrency } from '../../utils/formatters';
 import reporteService from '../../services/reporteService';
 import '../mayorista/dashboard.css';
 
@@ -28,8 +29,9 @@ export const AgenciaDashboard = () => {
 
   const kpis = [
     { label: 'Reservas Activas', value: data?.reservas_activas || 0, icon: <Calendar size={18} />, link: '/agencia/reservas' },
-    { label: 'Gasto del Mes', value: `$${data?.gasto_mes || 0}`, icon: <DollarSign size={18} />, link: '/agencia/reservas' },
+    { label: 'Gasto del Mes', value: formatCurrency(data?.gasto_mes || 0), icon: <DollarSign size={18} />, link: '/agencia/reservas' },
     { label: 'Cotizaciones Pendientes', value: data?.cotizaciones_pendientes || 0, icon: <FileText size={18} />, link: '/agencia/cotizaciones' },
+    { label: 'Aprobadas — Listas para Reservar', value: data?.cotizaciones_aprobadas || 0, icon: <CheckCircle size={18} />, link: '/agencia/cotizaciones?estado=aprobada' },
   ];
 
   return (
@@ -45,8 +47,8 @@ export const AgenciaDashboard = () => {
       </div>
 
       <div className="dashboard-kpi-grid">
-        {kpis.map((kpi, index) => (
-          <Card key={index} className="metric-card">
+        {kpis.map((kpi) => (
+          <Card key={kpi.label} className="metric-card">
             <CardBody>
               <div className="dashboard-kpi-top">
                 <div>

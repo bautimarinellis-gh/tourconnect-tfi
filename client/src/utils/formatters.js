@@ -1,27 +1,21 @@
+const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const dateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+const dateTimeFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
 export const formatCurrency = (amount) => {
   if (amount === undefined || amount === null) return '';
   const value = amount?.$numberDecimal ? parseFloat(amount.$numberDecimal) : amount;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(value);
+  return currencyFormatter.format(value);
 };
 
 export const formatDate = (dateString) => {
   if (!dateString) return '';
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-  }).format(date);
+  return dateFormatter.format(new Date(dateString));
 };
 
 export const formatDateTime = (dateString) => {
   if (!dateString) return '';
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date);
+  return dateTimeFormatter.format(new Date(dateString));
 };
 
 const COTIZACION_LABELS = {

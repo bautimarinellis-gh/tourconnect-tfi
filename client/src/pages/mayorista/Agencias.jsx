@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Eye, Pencil, Trash2, AlertTriangle, FileText, CalendarCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Eye, Pencil, Trash2, RefreshCw, AlertTriangle, FileText, CalendarCheck, Search } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -15,7 +15,9 @@ import agenciaService from '../../services/agenciaService';
 
 export const MayoristaAgencias = () => {
   const [agencias, setAgencias] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const navigate = useNavigate();
 
   // --- Crear ---
@@ -28,7 +30,7 @@ export const MayoristaAgencias = () => {
   const [createSaving, setCreateSaving] = useState(false);
 
   // --- Editar ---
-  const [editAgencia, setEditAgencia] = useState(null);
+  const editAgenciaRef = useRef(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editForm, setEditForm] = useState({ nombre: '', razon_social: '', telefono: '' });
   const [editError, setEditError] = useState('');
@@ -46,13 +48,21 @@ export const MayoristaAgencias = () => {
   const [blockedAgencia, setBlockedAgencia] = useState(null);
   const [blockedDetalles, setBlockedDetalles] = useState({ cotizaciones_activas: 0, reservas_activas: 0 });
 
+  // --- Reactivar ---
+  const [reactivarAgencia, setReactivarAgencia] = useState(null);
+  const [isReactivarModalOpen, setIsReactivarModalOpen] = useState(false);
+  const [reactivarSaving, setReactivarSaving] = useState(false);
+  const [reactivarError, setReactivarError] = useState('');
+
   const fetchAgencias = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await agenciaService.getAll();
       setAgencias(data);
     } catch (err) {
       console.error(err);
+      setFetchError(err.response?.data?.message || 'Error al cargar las agencias. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -97,7 +107,7 @@ export const MayoristaAgencias = () => {
 
   // --- Handlers: Editar ---
   const handleOpenEdit = (ag) => {
-    setEditAgencia(ag);
+    editAgenciaRef.current = ag;
     setEditForm({ nombre: ag.nombre || '', razon_social: ag.razon_social || '', telefono: ag.telefono || '' });
     setEditError('');
     setIsEditModalOpen(true);
@@ -111,9 +121,9 @@ export const MayoristaAgencias = () => {
     }
     setEditSaving(true);
     try {
-      const updated = await agenciaService.update(editAgencia._id, editForm);
+      const updated = await agenciaService.update(editAgenciaRef.current._id, editForm);
       setAgencias(prev => prev.map(ag =>
-        ag._id === editAgencia._id ? { ...ag, ...updated.data } : ag
+        ag._id === editAgenciaRef.current._id ? { ...ag, ...updated.data } : ag
       ));
       setIsEditModalOpen(false);
     } catch (err) {
@@ -160,15 +170,59 @@ export const MayoristaAgencias = () => {
     }
   };
 
+  // --- Handlers: Reactivar ---
+  const handleOpenReactivar = (ag) => {
+    setReactivarAgencia(ag);
+    setReactivarError('');
+    setIsReactivarModalOpen(true);
+  };
+
+  const handleReactivar = async () => {
+    setReactivarSaving(true);
+    setReactivarError('');
+    try {
+      await agenciaService.reactivar(reactivarAgencia._id);
+      setAgencias(prev => prev.map(ag =>
+        ag._id === reactivarAgencia._id ? { ...ag, activo: true } : ag
+      ));
+      setIsReactivarModalOpen(false);
+    } catch (err) {
+      setReactivarError(err.response?.data?.message || 'Error al reactivar la agencia.');
+    } finally {
+      setReactivarSaving(false);
+    }
+  };
+
+  const agenciasFiltradas = busqueda.trim()
+    ? agencias.filter(ag =>
+        ag.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        ag.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
+      )
+    : agencias;
+
   if (loading) return <Spinner center size="lg" />;
 
   return (
     <div>
+      {fetchError && <Alert variant="error" style={{ marginBottom: '1.5rem' }}>{fetchError}</Alert>}
       <div className="page-header">
         <h1 className="page-title">Agencias Asignadas</h1>
         <Button onClick={() => setIsCreateModalOpen(true)}>
           <Plus size={16} /> Nueva Agencia
         </Button>
+      </div>
+
+      <div style={{ marginBottom: '1.5rem', maxWidth: '360px', position: 'relative' }}>
+        <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-soft)', pointerEvents: 'none' }} />
+        <input
+          type="text"
+          aria-label="Buscar agencia"
+          placeholder="Buscar por nombre o razón social..."
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
+          className="input-control"
+          style={{ paddingLeft: '2.25rem' }}
+        />
       </div>
 
       {agencias.length === 0 ? (
@@ -177,6 +231,8 @@ export const MayoristaAgencias = () => {
           description="Aún no ha registrado ninguna agencia en su panel de mayorista."
           action={<Button onClick={() => setIsCreateModalOpen(true)}>Registrar Agencia</Button>}
         />
+      ) : agenciasFiltradas.length === 0 ? (
+        <EmptyState title="Sin resultados" description={`No hay agencias que coincidan con "${busqueda}".`} />
       ) : (
         <Card>
           <Table>
@@ -190,7 +246,7 @@ export const MayoristaAgencias = () => {
               </TableRow>
             </thead>
             <tbody>
-              {agencias.map(ag => (
+              {agenciasFiltradas.map(ag => (
                 <TableRow key={ag._id}>
                   <TableCell>
                     <div style={{ fontWeight: 500 }}>{ag.nombre}</div>
@@ -209,15 +265,25 @@ export const MayoristaAgencias = () => {
                       <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(ag)}>
                         <Pencil size={15} /> Editar
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        style={{ color: 'var(--color-error)' }}
-                        onClick={() => handleOpenDelete(ag)}
-                        disabled={!ag.activo}
-                      >
-                        <Trash2 size={15} /> Eliminar
-                      </Button>
+                      {ag.activo ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={{ color: 'var(--color-error)' }}
+                          onClick={() => handleOpenDelete(ag)}
+                        >
+                          <Trash2 size={15} /> Desactivar
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          style={{ color: 'var(--color-success)' }}
+                          onClick={() => handleOpenReactivar(ag)}
+                        >
+                          <RefreshCw size={15} /> Reactivar
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -344,6 +410,27 @@ export const MayoristaAgencias = () => {
               Sin operaciones activas. La agencia puede ser desactivada.
             </Alert>
           )}
+        </div>
+      </Modal>
+
+      {/* Modal: Confirmar reactivación */}
+      <Modal
+        isOpen={isReactivarModalOpen}
+        onClose={() => setIsReactivarModalOpen(false)}
+        title="Reactivar Agencia"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsReactivarModalOpen(false)}>Cancelar</Button>
+            <Button onClick={handleReactivar} isLoading={reactivarSaving}>Confirmar reactivación</Button>
+          </>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <p style={{ margin: 0, lineHeight: 1.6 }}>
+            ¿Estás seguro que querés reactivar <strong>{reactivarAgencia?.nombre}</strong>?
+            La agencia y su usuario asociado volverán a tener acceso al sistema.
+          </p>
+          {reactivarError && <Alert variant="error">{reactivarError}</Alert>}
         </div>
       </Modal>
 

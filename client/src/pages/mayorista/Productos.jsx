@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Pencil, Trash2, Tag, Hotel, Map, Calendar as CalendarIcon, Package as PackageIcon, AlertTriangle } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -52,9 +52,38 @@ const getAvailabilitySummary = (form) => {
   return `Disponible por ${days} día${days !== 1 ? 's' : ''}.`;
 };
 
+const buildPayload = (tipo, form) => {
+  const payload = {
+    tipo,
+    nombre: form.nombre,
+    descripcion: form.descripcion,
+    precio_base: Number(form.precio_base),
+    disponibilidad_desde: form.disponibilidad_desde,
+    disponibilidad_hasta: form.disponibilidad_hasta,
+  };
+  if (tipo === 'hotel') {
+    payload.direccion = form.hotel_direccion;
+    payload.estrellas = Number(form.hotel_estrellas);
+  } else if (tipo === 'actividad') {
+    payload.duracion_horas = Number(form.actividad_duracion);
+    payload.cupo_maximo = Number(form.actividad_cupo);
+  } else if (tipo === 'paquete') {
+    payload.itinerario = form.paquete_itinerario;
+  }
+  return payload;
+};
+
+const getIconForType = (tipo) => {
+  if (tipo === 'hotel') return <Hotel />;
+  if (tipo === 'actividad') return <Map />;
+  if (tipo === 'paquete') return <PackageIcon />;
+  return <Tag />;
+};
+
 export const MayoristaProductos = () => {
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('');
 
   // --- Crear ---
@@ -73,7 +102,7 @@ export const MayoristaProductos = () => {
   const [deleteError, setDeleteError] = useState('');
 
   // --- Editar ---
-  const [editProducto, setEditProducto] = useState(null);
+  const editProductoRef = useRef(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTipo, setEditTipo] = useState('hotel');
   const [editForm, setEditForm] = useState(INITIAL_FORM);
@@ -83,21 +112,23 @@ export const MayoristaProductos = () => {
   const set = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
   const setEdit = (key, value) => setEditForm(prev => ({ ...prev, [key]: value }));
 
-  const fetchProductos = async () => {
+  const fetchProductos = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await productoService.getAll(filtroTipo ? { tipo: filtroTipo } : {});
       setProductos(data);
     } catch (err) {
       console.error(err);
+      setFetchError(err.response?.data?.message || 'Error al cargar los productos. Intentá de nuevo.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtroTipo]);
 
   useEffect(() => {
     fetchProductos();
-  }, [filtroTipo]);
+  }, [fetchProductos]);
 
   // --- Handlers: Crear ---
   const handleOpenModal = () => {
@@ -105,27 +136,6 @@ export const MayoristaProductos = () => {
     setTipoProducto('hotel');
     setFormError('');
     setIsCreateModalOpen(true);
-  };
-
-  const buildPayload = (tipo, form) => {
-    const payload = {
-      tipo,
-      nombre: form.nombre,
-      descripcion: form.descripcion,
-      precio_base: Number(form.precio_base),
-      disponibilidad_desde: form.disponibilidad_desde,
-      disponibilidad_hasta: form.disponibilidad_hasta,
-    };
-    if (tipo === 'hotel') {
-      payload.direccion = form.hotel_direccion;
-      payload.estrellas = Number(form.hotel_estrellas);
-    } else if (tipo === 'actividad') {
-      payload.duracion_horas = Number(form.actividad_duracion);
-      payload.cupo_maximo = Number(form.actividad_cupo);
-    } else if (tipo === 'paquete') {
-      payload.itinerario = form.paquete_itinerario;
-    }
-    return payload;
   };
 
   const handleCreate = async () => {
@@ -156,7 +166,7 @@ export const MayoristaProductos = () => {
 
   // --- Handlers: Editar ---
   const handleOpenEdit = (p) => {
-    setEditProducto(p);
+    editProductoRef.current = p;
     setEditTipo(p.tipo);
     setEditForm({
       nombre: p.nombre || '',
@@ -192,9 +202,9 @@ export const MayoristaProductos = () => {
     }
     setEditSaving(true);
     try {
-      const result = await productoService.update(editProducto._id, buildPayload(editTipo, editForm));
+      const result = await productoService.update(editProductoRef.current._id, buildPayload(editTipo, editForm));
       setProductos(prev => prev.map(p =>
-        p._id === editProducto._id ? { ...p, ...result.data } : p
+        p._id === editProductoRef.current._id ? { ...p, ...result.data } : p
       ));
       setIsEditModalOpen(false);
     } catch (err) {
@@ -236,13 +246,6 @@ export const MayoristaProductos = () => {
     } finally {
       setDeleting(false);
     }
-  };
-
-  const getIconForType = (tipo) => {
-    if (tipo === 'hotel') return <Hotel />;
-    if (tipo === 'actividad') return <Map />;
-    if (tipo === 'paquete') return <PackageIcon />;
-    return <Tag />;
   };
 
   const tipoLabel = { hotel: 'Hotel', actividad: 'Actividad', paquete: 'Paquete' };
@@ -309,6 +312,7 @@ export const MayoristaProductos = () => {
 
   return (
     <div>
+      {fetchError && <Alert variant="error" style={{ marginBottom: '1.5rem' }}>{fetchError}</Alert>}
       <div className="page-header">
         <h1 className="page-title">Catálogo de Productos</h1>
         <Button onClick={handleOpenModal}>
@@ -460,13 +464,13 @@ export const MayoristaProductos = () => {
                     gap: '0.75rem',
                     alignItems: 'flex-start',
                     padding: '1rem',
-                    backgroundColor: '#FEF3C7',
-                    border: '1px solid #F59E0B',
+                    backgroundColor: 'var(--color-warning-soft)',
+                    border: '1px solid var(--color-warning)',
                     borderRadius: 'var(--radius-sm)',
-                    color: '#92400E',
+                    color: 'var(--color-warning)',
                   }}>
                     <AlertTriangle size={20} style={{ flexShrink: 0, marginTop: '0.1rem' }} />
-                    <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.5 }}>
+                    <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: 1.5, color: 'var(--color-text)' }}>
                       <strong>¡Atención!</strong> Este producto está vinculado a{' '}
                       <strong>{deleteAgenciasCount} agencia{deleteAgenciasCount !== 1 ? 's' : ''}</strong>.
                       Al eliminarlo, dejará de estar disponible para {deleteAgenciasCount !== 1 ? 'ellas' : 'ella'}.
