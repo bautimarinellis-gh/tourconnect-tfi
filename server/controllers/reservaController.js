@@ -222,6 +222,18 @@ exports.pagarReserva = async (req, res, next) => {
 
     const pagosExistentes = await Pago.countDocuments({ reserva_id: reserva._id }).session(session);
     if (pagosExistentes === 0 && monto && fecha_pago) {
+      const precioFinal = obtenerPrecioFinal(reserva);
+      const montoNum = parseFloat(monto);
+
+      if (precioFinal === null || Math.abs(montoNum - precioFinal) > 0.01) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: `El monto informado ($${montoNum}) no coincide con el precio total de la reserva ($${precioFinal})`,
+        });
+      }
+
       await Pago.create(
         [
           {

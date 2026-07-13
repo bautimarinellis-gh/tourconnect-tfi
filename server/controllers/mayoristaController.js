@@ -33,12 +33,20 @@ exports.updatePerfil = async (req, res, next) => {
   try {
     const { nombre, razon_social, telefono, cuit, plan_suscripcion } = req.body;
 
+    // El plan de suscripción es exclusivo del Administrador (ver adminController.updateMayorista).
+    // Se rechaza explícitamente en vez de ignorarlo para que el mayorista no asuma que se aplicó.
+    if (plan_suscripcion !== undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'No tenés permisos para modificar el plan de suscripción. Contactá a un administrador.',
+      });
+    }
+
     const updateFields = {};
     if (nombre !== undefined) updateFields.nombre = nombre;
     if (razon_social !== undefined) updateFields.razon_social = razon_social;
     if (telefono !== undefined) updateFields.telefono = telefono;
     if (cuit !== undefined) updateFields.cuit = cuit;
-    if (plan_suscripcion !== undefined) updateFields.plan_suscripcion = plan_suscripcion;
 
     const mayorista = await Mayorista.findOneAndUpdate(
       { usuario_id: req.usuario.id },

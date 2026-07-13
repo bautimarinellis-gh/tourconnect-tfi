@@ -3,6 +3,9 @@ const AgenciaProducto = require('../models/AgenciaProducto');
 const Producto = require('../models/Producto');
 const { calcularPrecioTotal } = require('../utils/precioCalculator');
 const { registrarAuditoria } = require('../utils/auditService');
+const { verificarCupoDisponible } = require('../utils/cupoValidator');
+
+const MAX_PASAJEROS = 30;
 
 // @desc    Obtener todas las cotizaciones
 // @route   GET /api/v1/cotizaciones
@@ -53,10 +56,10 @@ exports.createCotizacion = async (req, res, next) => {
       });
     }
 
-    if (pasajeros < 1) {
+    if (pasajeros < 1 || pasajeros > MAX_PASAJEROS) {
       return res.status(400).json({
         success: false,
-        message: 'La cantidad de pasajeros debe ser al menos 1'
+        message: `La cantidad de pasajeros debe ser entre 1 y ${MAX_PASAJEROS}`
       });
     }
 
@@ -237,23 +240,43 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
       });
     }
 
-    cotizacion.estado = estado;
-    if (estado === 'rechazada') {
-      cotizacion.motivo_rechazo = motivo_rechazo;
+    if (estado === 'aprobada') {
+      const cupo = await verificarCupoDisponible(cotizacion);
+      if (!cupo.ok) {
+        return res.status(400).json({ success: false, message: cupo.message });
+      }
     }
-    await cotizacion.save();
+
+    // Update atómico filtrando por el estado esperado: si otra request ya
+    // cambió el estado entre el chequeo de arriba y este punto, no matchea
+    // ningún documento y devolvemos 409 en vez de pisar el cambio ajeno.
+    const update = { estado };
+    if (estado === 'rechazada') update.motivo_rechazo = motivo_rechazo;
+
+    const actualizada = await Cotizacion.findOneAndUpdate(
+      { _id: id, estado: 'pendiente' },
+      { $set: update },
+      { new: true }
+    );
+
+    if (!actualizada) {
+      return res.status(409).json({
+        success: false,
+        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
+      });
+    }
 
     registrarAuditoria({
       req,
       accion: estado === 'aprobada' ? 'COTIZACION_APROBADA' : 'COTIZACION_RECHAZADA',
       entidad_afectada: 'Cotizacion',
-      entidad_id: cotizacion._id,
-      detalle: estado === 'rechazada' ? { motivo_rechazo, agencia_id: cotizacion.agencia_id } : { agencia_id: cotizacion.agencia_id },
+      entidad_id: actualizada._id,
+      detalle: estado === 'rechazada' ? { motivo_rechazo, agencia_id: actualizada.agencia_id } : { agencia_id: actualizada.agencia_id },
     });
 
     res.status(200).json({
       success: true,
-      data: cotizacion,
+      data: actualizada,
     });
   } catch (error) {
     next(error);
@@ -291,20 +314,35 @@ exports.confirmarCotizacion = async (req, res, next) => {
       });
     }
 
-    cotizacion.estado = 'aprobada';
-    await cotizacion.save();
+    const cupo = await verificarCupoDisponible(cotizacion);
+    if (!cupo.ok) {
+      return res.status(400).json({ success: false, message: cupo.message });
+    }
+
+    const actualizada = await Cotizacion.findOneAndUpdate(
+      { _id: id, estado: 'pendiente' },
+      { $set: { estado: 'aprobada' } },
+      { new: true }
+    );
+
+    if (!actualizada) {
+      return res.status(409).json({
+        success: false,
+        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
+      });
+    }
 
     registrarAuditoria({
       req,
       accion: 'COTIZACION_APROBADA',
       entidad_afectada: 'Cotizacion',
-      entidad_id: cotizacion._id,
-      detalle: { agencia_id: cotizacion.agencia_id },
+      entidad_id: actualizada._id,
+      detalle: { agencia_id: actualizada.agencia_id },
     });
 
     res.status(200).json({
       success: true,
-      data: cotizacion
+      data: actualizada
     });
   } catch (error) {
     next(error);
@@ -350,21 +388,30 @@ exports.rechazarCotizacion = async (req, res, next) => {
       });
     }
 
-    cotizacion.estado = 'rechazada';
-    cotizacion.motivo_rechazo = motivo_rechazo;
-    await cotizacion.save();
+    const actualizada = await Cotizacion.findOneAndUpdate(
+      { _id: id, estado: 'pendiente' },
+      { $set: { estado: 'rechazada', motivo_rechazo } },
+      { new: true }
+    );
+
+    if (!actualizada) {
+      return res.status(409).json({
+        success: false,
+        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
+      });
+    }
 
     registrarAuditoria({
       req,
       accion: 'COTIZACION_RECHAZADA',
       entidad_afectada: 'Cotizacion',
-      entidad_id: cotizacion._id,
-      detalle: { motivo_rechazo, agencia_id: cotizacion.agencia_id },
+      entidad_id: actualizada._id,
+      detalle: { motivo_rechazo, agencia_id: actualizada.agencia_id },
     });
 
     res.status(200).json({
       success: true,
-      data: cotizacion
+      data: actualizada
     });
   } catch (error) {
     next(error);
@@ -401,19 +448,29 @@ exports.cancelarCotizacion = async (req, res, next) => {
       });
     }
 
-    cotizacion.estado = 'cancelada';
-    await cotizacion.save();
+    const actualizada = await Cotizacion.findOneAndUpdate(
+      { _id: id, estado: 'pendiente' },
+      { $set: { estado: 'cancelada' } },
+      { new: true }
+    );
+
+    if (!actualizada) {
+      return res.status(409).json({
+        success: false,
+        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
+      });
+    }
 
     registrarAuditoria({
       req,
       accion: 'COTIZACION_CANCELADA',
       entidad_afectada: 'Cotizacion',
-      entidad_id: cotizacion._id,
+      entidad_id: actualizada._id,
     });
 
     res.status(200).json({
       success: true,
-      data: cotizacion,
+      data: actualizada,
     });
   } catch (error) {
     next(error);

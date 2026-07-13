@@ -20,6 +20,8 @@
 }
 
 .auth-form-container {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -30,6 +32,65 @@
   width: 100%;
 }
 
+.auth-bg-illustration {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.tc-plane {
+  fill: none;
+  stroke: var(--color-text);
+  stroke-width: 0.4;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.tc-plane-a {
+  opacity: 0.1;
+  transform: rotate(25deg);
+}
+
+.tc-plane-b {
+  opacity: 0.14;
+  transform: rotate(-18deg);
+}
+
+.tc-plane-c {
+  opacity: 0.1;
+  transform: rotate(8deg);
+}
+
+.tc-plane-d {
+  opacity: 0.12;
+  transform: rotate(-8deg);
+}
+
+.tc-plane-e {
+  opacity: 0.08;
+  transform: rotate(30deg);
+}
+
+.tc-plane-f {
+  opacity: 0.09;
+  transform: rotate(-30deg);
+}
+
+@media (max-width: 520px) {
+  .tc-plane-a {
+    opacity: 0.06;
+  }
+
+  .tc-plane-d,
+  .tc-plane-e,
+  .tc-plane-f {
+    display: none;
+  }
+}
+
 .auth-form-box {
   width: 100%;
   max-width: 410px;
@@ -37,19 +98,42 @@
   padding: 2rem;
   border-radius: 18px;
   border: 1px solid var(--glass-border-container);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(47, 154, 98, 0.05);
   backdrop-filter: blur(18px);
   transition: background-color 0.3s ease, border-color 0.3s ease;
+  animation: auth-card-in 0.25s ease-out;
+}
+
+[data-theme="dark"] .auth-form-box {
+  box-shadow: var(--shadow-lg), 0 0 48px rgba(62, 207, 142, 0.08);
+}
+
+@keyframes auth-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-form-box {
+    animation: none;
+  }
 }
 
 .auth-logo-img {
   height: 90px;
   width: auto;
+  max-width: 100%;
   object-fit: contain;
   display: block;
   margin-bottom: 2rem;
   filter: none;
-  transition: filter 0.2s ease;
+  transition: filter 0.2s ease, height 0.2s ease;
 }
 
 .auth-logo-img.center {
@@ -59,6 +143,35 @@
 
 [data-theme="dark"] .auth-logo-img {
   filter: invert(1) hue-rotate(180deg) brightness(1.8);
+}
+
+/* Hero variants: bigger logo treatment for Login / ResetPassword.
+   Swap the modifier class on the <img> to try a different size. */
+.auth-logo-hero-md,
+.auth-logo-hero-lg,
+.auth-logo-hero-xl {
+  margin-bottom: 2.25rem;
+}
+
+.auth-logo-hero-md {
+  height: 110px;
+}
+
+.auth-logo-hero-lg {
+  height: 140px;
+}
+
+.auth-logo-hero-xl {
+  height: 170px;
+}
+
+@media (max-width: 520px) {
+  .auth-logo-hero-md,
+  .auth-logo-hero-lg,
+  .auth-logo-hero-xl {
+    height: 90px;
+    margin-bottom: 1.5rem;
+  }
 }
 
 .auth-title {
@@ -86,6 +199,24 @@
   gap: 1rem;
 }
 
+.auth-form .input-control:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(47, 154, 98, 0.15);
+}
+
+[data-theme="dark"] .auth-form .input-control:focus {
+  box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.18);
+}
+
+.auth-form .input-control::placeholder {
+  color: var(--color-text-soft);
+  opacity: 1;
+}
+
+.auth-form .btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
 .password-header {
   display: flex;
   justify-content: space-between;
@@ -95,7 +226,11 @@
 .auth-link {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-accent);
+}
+
+.auth-link:hover {
+  text-decoration: underline;
 }
 
 .w-full {

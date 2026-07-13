@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Agencia = require('../models/Agencia');
 const Producto = require('../models/Producto');
@@ -101,23 +102,43 @@ exports.addProductoAgencia = async (req, res, next) => {
  * @access  Private (Mayorista)
  */
 exports.syncProductosAgencia = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const agenciaId = req.params.id;
     const mayoristaId = req.usuario.mayorista_id;
     const { productos = [] } = req.body;
 
     // 1. Validar que la agencia pertenece al mayorista
-    await validarAgencia(agenciaId, mayoristaId);
+    const agencia = await Agencia.findOne({ _id: agenciaId, mayorista_id: mayoristaId }).session(session);
+    if (!agencia) {
+      throw new Error('Agencia no encontrada o no pertenece a este mayorista');
+    }
 
-    // 2. Validar que todos los productos pertenezcan al mayorista
+    // 2. Validar que todos los productos pertenezcan al mayorista y tengan un markup válido
     if (productos.length > 0) {
+      const markupInvalido = productos.some(
+        (p) => p.markup_porcentaje === undefined || Number(p.markup_porcentaje) < 0 || Number.isNaN(Number(p.markup_porcentaje))
+      );
+      if (markupInvalido) {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(400).json({
+          success: false,
+          message: 'El markup_porcentaje de cada producto debe ser un número mayor o igual a 0',
+        });
+      }
+
       const ids = productos.map(p => p.producto_id);
       const productosDB = await Producto.find({
         _id: { $in: ids },
         mayorista_id: mayoristaId,
-      }).select('_id').lean();
+      }).select('_id').session(session).lean();
 
       if (productosDB.length !== ids.length) {
+        await session.abortTransaction();
+        session.endSession();
         return res.status(403).json({
           success: false,
           message: 'Uno o más productos no pertenecen al mayorista',
@@ -126,18 +147,22 @@ exports.syncProductosAgencia = async (req, res, next) => {
     }
 
     // 3. Eliminar todas las relaciones existentes para esta agencia
-    await AgenciaProducto.deleteMany({ agencia_id: agenciaId });
+    await AgenciaProducto.deleteMany({ agencia_id: agenciaId }).session(session);
 
-    // 4. Crear las nuevas relaciones
+    // 4. Crear las nuevas relaciones — mismo paso 3+4 dentro de una transacción:
+    // si la creación falla, el borrado se revierte y la agencia no queda sin catálogo.
     if (productos.length > 0) {
       const nuevasRelaciones = productos.map(p => ({
         agencia_id: agenciaId,
         producto_id: p.producto_id,
-        markup_porcentaje: Number(p.markup_porcentaje) || 0,
+        markup_porcentaje: Number(p.markup_porcentaje),
         habilitado: true,
       }));
-      await AgenciaProducto.insertMany(nuevasRelaciones);
+      await AgenciaProducto.insertMany(nuevasRelaciones, { session });
     }
+
+    await session.commitTransaction();
+    session.endSession();
 
     registrarAuditoria({
       req,
@@ -156,6 +181,9 @@ exports.syncProductosAgencia = async (req, res, next) => {
       data: { mensaje: 'Productos sincronizados correctamente', total: productos.length },
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     if (error.message.includes('No encontrada') || error.message.includes('no pertenece')) {
       return res.status(404).json({ success: false, message: error.message });
     }

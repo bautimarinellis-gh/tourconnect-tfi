@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { Alert } from '../../components/ui/Alert';
+import { AuthBackground } from '../../components/shared/AuthBackground';
 import './auth.css';
 import logoImg from '/logo.png';
 
@@ -17,6 +18,11 @@ export const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const successMessage = location.state?.successMessage || '';
+  const [authMessage] = useState(() => {
+    const stored = sessionStorage.getItem('tourconnect_auth_message');
+    if (stored) sessionStorage.removeItem('tourconnect_auth_message');
+    return stored || '';
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,20 +47,22 @@ export const Login = () => {
   };
 
   return (
-    <div className="auth-layout">
+    <div className="auth-layout single-col">
+      <AuthBackground />
       <div className="auth-form-container">
         <div className="auth-form-box">
-          <img src={logoImg} alt="TourConnect" className="auth-logo-img" />
+          <img src={logoImg} alt="TourConnect" className="auth-logo-img center auth-logo-hero-lg" />
           <h1 className="auth-title">Bienvenido de nuevo</h1>
           <p className="auth-subtitle">Ingrese sus credenciales para acceder a su cuenta</p>
 
           {successMessage && <Alert variant="success">{successMessage}</Alert>}
+          {authMessage && <Alert variant="error">{authMessage}</Alert>}
           {error && <Alert variant="error">{error}</Alert>}
 
           <form onSubmit={handleSubmit} className="auth-form">
-            <Input 
-              label="Email" 
-              type="email" 
+            <Input
+              label="Email"
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="nombre@ejemplo.com"
@@ -75,18 +83,6 @@ export const Login = () => {
               Iniciar Sesión
             </Button>
           </form>
-        </div>
-      </div>
-      <div className="auth-image-container">
-        <div className="auth-image-overlay"></div>
-        <img 
-          src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=2674&auto=format&fit=crop" 
-          alt="Travel landscape" 
-          className="auth-image"
-        />
-        <div className="auth-quote">
-          <h2>"El mundo es un libro y aquellos que no viajan leen solo una página."</h2>
-          <p>— San Agustín</p>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { Alert } from '../../components/ui/Alert';
+import { AuthBackground } from '../../components/shared/AuthBackground';
 import authService from '../../services/authService';
 import './auth.css';
 import logoImg from '/logo.png';
@@ -56,10 +57,11 @@ export const ResetPassword = () => {
   };
 
   return (
-    <div className="auth-layout">
+    <div className="auth-layout single-col">
+      <AuthBackground />
       <div className="auth-form-container">
         <div className="auth-form-box">
-          <img src={logoImg} alt="TourConnect" className="auth-logo-img" />
+          <img src={logoImg} alt="TourConnect" className="auth-logo-img center auth-logo-hero-lg" />
           <h1 className="auth-title">Resetear contraseña</h1>
           <p className="auth-subtitle">Ingresa tu email y tu nueva contraseña</p>
 
@@ -105,18 +107,6 @@ export const ResetPassword = () => {
               Volver al login
             </Link>
           </p>
-        </div>
-      </div>
-      <div className="auth-image-container">
-        <div className="auth-image-overlay"></div>
-        <img
-          src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=2674&auto=format&fit=crop"
-          alt="Travel landscape"
-          className="auth-image"
-        />
-        <div className="auth-quote">
-          <h2>"El mundo es un libro y aquellos que no viajan leen solo una página."</h2>
-          <p>— San Agustín</p>
         </div>
       </div>
     </div>
