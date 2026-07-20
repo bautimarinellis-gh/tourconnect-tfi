@@ -12,6 +12,8 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { useToast } from '../../components/ui/Toast';
 import mayoristaService from '../../services/mayoristaService';
+import { formatCuit, isValidCuit } from '../../utils/cuit';
+import { formatTelefono } from '../../utils/telefono';
 
 const SUBSCRIPTION_PLANS = [
   { value: 'Starter', label: 'Starter', description: 'Hasta 20 agencias' },
@@ -54,7 +56,7 @@ export const AdminMayoristas = () => {
   const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
   const [activarPassword, setActivarPassword] = useState('');
   const [formData, setFormData] = useState({
-    nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: ''
+    nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: ''
   });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -82,15 +84,19 @@ export const AdminMayoristas = () => {
 
   const mayoristasFiltrados = busqueda.trim()
     ? mayoristas.filter(m =>
-        m.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        m.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
-      )
+      m.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      m.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
+    )
     : mayoristas;
 
   const handleCreate = async () => {
     setFormError('');
-    if (!formData.nombre || !formData.cuit || !formData.admin_email || !formData.admin_password) {
-      showFormError('Nombre, CUIT, email y contraseña del administrador son obligatorios.');
+    if (!formData.nombre || !formData.cuit || !formData.admin_email) {
+      showFormError('Nombre, CUIT y email del administrador son obligatorios.');
+      return;
+    }
+    if (!isValidCuit(formData.cuit)) {
+      showFormError('El CUIT debe tener el formato XX-XXXXXXXX-X (11 dígitos).');
       return;
     }
     setSaving(true);
@@ -103,13 +109,12 @@ export const AdminMayoristas = () => {
         plan_suscripcion: formData.plan_suscripcion,
         email: formData.admin_email,
         nombre_usuario: formData.admin_nombre || formData.admin_email.split('@')[0],
-        password: formData.admin_password || undefined,
       };
       await mayoristaService.create(payload);
       setIsModalOpen(false);
-      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
+      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '' });
       fetchMayoristas();
-      toast.success('Mayorista creado exitosamente.');
+      toast.success('Mayorista creado. Se le envió un email de invitación para configurar su contraseña.');
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al crear mayorista'));
     } finally {
@@ -135,6 +140,10 @@ export const AdminMayoristas = () => {
     setFormError('');
     if (!editFormData.nombre) {
       showFormError('El nombre es obligatorio.');
+      return;
+    }
+    if (!isValidCuit(editFormData.cuit)) {
+      showFormError('El CUIT debe tener el formato XX-XXXXXXXX-X (11 dígitos).');
       return;
     }
     setSaving(true);
@@ -239,7 +248,6 @@ export const AdminMayoristas = () => {
                   <TableCell isHeader>Nombre</TableCell>
                   <TableCell isHeader>Razón Social</TableCell>
                   <TableCell isHeader>Plan</TableCell>
-                  <TableCell isHeader>Agencias / Reservas</TableCell>
                   <TableCell isHeader>Estado</TableCell>
                   <TableCell isHeader>Acciones</TableCell>
                 </TableRow>
@@ -265,12 +273,6 @@ export const AdminMayoristas = () => {
                         <Badge variant={PLAN_BADGE_VARIANT[m.plan_suscripcion] ?? 'info'}>
                           {m.plan_suscripcion || 'Starter'}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div style={{ fontWeight: 500 }}>{m.kpis?.agencias_activas ?? 0} agencias</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>
-                          {m.kpis?.reservas_totales ?? 0} reservas
-                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={m.activo ? 'success' : 'error'}>{m.activo ? 'Activo' : 'Inactivo'}</Badge>
@@ -305,21 +307,23 @@ export const AdminMayoristas = () => {
         {formError && <Alert variant="error">{formError}</Alert>}
 
         <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Datos de la Empresa</h4>
-        <Input label="Nombre de Fantasía *" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
-        <Input label="Razón Social" value={formData.razon_social} onChange={e => setFormData({...formData, razon_social: e.target.value})} />
+        <Input label="Nombre" value={formData.nombre} onChange={e => setFormData({ ...formData, nombre: e.target.value })} />
+        <Input label="Razón Social" value={formData.razon_social} onChange={e => setFormData({ ...formData, razon_social: e.target.value })} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input label="CUIT *" value={formData.cuit} onChange={e => setFormData({ ...formData, cuit: e.target.value })} />
+          <Input label="CUIT *" value={formData.cuit} onChange={e => setFormData({ ...formData, cuit: formatCuit(e.target.value) })} placeholder="20-12345678-9" maxLength={13} />
           <SubscriptionPlanSelect label="Plan de suscripción" value={formData.plan_suscripcion} onChange={e => setFormData({ ...formData, plan_suscripcion: e.target.value })} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input label="Email de Contacto" type="email" value={formData.email_contacto} onChange={e => setFormData({...formData, email_contacto: e.target.value})} />
-          <Input label="Teléfono" value={formData.telefono} onChange={e => setFormData({...formData, telefono: e.target.value})} />
+          <Input label="Email de Contacto" type="email" value={formData.email_contacto} onChange={e => setFormData({ ...formData, email_contacto: e.target.value })} />
+          <Input label="Teléfono" value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
         </div>
 
         <h4 style={{ margin: '1.5rem 0 1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Usuario Administrador</h4>
-        <Input label="Nombre del Administrador *" value={formData.admin_nombre} onChange={e => setFormData({...formData, admin_nombre: e.target.value})} />
-        <Input label="Email del Administrador (Login) *" type="email" value={formData.admin_email} onChange={e => setFormData({...formData, admin_email: e.target.value})} />
-        <PasswordInput label="Contraseña Provisoria *" value={formData.admin_password} onChange={e => setFormData({...formData, admin_password: e.target.value})} />
+        <Input label="Nombre del Administrador *" value={formData.admin_nombre} onChange={e => setFormData({ ...formData, admin_nombre: e.target.value })} />
+        <Input label="Email del Administrador (Login) *" type="email" value={formData.admin_email} onChange={e => setFormData({ ...formData, admin_email: e.target.value })} />
+        <Alert variant="info">
+          Se le enviará un email a esta dirección con un link para que configure su propia contraseña.
+        </Alert>
       </Modal>
 
       <Modal
@@ -335,17 +339,17 @@ export const AdminMayoristas = () => {
       >
         {formError && <Alert variant="error">{formError}</Alert>}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Input label="Nombre de Fantasía *" value={editFormData.nombre} onChange={e => setEditFormData({...editFormData, nombre: e.target.value})} />
-          <Input label="Razón Social" value={editFormData.razon_social} onChange={e => setEditFormData({...editFormData, razon_social: e.target.value})} />
-          <Input label="CUIT *" value={editFormData.cuit} onChange={e => setEditFormData({...editFormData, cuit: e.target.value})} />
-          <SubscriptionPlanSelect label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({...editFormData, plan_suscripcion: e.target.value })} />
-          <Input label="Teléfono" value={editFormData.telefono} onChange={e => setEditFormData({...editFormData, telefono: e.target.value})} />
+          <Input label="Nombre de Fantasía *" value={editFormData.nombre} onChange={e => setEditFormData({ ...editFormData, nombre: e.target.value })} />
+          <Input label="Razón Social" value={editFormData.razon_social} onChange={e => setEditFormData({ ...editFormData, razon_social: e.target.value })} />
+          <Input label="CUIT *" value={editFormData.cuit} onChange={e => setEditFormData({ ...editFormData, cuit: formatCuit(e.target.value) })} placeholder="20-12345678-9" maxLength={13} />
+          <SubscriptionPlanSelect label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({ ...editFormData, plan_suscripcion: e.target.value })} />
+          <Input label="Teléfono" value={editFormData.telefono} onChange={e => setEditFormData({ ...editFormData, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
             <input
               type="checkbox"
               id="edit-activo"
               checked={editFormData.activo}
-              onChange={e => setEditFormData({...editFormData, activo: e.target.checked})}
+              onChange={e => setEditFormData({ ...editFormData, activo: e.target.checked })}
               style={{ width: 18, height: 18, cursor: 'pointer' }}
             />
             <label htmlFor="edit-activo" style={{ cursor: 'pointer', fontWeight: 500 }}>Mayorista activo</label>
@@ -393,7 +397,7 @@ export const AdminMayoristas = () => {
               ¿Estás seguro de que deseas desactivar <strong>{deletingMayorista.nombre}</strong>?
             </p>
             <Alert variant="warning">
-              Se desactivarán también todas sus agencias ({deletingMayorista.kpis?.agencias_activas ?? 0} activas) y el usuario administrador asociado.
+              Se desactivarán también todas sus agencias y el usuario administrador asociado.
             </Alert>
           </div>
         )}

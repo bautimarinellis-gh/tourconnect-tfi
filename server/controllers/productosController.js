@@ -80,6 +80,39 @@ exports.getProductos = async (req, res, next) => {
 };
 
 /**
+ * Fecha de hoy (local del servidor) en formato YYYY-MM-DD, para comparar
+ * contra los inputs de fecha que llegan del frontend en ese mismo formato.
+ */
+const hoyDateString = () => new Date().toLocaleDateString('en-CA');
+
+/** Convierte un valor de fecha (string YYYY-MM-DD o Date) a YYYY-MM-DD. */
+const toDateString = (v) => {
+  if (!v) return null;
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  return String(v).slice(0, 10);
+};
+
+/**
+ * Valida el rango de disponibilidad.
+ * @param {Object} opts
+ * @param {string|Date} opts.desde - fecha de inicio efectiva
+ * @param {string|Date} opts.hasta - fecha de fin efectiva
+ * @param {boolean} opts.validarDesdeHoy - si debe exigirse desde >= hoy
+ * @returns {string|null} mensaje de error o null si es válido
+ */
+const validarDisponibilidad = ({ desde, hasta, validarDesdeHoy }) => {
+  const desdeStr = toDateString(desde);
+  const hastaStr = toDateString(hasta);
+  if (validarDesdeHoy && desdeStr && desdeStr < hoyDateString()) {
+    return 'La fecha de disponibilidad no puede ser anterior a la fecha actual.';
+  }
+  if (desdeStr && hastaStr && hastaStr < desdeStr) {
+    return 'La fecha de disponibilidad final debe ser igual o posterior a la inicial.';
+  }
+  return null;
+};
+
+/**
  * Validar campos específicos según el tipo de producto.
  */
 const validateTipoFields = (tipo, body) => {
@@ -111,6 +144,16 @@ exports.createProducto = async (req, res, next) => {
     const validationErrors = validateTipoFields(tipo, req.body);
     if (validationErrors.length > 0) {
       return res.status(400).json({ success: false, message: validationErrors.join(', ') });
+    }
+
+    // En el alta, la disponibilidad no puede empezar antes de hoy
+    const errorFechas = validarDisponibilidad({
+      desde: req.body.disponibilidad_desde,
+      hasta: req.body.disponibilidad_hasta,
+      validarDesdeHoy: true,
+    });
+    if (errorFechas) {
+      return res.status(400).json({ success: false, message: errorFechas });
     }
 
     // Asegurar que el producto se asocie al mayorista del token
@@ -210,6 +253,25 @@ exports.updateProducto = async (req, res, next) => {
     const updates = { ...req.body };
     delete updates.mayorista_id; // No puede cambiar de dueño
     delete updates._id;
+
+    const existente = await Producto.findById(id);
+    if (!existente) {
+      return res.status(404).json({ success: false, message: 'Producto no encontrado' });
+    }
+
+    // Fechas efectivas: las del payload, o las ya guardadas si no se modifican.
+    // "Desde >= hoy" solo se exige si la fecha de inicio realmente cambia,
+    // para no bloquear la edición de productos cuya vigencia ya comenzó.
+    const desdeNuevo = toDateString(updates.disponibilidad_desde);
+    const desdeActual = toDateString(existente.disponibilidad_desde);
+    const errorFechas = validarDisponibilidad({
+      desde: desdeNuevo ?? desdeActual,
+      hasta: updates.disponibilidad_hasta ?? existente.disponibilidad_hasta,
+      validarDesdeHoy: desdeNuevo !== null && desdeNuevo !== desdeActual,
+    });
+    if (errorFechas) {
+      return res.status(400).json({ success: false, message: errorFechas });
+    }
 
     const producto = await Producto.findByIdAndUpdate(id, updates, {
       new: true,

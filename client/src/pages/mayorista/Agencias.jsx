@@ -9,11 +9,14 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
-import { PasswordInput } from '../../components/ui/PasswordInput';
 import { Alert } from '../../components/ui/Alert';
+import { useToast } from '../../components/ui/Toast';
 import agenciaService from '../../services/agenciaService';
+import { formatCuit, isValidCuit } from '../../utils/cuit';
+import { formatTelefono } from '../../utils/telefono';
 
 export const MayoristaAgencias = () => {
+  const toast = useToast();
   const [agencias, setAgencias] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
@@ -24,7 +27,7 @@ export const MayoristaAgencias = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
     nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '',
-    admin_nombre: '', admin_email: '', admin_password: ''
+    admin_nombre: '', admin_email: ''
   });
   const [createError, setCreateError] = useState('');
   const [createSaving, setCreateSaving] = useState(false);
@@ -75,12 +78,12 @@ export const MayoristaAgencias = () => {
   // --- Handlers: Crear ---
   const handleCreate = async () => {
     setCreateError('');
-    if (!createForm.nombre || !createForm.cuit || !createForm.admin_email || !createForm.admin_password) {
-      setCreateError('Nombre, CUIT, email y contraseña del administrador son obligatorios.');
+    if (!createForm.nombre || !createForm.cuit || !createForm.admin_email) {
+      setCreateError('Nombre, CUIT y email del administrador son obligatorios.');
       return;
     }
-    if (createForm.admin_password.trim().length < 8) {
-      setCreateError('La contraseña debe tener al menos 8 caracteres.');
+    if (!isValidCuit(createForm.cuit)) {
+      setCreateError('El CUIT debe tener el formato XX-XXXXXXXX-X (11 dígitos).');
       return;
     }
     setCreateSaving(true);
@@ -92,12 +95,12 @@ export const MayoristaAgencias = () => {
         cuit: createForm.cuit,
         email: createForm.admin_email,
         nombre_usuario: createForm.admin_nombre || createForm.admin_email?.split('@')[0],
-        password: createForm.admin_password || undefined,
       };
       await agenciaService.create(payload);
       setIsCreateModalOpen(false);
-      setCreateForm({ nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '', admin_password: '' });
+      setCreateForm({ nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '' });
       fetchAgencias();
+      toast.success('Agencia creada. Se le envió un email de invitación para configurar su contraseña.');
     } catch (err) {
       setCreateError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al crear la agencia');
     } finally {
@@ -195,9 +198,9 @@ export const MayoristaAgencias = () => {
 
   const agenciasFiltradas = busqueda.trim()
     ? agencias.filter(ag =>
-        ag.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
-        ag.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
-      )
+      ag.nombre?.toLowerCase().includes(busqueda.toLowerCase()) ||
+      ag.razon_social?.toLowerCase().includes(busqueda.toLowerCase())
+    )
     : agencias;
 
   if (loading) return <Spinner center size="lg" />;
@@ -250,7 +253,12 @@ export const MayoristaAgencias = () => {
                 <TableRow key={ag._id}>
                   <TableCell>
                     <div style={{ fontWeight: 500 }}>{ag.nombre}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{ag.usuario_id?.email ?? ag.email_contacto ?? '-'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{ag.usuario_id?.email ?? ag.email_contacto ?? '-'}</span>
+                      {ag.usuario_id && ag.usuario_id.activo !== true && (
+                        <Badge variant="warning" style={{ fontSize: '0.65rem' }}>Sin acceso</Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>{ag.razon_social || '-'}</TableCell>
                   <TableCell>{ag.productos_habilitados ?? 0}</TableCell>
@@ -308,18 +316,20 @@ export const MayoristaAgencias = () => {
         {createError && <Alert variant="error">{createError}</Alert>}
 
         <h4 style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Datos de la Agencia</h4>
-        <Input label="Nombre de Fantasía *" value={createForm.nombre} onChange={e => setCreateForm({ ...createForm, nombre: e.target.value })} />
+        <Input label="Nombre *" value={createForm.nombre} onChange={e => setCreateForm({ ...createForm, nombre: e.target.value })} />
         <Input label="Razón Social" value={createForm.razon_social} onChange={e => setCreateForm({ ...createForm, razon_social: e.target.value })} />
-        <Input label="CUIT *" value={createForm.cuit} onChange={e => setCreateForm({ ...createForm, cuit: e.target.value })} />
+        <Input label="CUIT *" value={createForm.cuit} onChange={e => setCreateForm({ ...createForm, cuit: formatCuit(e.target.value) })} placeholder="20-12345678-9" maxLength={13} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <Input label="Email de Contacto" type="email" value={createForm.email_contacto} onChange={e => setCreateForm({ ...createForm, email_contacto: e.target.value })} />
-          <Input label="Teléfono" value={createForm.telefono} onChange={e => setCreateForm({ ...createForm, telefono: e.target.value })} />
+          <Input label="Teléfono" value={createForm.telefono} onChange={e => setCreateForm({ ...createForm, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
         </div>
 
         <h4 style={{ margin: '1.5rem 0 1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Usuario Administrador</h4>
-        <Input label="Nombre *" value={createForm.admin_nombre} onChange={e => setCreateForm({ ...createForm, admin_nombre: e.target.value })} />
+        <Input label="Nombre" value={createForm.admin_nombre} onChange={e => setCreateForm({ ...createForm, admin_nombre: e.target.value })} />
         <Input label="Email de Login *" type="email" value={createForm.admin_email} onChange={e => setCreateForm({ ...createForm, admin_email: e.target.value })} />
-        <PasswordInput label="Contraseña Inicial *" value={createForm.admin_password} onChange={e => setCreateForm({ ...createForm, admin_password: e.target.value })} />
+        <Alert variant="info">
+          Se le enviará un email a esta dirección con un link para que configure su propia contraseña.
+        </Alert>
       </Modal>
 
       {/* Modal: Editar */}
@@ -348,7 +358,8 @@ export const MayoristaAgencias = () => {
         <Input
           label="Teléfono"
           value={editForm.telefono}
-          onChange={e => setEditForm({ ...editForm, telefono: e.target.value })}
+          onChange={e => setEditForm({ ...editForm, telefono: formatTelefono(e.target.value) })}
+          placeholder="1122334455"
         />
       </Modal>
 

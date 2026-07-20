@@ -2,7 +2,7 @@ import React from 'react';
 import { AuditoriaPage } from '../auditoria/AuditoriaPage';
 
 const Auditoria = () => (
-  <AuditoriaPage title="Auditoría del panel" />
+  <AuditoriaPage title="Mi actividad" />
 );
 
 export default Auditoria;

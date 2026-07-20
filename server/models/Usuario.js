@@ -43,6 +43,20 @@ const usuarioSchema = new mongoose.Schema(
       type: Date,
       select: false,
     },
+    // Código de verificación de 6 dígitos (se guarda hasheado, nunca en claro)
+    reset_code_hash: {
+      type: String,
+      select: false,
+    },
+    reset_code_expires: {
+      type: Date,
+      select: false,
+    },
+    reset_code_attempts: {
+      type: Number,
+      select: false,
+      default: 0,
+    },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
@@ -67,6 +81,9 @@ usuarioSchema.set('toJSON', {
     delete ret.invite_token_expires;
     delete ret.reset_token;
     delete ret.reset_token_expires;
+    delete ret.reset_code_hash;
+    delete ret.reset_code_expires;
+    delete ret.reset_code_attempts;
     delete ret.__v;
     return ret;
   },

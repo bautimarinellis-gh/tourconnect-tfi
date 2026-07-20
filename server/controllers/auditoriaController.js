@@ -13,40 +13,33 @@ const PAGE_LIMIT_DEFAULT = 25;
  *   accion      string    — valor del enum ACCIONES
  *   categoria   string    — 'seguridad' | 'negocio'
  *   resultado   string    — 'exitoso' | 'fallido'
- *   usuario_id  ObjectId  — solo admin puede filtrar por usuario arbitrario
  *   page        number    — 1-based (default 1)
  *   limit       number    — max 100 (default 25)
  *
- * Scoping automático por rol:
- *   admin     → ve toda la plataforma
- *   mayorista → ve solo su mayorista_id
- *   agencia   → ve solo su agencia_id dentro de su mayorista_id
+ * Scoping: cada usuario (admin incluido) ve solo los eventos que él mismo
+ * ejecutó (usuario_id = su propio id).
+ *
+ * Trade-off documentado: los eventos registrados con usuario_id: null
+ * (p. ej. LOGIN_FALLIDO con email inexistente) no son visibles para nadie
+ * en la UI. Quedan en la colección como evidencia forense consultable
+ * directamente en la base.
  */
 exports.getAuditoria = async (req, res, next) => {
   try {
-    const { rol, id: usuario_id, mayorista_id, agencia_id } = req.usuario;
+    const { id: usuario_id } = req.usuario;
     const {
       desde,
       hasta,
       accion,
       categoria,
       resultado,
-      usuario_id: filtroUsuario,
       page = '1',
       limit = String(PAGE_LIMIT_DEFAULT),
     } = req.query;
 
     // ── Construcción de query ────────────────────────────────────────────
-    const query = {};
-
-    // Scoping por rol — regla central de visibilidad
-    if (rol === 'mayorista') {
-      query.mayorista_id = mayorista_id;
-    } else if (rol === 'agencia') {
-      query.mayorista_id = mayorista_id;
-      query.agencia_id = agencia_id;
-    }
-    // admin: sin restricción de tenant
+    // Regla central de visibilidad: solo las acciones propias
+    const query = { usuario_id };
 
     // Filtro de fechas
     if (desde || hasta) {
@@ -79,14 +72,6 @@ exports.getAuditoria = async (req, res, next) => {
         return res.status(400).json({ success: false, message: "resultado debe ser 'exitoso' o 'fallido'." });
       }
       query.resultado = resultado;
-    }
-
-    // Solo admin puede filtrar por usuario arbitrario
-    if (filtroUsuario) {
-      if (rol !== 'admin') {
-        return res.status(403).json({ success: false, message: 'No tenés permisos para filtrar por usuario.' });
-      }
-      query.usuario_id = filtroUsuario;
     }
 
     // ── Paginación ───────────────────────────────────────────────────────
@@ -127,13 +112,15 @@ exports.getAuditoria = async (req, res, next) => {
 
 /**
  * GET /api/v1/auditoria/:id
- * Detalle de un evento de auditoría. Valida scoping antes de devolver.
+ * Detalle de un evento de auditoría. Solo el usuario que ejecutó la acción
+ * puede verlo: la propiedad se verifica en el filtro de la query (antes de
+ * popular — el populate excluye el _id de usuario_id, así que un chequeo
+ * posterior no sería posible). Si el evento no es suyo, responde 404 igual
+ * que si no existiera, sin revelar su existencia.
  */
 exports.getAuditoriaById = async (req, res, next) => {
   try {
-    const { rol, mayorista_id, agencia_id } = req.usuario;
-
-    const log = await AuditLog.findById(req.params.id)
+    const log = await AuditLog.findOne({ _id: req.params.id, usuario_id: req.usuario.id })
       .select('-__v')
       .populate('usuario_id', 'email rol -_id')
       .populate('mayorista_id', 'nombre -_id')
@@ -142,17 +129,6 @@ exports.getAuditoriaById = async (req, res, next) => {
 
     if (!log) {
       return res.status(404).json({ success: false, message: 'Evento de auditoría no encontrado.' });
-    }
-
-    // Verificar que el solicitante tiene acceso al evento
-    if (rol === 'mayorista') {
-      if (!log.mayorista_id || log.mayorista_id._id.toString() !== mayorista_id.toString()) {
-        return res.status(403).json({ success: false, message: 'No tenés permisos para ver este evento.' });
-      }
-    } else if (rol === 'agencia') {
-      if (!log.agencia_id || log.agencia_id._id.toString() !== agencia_id.toString()) {
-        return res.status(403).json({ success: false, message: 'No tenés permisos para ver este evento.' });
-      }
     }
 
     res.json({ success: true, data: log });

@@ -49,7 +49,7 @@ export const AgenciaCatalogo = () => {
     setLoading(true);
     setFetchError(null);
     try {
-      const data = await productoService.getCatalogo(filtroTipo ? { tipo: filtroTipo } : {});
+      const data = await productoService.getAll(filtroTipo ? { tipo: filtroTipo } : {});
       setProductos(data);
     } catch (err) {
       console.error(err);

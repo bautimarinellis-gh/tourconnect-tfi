@@ -1,9 +1,11 @@
 import React, { createContext, useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState(() => {
     const stored = localStorage.getItem('tourconnect_user_v1');
     if (!stored) return null;
@@ -31,7 +33,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       localStorage.removeItem('tourconnect_user_v1');
       setUser(null);
-      window.location.href = '/login';
+      navigate('/login', { replace: true });
     }
   }, []);
 

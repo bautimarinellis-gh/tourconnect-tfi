@@ -144,8 +144,16 @@ export const MayoristaProductos = () => {
       setFormError('Nombre, descripción y precio son obligatorios.');
       return;
     }
+    if (Number(formData.precio_base) <= 0) {
+      setFormError('El precio base debe ser mayor a 0.');
+      return;
+    }
     if (!formData.disponibilidad_desde || !formData.disponibilidad_hasta) {
       setFormError('Las fechas de disponibilidad son obligatorias.');
+      return;
+    }
+    if (formData.disponibilidad_desde < todayDateInput()) {
+      setFormError('La fecha de disponibilidad no puede ser anterior a la fecha actual.');
       return;
     }
     if (!isValidDateRange(formData.disponibilidad_desde, formData.disponibilidad_hasta)) {
@@ -192,8 +200,19 @@ export const MayoristaProductos = () => {
       setEditError('Nombre, descripción y precio son obligatorios.');
       return;
     }
+    if (Number(editForm.precio_base) <= 0) {
+      setEditError('El precio base debe ser mayor a 0.');
+      return;
+    }
     if (!editForm.disponibilidad_desde || !editForm.disponibilidad_hasta) {
       setEditError('Las fechas de disponibilidad son obligatorias.');
+      return;
+    }
+    // "Desde >= hoy" solo si la fecha de inicio se modificó: un producto cuya
+    // vigencia ya comenzó debe poder editarse sin cambiar sus fechas.
+    const desdeOriginal = toDateInputValue(editProductoRef.current?.disponibilidad_desde);
+    if (editForm.disponibilidad_desde !== desdeOriginal && editForm.disponibilidad_desde < todayDateInput()) {
+      setEditError('La fecha de disponibilidad no puede ser anterior a la fecha actual.');
       return;
     }
     if (!isValidDateRange(editForm.disponibilidad_desde, editForm.disponibilidad_hasta)) {
@@ -286,13 +305,14 @@ export const MayoristaProductos = () => {
           <Input
             label="Disponible desde *"
             type="date"
+            min={mode === 'create' ? todayDateInput() : undefined}
             value={form.disponibilidad_desde}
             onChange={e => onSet('disponibilidad_desde', e.target.value)}
           />
           <Input
             label="Disponible hasta *"
             type="date"
-            min={form.disponibilidad_desde || undefined}
+            min={form.disponibilidad_desde || (mode === 'create' ? todayDateInput() : undefined)}
             value={form.disponibilidad_hasta}
             onChange={e => onSet('disponibilidad_hasta', e.target.value)}
           />
@@ -402,7 +422,7 @@ export const MayoristaProductos = () => {
         />
         <Input label="Nombre *" value={formData.nombre} onChange={e => set('nombre', e.target.value)} />
         <Textarea label="Descripción *" rows={3} value={formData.descripcion} onChange={e => set('descripcion', e.target.value)} />
-        <Input label="Precio Base (USD) *" type="number" min="0" value={formData.precio_base} onChange={e => set('precio_base', e.target.value)} />
+        <Input label="Precio Base (USD) *" type="number" min="0.01" step="0.01" value={formData.precio_base} onChange={e => set('precio_base', e.target.value)} />
         {renderAvailabilityFields(formData, set, 'create')}
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
@@ -510,7 +530,7 @@ export const MayoristaProductos = () => {
         <Input label="Nombre *" value={editForm.nombre} onChange={e => setEdit('nombre', e.target.value)} />
         <Textarea label="Descripción *" rows={3} value={editForm.descripcion} onChange={e => setEdit('descripcion', e.target.value)} />
 
-        <Input label="Precio Base (USD) *" type="number" min="0" value={editForm.precio_base} onChange={e => setEdit('precio_base', e.target.value)} />
+        <Input label="Precio Base (USD) *" type="number" min="0.01" step="0.01" value={editForm.precio_base} onChange={e => setEdit('precio_base', e.target.value)} />
         <Alert variant="info" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
           Las cotizaciones ya realizadas no se verán afectadas por este cambio.
         </Alert>

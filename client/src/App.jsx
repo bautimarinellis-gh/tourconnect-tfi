@@ -7,6 +7,7 @@ import { PageWrapper } from './components/layout/PageWrapper';
 import { ToastContainer } from './components/ui/Toast';
 import { ThemeToggle } from './components/ui/ThemeToggle';
 import { Spinner } from './components/ui/Spinner';
+import { getDashboardPathForRole } from './utils/roles';
 
 // Auth Pages
 import { Login } from './pages/auth/Login';
@@ -44,10 +45,7 @@ const RootRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.rol === 'admin') return <Navigate to="/admin/dashboard" replace />;
-  if (user.rol === 'mayorista') return <Navigate to="/mayorista/dashboard" replace />;
-  if (user.rol === 'agencia') return <Navigate to="/agencia/dashboard" replace />;
-  return <Navigate to="/login" replace />;
+  return <Navigate to={getDashboardPathForRole(user.rol)} replace />;
 };
 
 function App() {

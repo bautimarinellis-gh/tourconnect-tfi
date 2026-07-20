@@ -64,7 +64,7 @@ const enviarEmail = async ({ para, asunto, html, to, subject }) => {
  * @param {string} rol — rol del usuario invitado
  */
 const enviarInvitacion = async (email, token, rol) => {
-  const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+  const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
   const link = `${baseUrl}/set-password?token=${token}`;
 
   const html = `

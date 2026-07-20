@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, Calendar, FileText, ArrowRight } from 'lucide-react';
+import { Building2, ArrowRight } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
@@ -33,9 +33,6 @@ export const AdminDashboard = () => {
 
   const kpis = [
     { label: 'Total Mayoristas', value: data.kpis?.mayoristas || 0, icon: <Building2 size={18} />, link: '/admin/mayoristas' },
-    { label: 'Total Agencias Activas', value: data.kpis?.agencias || 0, icon: <Users size={18} />, link: null },
-    { label: 'Cotizaciones Pendientes', value: data.kpis?.cotizacionesPendientes || 0, icon: <FileText size={18} />, link: null },
-    { label: 'Total Reservas', value: data.kpis?.reservas || 0, icon: <Calendar size={18} />, link: null },
   ];
 
   return (

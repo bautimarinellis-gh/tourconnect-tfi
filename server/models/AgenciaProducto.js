@@ -16,6 +16,7 @@ const agenciaProductoSchema = new mongoose.Schema(
       type: Number,
       required: [true, 'El porcentaje de markup es obligatorio'],
       min: [0, 'El markup no puede ser negativo'],
+      max: [100, 'El markup no puede superar el 100%'],
     },
     habilitado: {
       type: Boolean,

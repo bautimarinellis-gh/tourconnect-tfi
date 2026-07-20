@@ -32,6 +32,14 @@ const generarToken = (usuario, contexto) => {
  */
 const tokenBlacklist = new Set();
 
+// Recuperación de contraseña por código de verificación
+const RESET_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
+const RESET_TOKEN_TTL_MS = 15 * 60 * 1000; // ventana para setear la nueva contraseña
+const MAX_INTENTOS_CODIGO = 5;
+
+const hashCodigo = (codigo) =>
+  crypto.createHash('sha256').update(String(codigo)).digest('hex');
+
 // ---------------------
 // Controllers
 // ---------------------
@@ -306,10 +314,15 @@ const forgotPassword = async (req, res, next) => {
       });
     }
 
-    // Generar token de reset
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    usuario.reset_token = resetToken;
-    usuario.reset_token_expires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 horas
+    // Generar código de verificación de 6 dígitos.
+    // Se guarda solo el hash: si alguien lee la base, no puede usar el código.
+    const codigo = crypto.randomInt(100000, 1000000).toString();
+    usuario.reset_code_hash = hashCodigo(codigo);
+    usuario.reset_code_expires = new Date(Date.now() + RESET_CODE_TTL_MS);
+    usuario.reset_code_attempts = 0;
+    // Invalidar cualquier token de reset previo
+    usuario.reset_token = undefined;
+    usuario.reset_token_expires = undefined;
     await usuario.save();
 
     registrarAuditoria({
@@ -322,22 +335,18 @@ const forgotPassword = async (req, res, next) => {
       detalle: { email: usuario.email },
     });
 
-    // Enviar email de reset
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
-
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #2563eb;">Restablecer contraseña</h2>
         <p>Recibimos una solicitud para restablecer tu contraseña en TourConnect.</p>
-        <p>Hacé clic en el siguiente botón para crear una nueva contraseña:</p>
-        <a href="${resetLink}"
-           style="display: inline-block; padding: 12px 24px; background-color: #2563eb;
-                  color: #fff; text-decoration: none; border-radius: 6px; margin: 16px 0;">
-          Restablecer contraseña
-        </a>
+        <p>Ingresá el siguiente código de verificación en la pantalla de recuperación:</p>
+        <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px;
+                  text-align: center; padding: 16px; background-color: #f3f4f6;
+                  border-radius: 6px; color: #111827;">
+          ${codigo}
+        </p>
         <p style="color: #6b7280; font-size: 14px;">
-          Este enlace expira en 48 horas. Si no solicitaste este cambio, ignorá este email.
+          Este código expira en 15 minutos. Si no solicitaste este cambio, ignorá este email.
         </p>
         <hr style="border: none; border-top: 1px solid #e5e7eb;" />
         <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>
@@ -347,7 +356,7 @@ const forgotPassword = async (req, res, next) => {
     try {
       await enviarEmail({
         para: usuario.email,
-        asunto: 'TourConnect — Restablecer contraseña',
+        asunto: 'TourConnect — Código para restablecer contraseña',
         html,
       });
     } catch (emailError) {
@@ -358,8 +367,92 @@ const forgotPassword = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        message: 'Si el email existe, recibirás un enlace para restablecer tu contraseña.',
+        message: 'Si el email existe, recibirás un código para restablecer tu contraseña.',
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * POST /api/v1/auth/verify-reset-code
+ * Verifica el código de 6 dígitos y lo canjea por un reset_token de un solo uso.
+ * La respuesta es genérica ante email inexistente, código incorrecto o expirado,
+ * para no dar información a un atacante.
+ */
+const verifyResetCode = async (req, res, next) => {
+  try {
+    const { email, codigo } = req.body;
+
+    if (!email || !codigo) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email y código son obligatorios.',
+      });
+    }
+
+    const respuestaInvalida = () =>
+      res.status(400).json({
+        success: false,
+        message: 'Código inválido o expirado.',
+      });
+
+    const usuario = await Usuario.findOne({ email }).select(
+      '+reset_code_hash +reset_code_expires +reset_code_attempts'
+    );
+
+    if (!usuario || !usuario.reset_code_hash) {
+      return respuestaInvalida();
+    }
+
+    if (usuario.reset_code_expires && usuario.reset_code_expires < new Date()) {
+      return respuestaInvalida();
+    }
+
+    // Con 6 dígitos el código es fuerza-brutable: cortar tras N intentos
+    if (usuario.reset_code_attempts >= MAX_INTENTOS_CODIGO) {
+      await registrarAuditoria({
+        req,
+        accion: 'RESET_CODE_FALLIDO',
+        usuario_id: usuario._id,
+        mayorista_id: null,
+        resultado: 'fallido',
+        detalle: { email: usuario.email, motivo: 'max_intentos_superado' },
+      });
+      return respuestaInvalida();
+    }
+
+    if (hashCodigo(codigo) !== usuario.reset_code_hash) {
+      usuario.reset_code_attempts += 1;
+      await usuario.save();
+      await registrarAuditoria({
+        req,
+        accion: 'RESET_CODE_FALLIDO',
+        usuario_id: usuario._id,
+        mayorista_id: null,
+        resultado: 'fallido',
+        detalle: {
+          email: usuario.email,
+          motivo: 'codigo_incorrecto',
+          intento: usuario.reset_code_attempts,
+        },
+      });
+      return respuestaInvalida();
+    }
+
+    // Código correcto: se consume y se canjea por un token aleatorio de un solo uso
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    usuario.reset_code_hash = undefined;
+    usuario.reset_code_expires = undefined;
+    usuario.reset_code_attempts = 0;
+    usuario.reset_token = resetToken;
+    usuario.reset_token_expires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await usuario.save();
+
+    res.json({
+      success: true,
+      data: { reset_token: resetToken },
     });
   } catch (error) {
     next(error);
@@ -491,6 +584,7 @@ module.exports = {
   login,
   setPassword,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
   me,
   logout,

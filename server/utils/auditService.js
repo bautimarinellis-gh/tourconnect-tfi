@@ -7,6 +7,7 @@ const CATEGORIA_POR_ACCION = {
   SET_PASSWORD: 'seguridad',
   RESET_PASSWORD: 'seguridad',
   RESET_PASSWORD_SOLICITADO: 'seguridad',
+  RESET_CODE_FALLIDO: 'seguridad',
   USUARIO_CREADO: 'seguridad',
   USUARIO_DESACTIVADO: 'seguridad',
   MAYORISTA_CREADO: 'seguridad',

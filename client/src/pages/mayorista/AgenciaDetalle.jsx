@@ -55,7 +55,6 @@ export const MayoristaAgenciaDetalle = () => {
   }, [id]);
 
   const handleSaveProducts = async () => {
-    setSaving(true);
     const productosToSave = Object.keys(productStates)
       .filter(pId => productStates[pId].habilitado)
       .map(pId => ({
@@ -63,6 +62,15 @@ export const MayoristaAgenciaDetalle = () => {
         markup_porcentaje: Number(productStates[pId].markup_porcentaje)
       }));
 
+    const markupInvalido = productosToSave.some(
+      p => Number.isNaN(p.markup_porcentaje) || p.markup_porcentaje < 0 || p.markup_porcentaje > 100
+    );
+    if (markupInvalido) {
+      toast.error('El markup debe ser un número entre 0 y 100.');
+      return;
+    }
+
+    setSaving(true);
     try {
       await agenciaService.updateProducts(id, { productos: productosToSave });
       toast.success('Los productos de la agencia fueron actualizados.');
@@ -190,12 +198,16 @@ export const MayoristaAgenciaDetalle = () => {
                     <TableCell><Badge>{p.tipo}</Badge></TableCell>
                     <TableCell>{formatCurrency(p.precio_base)}</TableCell>
                     <TableCell>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max="100" 
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
                         value={state.markup_porcentaje}
-                        onChange={(e) => setProductStates({...productStates, [p._id]: {...state, markup_porcentaje: e.target.value}})}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const clamped = raw === '' ? '' : Math.min(100, Math.max(0, Number(raw)));
+                          setProductStates({...productStates, [p._id]: {...state, markup_porcentaje: clamped}});
+                        }}
                         disabled={!state.habilitado}
                         style={{ width: '80px', marginBottom: 0 }}
                       />

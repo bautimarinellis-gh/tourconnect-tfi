@@ -6,7 +6,7 @@ const Agencia = require('../models/Agencia');
 const Reserva = require('../models/Reserva');
 const Producto = require('../models/Producto');
 const Cotizacion = require('../models/Cotizacion');
-const { enviarEmail } = require('../utils/mailer');
+const { enviarInvitacion } = require('../utils/mailer');
 const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
 
@@ -25,41 +25,11 @@ const validarPlanSuscripcion = (plan) => {
  */
 exports.getMayoristas = async (req, res, next) => {
   try {
-    const cotizacionCollection = Cotizacion.collection.name;
+    // El admin no debe ver datos operativos de sus tenants (agencias/reservas):
+    // se devuelven solo los datos del mayorista, sin KPIs.
+    const mayoristas = await Mayorista.find().populate('usuario_id', 'email activo').lean();
 
-    // 3 queries en paralelo en vez de 2N+1 queries secuenciales
-    const [mayoristas, agenciasAgg, reservasAgg] = await Promise.all([
-      Mayorista.find().populate('usuario_id', 'email activo').lean(),
-      Agencia.aggregate([
-        { $match: { activo: true } },
-        { $group: { _id: '$mayorista_id', count: { $sum: 1 } } },
-      ]),
-      Reserva.aggregate([
-        {
-          $lookup: {
-            from: cotizacionCollection,
-            localField: 'cotizacion_id',
-            foreignField: '_id',
-            as: 'cot',
-          },
-        },
-        { $unwind: '$cot' },
-        { $group: { _id: '$cot.mayorista_id', count: { $sum: 1 } } },
-      ]),
-    ]);
-
-    const agenciasMap = new Map(agenciasAgg.map((a) => [a._id.toString(), a.count]));
-    const reservasMap = new Map(reservasAgg.map((r) => [r._id.toString(), r.count]));
-
-    const result = mayoristas.map((m) => ({
-      ...m,
-      kpis: {
-        agencias_activas: agenciasMap.get(m._id.toString()) ?? 0,
-        reservas_totales: reservasMap.get(m._id.toString()) ?? 0,
-      },
-    }));
-
-    res.json({ success: true, data: result });
+    res.json({ success: true, data: mayoristas });
   } catch (error) {
     next(error);
   }
@@ -90,12 +60,10 @@ exports.crearMayorista = async (req, res, next) => {
 
     const tienePassword = password && String(password).trim().length >= 8;
     let inviteToken = null;
-    let hashedToken = null;
     let expiresIn = null;
 
     if (!tienePassword) {
       inviteToken = crypto.randomBytes(32).toString('hex');
-      hashedToken = crypto.createHash('sha256').update(inviteToken).digest('hex');
       expiresIn = new Date(Date.now() + 48 * 60 * 60 * 1000);
     }
 
@@ -104,7 +72,7 @@ exports.crearMayorista = async (req, res, next) => {
       email,
       rol: 'mayorista',
       activo: tienePassword,
-      invite_token: tienePassword ? undefined : hashedToken,
+      invite_token: tienePassword ? undefined : inviteToken,
       invite_token_expires: tienePassword ? undefined : expiresIn,
     });
     if (tienePassword) {
@@ -145,19 +113,10 @@ exports.crearMayorista = async (req, res, next) => {
 
     // 6. Enviar email de invitación (solo si no se configuró password)
     if (!tienePassword && inviteToken) {
-      const inviteUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/set-password/${inviteToken}`;
-      const subject = 'Bienvenido a TourConnect - Configura tu contraseña';
-      const html = `
-        <h1>Hola ${nombre_usuario || nombre}</h1>
-        <p>Has sido invitado a sumarte a TourConnect como administrador del mayorista <strong>${nombre}</strong>.</p>
-        <p>Por favor, configura tu contraseña haciendo clic en el siguiente enlace (válido por 48 horas):</p>
-        <a href="${inviteUrl}">Configurar mi contraseña</a>
-        <p>Si no esperabas este correo, puedes ignorarlo.</p>
-      `;
       try {
-        await enviarEmail({ to: email, subject, html });
+        await enviarInvitacion(email, inviteToken, 'Mayorista');
       } catch (mailError) {
-        console.error('Error al enviar email de invitación, pero la cuenta fue creada:', mailError);
+        console.error('Error al enviar email de invitación, pero la cuenta fue creada:', mailError.message);
       }
     }
 

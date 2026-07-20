@@ -127,7 +127,6 @@ export const AuditoriaPage = ({ title }) => {
                 <TableCell isHeader>Fecha / Hora</TableCell>
                 <TableCell isHeader>Acción</TableCell>
                 <TableCell isHeader>Resultado</TableCell>
-                <TableCell isHeader>Usuario</TableCell>
                 <TableCell isHeader>Entidad</TableCell>
                 <TableCell isHeader>IP</TableCell>
               </tr>
@@ -146,11 +145,6 @@ export const AuditoriaPage = ({ title }) => {
                   </TableCell>
                   <TableCell>
                     <ResultadoBadge resultado={log.resultado} />
-                  </TableCell>
-                  <TableCell>
-                    <span className="audit-email" title={log.usuario_id?.email}>
-                      {log.usuario_id?.email ?? <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Desconocido</span>}
-                    </span>
                   </TableCell>
                   <TableCell>
                     {log.entidad_afectada ? (

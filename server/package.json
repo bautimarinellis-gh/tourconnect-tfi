@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "seed:admin": "node seeds/admin.seed.js"
+    "test": "node --test",
+    "seed:admin": "node seeds/adminSeed.js"
   },
   "license": "ISC",
   "devDependencies": {

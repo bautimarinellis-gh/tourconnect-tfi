@@ -27,7 +27,10 @@ const productoSchema = new mongoose.Schema(
     precio_base: {
       type: Number,
       required: [true, 'El precio base es obligatorio'],
-      min: [0, 'El precio base no puede ser negativo'],
+      validate: {
+        validator: (v) => v > 0,
+        message: 'El precio base debe ser mayor a 0.',
+      },
     },
     disponibilidad_desde: {
       type: Date,

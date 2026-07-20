@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { Spinner } from '../ui/Spinner';
+import { getDashboardPathForRole } from '../../utils/roles';
 
 export const ProtectedRoute = ({ allowedRoles }) => {
   const { user, loading } = useAuth();
@@ -20,10 +21,7 @@ export const ProtectedRoute = ({ allowedRoles }) => {
 
   if (allowedRoles && !allowedRoles.includes(user.rol)) {
     // Redirect according to correct role when trespassing
-    if (user.rol === 'admin') return <Navigate to="/admin/dashboard" replace />;
-    if (user.rol === 'mayorista') return <Navigate to="/mayorista/dashboard" replace />;
-    if (user.rol === 'agencia') return <Navigate to="/agencia/dashboard" replace />;
-    return <Navigate to="/login" replace />;
+    return <Navigate to={getDashboardPathForRole(user.rol)} replace />;
   }
 
   return <Outlet />;

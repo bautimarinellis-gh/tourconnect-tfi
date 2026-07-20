@@ -5,6 +5,7 @@ const {
   login,
   setPassword,
   forgotPassword,
+  verifyResetCode,
   resetPassword,
   me,
   logout,
@@ -20,11 +21,21 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Demasiados intentos. Intentá de nuevo en 15 minutos.' },
 });
 
+// Limiter propio para el flujo de recuperación: no comparte cupo con login
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Demasiados intentos. Intentá de nuevo en 15 minutos.' },
+});
+
 // Rutas públicas (no requieren autenticación)
 router.post('/login', authLimiter, login);
 router.post('/set-password', setPassword);
 router.post('/forgot-password', authLimiter, forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/verify-reset-code', resetLimiter, verifyResetCode);
+router.post('/reset-password', resetLimiter, resetPassword);
 
 // Rutas protegidas (requieren JWT válido)
 router.get('/me', auth, me);

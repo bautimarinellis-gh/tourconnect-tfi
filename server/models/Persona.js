@@ -24,11 +24,38 @@ const personaSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: null,
+      // Normaliza quitando espacios, guiones, puntos y paréntesis (conserva el + inicial).
+      // Si aun así no queda un número válido (p. ej. contiene letras), se deja tal cual para que el validator lo rechace.
+      set: (v) => {
+        if (typeof v !== 'string') return v;
+        const trimmed = v.trim();
+        if (!trimmed) return null;
+        const cleaned = trimmed.replace(/[\s\-().]/g, '');
+        if (/^\+?\d{6,15}$/.test(cleaned)) return cleaned;
+        return trimmed;
+      },
+      validate: {
+        validator: (v) => v == null || /^\+?\d{6,15}$/.test(v),
+        message: 'El teléfono solo puede contener números (6 a 15 dígitos, opcionalmente con + inicial).',
+      },
     },
     cuit: {
       type: String,
       required: [true, 'El CUIT es obligatorio'],
-      trim: true,
+      // Normaliza "20111111111", "20.11111111.1" o "20-11111111-1" al formato canónico.
+      // Si no reduce a 11 dígitos (p. ej. contiene letras), se deja tal cual para que el validator lo rechace.
+      set: (v) => {
+        if (typeof v !== 'string') return v;
+        const cleaned = v.replace(/[-.\s]/g, '');
+        if (/^\d{11}$/.test(cleaned)) {
+          return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 10)}-${cleaned.slice(10)}`;
+        }
+        return v.trim();
+      },
+      validate: {
+        validator: (v) => /^\d{2}-\d{8}-\d{1}$/.test(v),
+        message: 'El CUIT debe tener el formato XX-XXXXXXXX-X (11 dígitos, sin letras).',
+      },
     },
     activo: {
       type: Boolean,

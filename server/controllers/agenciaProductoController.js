@@ -118,15 +118,16 @@ exports.syncProductosAgencia = async (req, res, next) => {
 
     // 2. Validar que todos los productos pertenezcan al mayorista y tengan un markup válido
     if (productos.length > 0) {
-      const markupInvalido = productos.some(
-        (p) => p.markup_porcentaje === undefined || Number(p.markup_porcentaje) < 0 || Number.isNaN(Number(p.markup_porcentaje))
-      );
+      const markupInvalido = productos.some((p) => {
+        const markup = Number(p.markup_porcentaje);
+        return p.markup_porcentaje === undefined || Number.isNaN(markup) || markup < 0 || markup > 100;
+      });
       if (markupInvalido) {
         await session.abortTransaction();
         session.endSession();
         return res.status(400).json({
           success: false,
-          message: 'El markup_porcentaje de cada producto debe ser un número mayor o igual a 0',
+          message: 'El markup_porcentaje de cada producto debe ser un número entre 0 y 100',
         });
       }
 

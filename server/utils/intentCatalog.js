@@ -19,7 +19,7 @@ const intentCatalog = {
       mas: 1, mayor: 1, mayores: 1, activas: 1,
     },
     defaultParams: { limit: 5, time_range: 'last_30_days', orderBy: 'reservas' },
-    roles: ['mayorista', 'admin'],
+    roles: ['mayorista'],
     visualization: 'table',
   },
 
@@ -33,7 +33,7 @@ const intentCatalog = {
       nueva: 1, nuevas: 1, reciente: 1, recientes: 1,
     },
     defaultParams: { limit: 10, time_range: 'last_30_days' },
-    roles: ['mayorista', 'admin'],
+    roles: ['mayorista'],
     visualization: 'table',
   },
 
@@ -48,7 +48,7 @@ const intentCatalog = {
       no: 1, reservaron: 2, compro: 1, compraron: 1,
     },
     defaultParams: { dias_inactivos: 30 },
-    roles: ['mayorista', 'admin'],
+    roles: ['mayorista'],
     visualization: 'list',
   },
 
@@ -64,7 +64,7 @@ const intentCatalog = {
       mes: 1, semana: 1, periodo: 1, hoy: 1,
     },
     defaultParams: { time_range: 'last_30_days' },
-    roles: ['mayorista', 'admin'],
+    roles: ['mayorista'],
     visualization: 'stat',
   },
 
@@ -80,7 +80,7 @@ const intentCatalog = {
       cuantas: 1, cuantos: 1, hay: 1,
     },
     defaultParams: { time_range: 'last_30_days' },
-    roles: ['mayorista', 'admin'],
+    roles: ['mayorista'],
     visualization: 'table',
   },
 
@@ -95,7 +95,7 @@ const intentCatalog = {
       mas: 1, mayor: 1, mas_reservado: 3,
     },
     defaultParams: { limit: 5, time_range: 'last_30_days' },
-    roles: ['mayorista', 'admin'],
+    roles: ['mayorista'],
     visualization: 'table',
   },
 };

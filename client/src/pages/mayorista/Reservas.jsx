@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, Search } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Table, TableRow, TableCell } from '../../components/ui/Table';
-import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
-import { Spinner } from '../../components/ui/Spinner';
+import { Search } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Select } from '../../components/ui/Select';
+import { Spinner } from '../../components/ui/Spinner';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { formatCurrency, formatDate, formatEstadoReserva } from '../../utils/formatters';
+import { ReservasTable } from '../../components/shared/ReservasTable';
 import reservaService from '../../services/reservaService';
 
 export const MayoristaReservas = () => {
@@ -83,60 +79,7 @@ export const MayoristaReservas = () => {
       ) : reservasFiltradas.length === 0 ? (
         <EmptyState title="Sin resultados" description={`No hay reservas de agencias que contengan "${filtroAgencia}".`} />
       ) : (
-        <Card>
-          <Table>
-            <thead>
-              <TableRow>
-                <TableCell isHeader>ID / Alta</TableCell>
-                <TableCell isHeader>Producto</TableCell>
-                <TableCell isHeader>Agencia</TableCell>
-                <TableCell isHeader>Fechas</TableCell>
-                <TableCell isHeader>Pasajeros</TableCell>
-                <TableCell isHeader>Precio Final</TableCell>
-                <TableCell isHeader>Estado</TableCell>
-                <TableCell isHeader>Acciones</TableCell>
-              </TableRow>
-            </thead>
-            <tbody>
-              {reservasFiltradas.map(r => (
-                <TableRow key={r._id}>
-                  <TableCell>
-                    <div style={{ fontWeight: 600 }}>#{r._id.slice(-6).toUpperCase()}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>
-                      {formatDate(r.created_at)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div style={{ fontWeight: 500 }}>{r.producto_id?.nombre || 'Producto'}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', textTransform: 'capitalize' }}>
-                      {r.producto_id?.tipo}
-                    </div>
-                  </TableCell>
-                  <TableCell>{r.agencia_id?.nombre || 'N/A'}</TableCell>
-                  <TableCell>
-                    <div style={{ fontSize: '0.875rem' }}>
-                      {formatDate(r.fecha_inicio)} — {formatDate(r.fecha_fin)}
-                    </div>
-                  </TableCell>
-                  <TableCell>{r.pasajeros}</TableCell>
-                  <TableCell>
-                    <div style={{ fontWeight: 600 }}>
-                      {formatCurrency(r.precio_final)}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={r.estado}>{formatEstadoReserva(r.estado)}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Link to={`/mayorista/reservas/${r._id}`}>
-                      <Button variant="ghost" size="sm"><Eye size={16} /> Ver detalles</Button>
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </tbody>
-          </Table>
-        </Card>
+        <ReservasTable reservas={reservasFiltradas} basePath="/mayorista/reservas" showAgenciaColumn />
       )}
     </div>
   );

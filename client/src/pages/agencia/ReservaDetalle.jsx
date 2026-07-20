@@ -8,14 +8,11 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
+import { ReservaTimeline } from '../../components/shared/ReservaTimeline';
+import { EstadoCuentaCard } from '../../components/shared/EstadoCuentaCard';
 import { formatCurrency, formatDateTime, formatDate, formatEstadoReserva } from '../../utils/formatters';
+import { toFloat } from '../../utils/money';
 import reservaService from '../../services/reservaService';
-
-const toFloat = (val) => {
-  if (!val) return 0;
-  if (val?.$numberDecimal) return parseFloat(val.$numberDecimal);
-  return parseFloat(val.toString());
-};
 
 const METODOS = [
   { value: 'transferencia', label: 'Transferencia Bancaria' },
@@ -209,21 +206,7 @@ export const AgenciaReservaDetalle = () => {
 
         <div>
           {/* Estado de cuenta */}
-          <Card style={{ marginBottom: '1.5rem', borderColor: 'var(--color-primary)' }}>
-            <CardBody>
-              <h3 style={{ margin: '0 0 1rem 0' }}>Estado de Cuenta</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--color-text-soft)' }}>Total a abonar:</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(precioFinal)}</span>
-              </div>
-              <div style={{ borderTop: '1px dashed var(--color-border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600 }}>Saldo Pendiente:</span>
-                <span style={{ fontWeight: 700, fontSize: '1.25rem', color: saldo > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
-                  {formatCurrency(saldo)}
-                </span>
-              </div>
-            </CardBody>
-          </Card>
+          <EstadoCuentaCard totalLabel="Total a abonar:" precioFinal={precioFinal} totalPagado={totalPagado} saldo={saldo} />
 
           {/* Acción: informar pago */}
           {reserva.estado === 'pendiente_pago' && (
@@ -266,24 +249,7 @@ export const AgenciaReservaDetalle = () => {
           )}
 
           {/* Timeline */}
-          <Card>
-            <CardHeader><h3>Timeline</h3></CardHeader>
-            <CardBody>
-              <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>
-                <div style={{ position: 'absolute', top: 0, bottom: 0, left: '7px', width: '2px', backgroundColor: 'var(--color-border)' }}></div>
-                {(reserva.historial ?? []).map((h) => (
-                  <div key={h._id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
-                    <div style={{ position: 'absolute', left: '-1.5rem', width: '16px', height: '16px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', border: '4px solid var(--color-surface)' }}></div>
-                    <div style={{ fontWeight: 600, textTransform: 'capitalize' }}>{formatEstadoReserva(h.estado_nuevo)}</div>
-                    {h.comentario && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', fontStyle: 'italic', marginTop: '0.1rem' }}>{h.comentario}</div>
-                    )}
-                    <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{formatDateTime(h.created_at)}</div>
-                  </div>
-                ))}
-              </div>
-            </CardBody>
-          </Card>
+          <ReservaTimeline historial={reserva.historial} title="Timeline" />
         </div>
       </div>
 

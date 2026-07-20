@@ -10,6 +10,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { CotizacionDetailModal } from '../../components/shared/CotizacionDetailModal';
 import { formatCurrency, formatDate, formatEstadoCotizacion } from '../../utils/formatters';
 import cotizacionService from '../../services/cotizacionService';
 
@@ -235,56 +236,12 @@ export const MayoristaCotizaciones = () => {
       </Modal>
 
       {/* Modal: Detalle de cotización */}
-      <Modal
+      <CotizacionDetailModal
         isOpen={isDetailModalOpen}
         onClose={() => { setIsDetailModalOpen(false); setDetailCotizacion(null); }}
-        title="Detalle de Cotización"
-        footer={
-          <Button variant="ghost" onClick={() => { setIsDetailModalOpen(false); setDetailCotizacion(null); }}>
-            Cerrar
-          </Button>
-        }
-      >
-        {detailCotizacion && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9375rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>ID</span>
-              <span style={{ fontWeight: 500 }}>#{detailCotizacion._id.slice(-6).toUpperCase()}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>Agencia</span>
-              <span>{detailCotizacion.agencia_id?.nombre || detailCotizacion.agencia_id?.username || 'N/A'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>Producto</span>
-              <span>{detailCotizacion.producto_id?.nombre || 'N/A'}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>Fechas</span>
-              <span>{formatDate(detailCotizacion.fecha_inicio)} — {formatDate(detailCotizacion.fecha_fin)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>Pasajeros</span>
-              <span>{detailCotizacion.pasajeros}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>Total</span>
-              <span style={{ fontWeight: 600 }}>{formatCurrency(detailCotizacion.precio_total)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: 'var(--color-text-soft)' }}>Estado</span>
-              <Badge variant={detailCotizacion.estado}>{formatEstadoCotizacion(detailCotizacion.estado)}</Badge>
-            </div>
-            {detailCotizacion.motivo_rechazo && (
-              <div style={{ marginTop: '0.25rem' }}>
-                <Alert variant="error">
-                  <strong>Motivo de rechazo:</strong> {detailCotizacion.motivo_rechazo}
-                </Alert>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
+        cotizacion={detailCotizacion}
+        showAgencia
+      />
 
       {/* Modal: Éxito al confirmar */}
       <Modal
