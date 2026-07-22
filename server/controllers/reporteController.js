@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const PDFDocument = require('pdfkit');
 const Reserva = require('../models/Reserva');
 const Cotizacion = require('../models/Cotizacion');
 const Mayorista = require('../models/Mayorista');
@@ -8,6 +9,7 @@ const {
   productoCollection,
   agenciaCollection,
 } = require('../utils/reporteHelpers');
+const { registrarAuditoria } = require('../utils/auditService');
 
 const ESTADOS_INGRESO = ['pago_informado', 'pagada', 'cerrada'];
 
@@ -256,6 +258,42 @@ exports.getIngresosPorAgencia = async (req, res, next) => {
   }
 };
 
+async function fetchIngresosData(mayoristaId, periodoConfig) {
+  const resultados = await Reserva.aggregate([
+    ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
+    {
+      $match: {
+        estado: { $in: ESTADOS_INGRESO },
+        created_at: { $gte: periodoConfig.fechaInicio, $lte: periodoConfig.fechaFin },
+      },
+    },
+    {
+      $group: {
+        _id: periodoConfig.groupId,
+        ingresos: { $sum: '$cot.precio_total' },
+        reservas: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  const puntos = resultados.map((r) => ({
+    label: periodoConfig.labelFor(r._id),
+    fecha: periodoConfig.fechaFor(r._id),
+    ingresos: r.ingresos ? parseFloat(r.ingresos.toString()) : 0,
+    reservas: r.reservas,
+  }));
+
+  const totalIngresos = puntos.reduce((sum, item) => sum + item.ingresos, 0);
+
+  return {
+    total_ingresos: totalIngresos,
+    periodo: periodoConfig.periodo,
+    valor: periodoConfig.valor,
+    puntos,
+  };
+}
+
 exports.getIngresos = async (req, res, next) => {
   try {
     const periodoConfig = parsePeriodoIngresos(req.query.periodo, req.query.valor);
@@ -268,46 +306,60 @@ exports.getIngresos = async (req, res, next) => {
     }
 
     const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
-    const resultados = await Reserva.aggregate([
-      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
-      {
-        $match: {
-          estado: { $in: ESTADOS_INGRESO },
-          created_at: { $gte: periodoConfig.fechaInicio, $lte: periodoConfig.fechaFin },
-        },
-      },
-      {
-        $group: {
-          _id: periodoConfig.groupId,
-          ingresos: { $sum: '$cot.precio_total' },
-          reservas: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
+    const data = await fetchIngresosData(mayoristaId, periodoConfig);
 
-    const puntos = resultados.map((r) => ({
-      label: periodoConfig.labelFor(r._id),
-      fecha: periodoConfig.fechaFor(r._id),
-      ingresos: r.ingresos ? parseFloat(r.ingresos.toString()) : 0,
-      reservas: r.reservas,
-    }));
-
-    const totalIngresos = puntos.reduce((sum, item) => sum + item.ingresos, 0);
-
-    return res.json({
-      success: true,
-      data: {
-        total_ingresos: totalIngresos,
-        periodo: periodoConfig.periodo,
-        valor: periodoConfig.valor,
-        puntos,
-      },
-    });
+    return res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
+
+async function fetchProductosTopData(mayoristaId, fechaInicio, fechaFin) {
+  const pipeline = [
+    ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
+    {
+      $match: {
+        estado: { $ne: 'cancelada' },
+        created_at: { $gte: fechaInicio, $lte: fechaFin },
+      },
+    },
+    {
+      $group: {
+        _id: '$cot.producto_id',
+        cantidad_reservas: { $sum: 1 },
+        monto_total: { $sum: '$cot.precio_total' },
+      },
+    },
+    { $sort: { monto_total: -1 } },
+    {
+      $lookup: {
+        from: productoCollection(),
+        localField: '_id',
+        foreignField: '_id',
+        as: 'producto_info',
+      },
+    },
+    { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        nombre: { $ifNull: ['$producto_info.nombre', 'Producto desconocido'] },
+        tipo: { $ifNull: ['$producto_info.tipo', 'N/A'] },
+        cantidad_reservas: 1,
+        monto_total: 1,
+      },
+    },
+  ];
+
+  const resultados = await Reserva.aggregate(pipeline);
+
+  return resultados.map((r) => ({
+    nombre: r.nombre,
+    tipo: r.tipo,
+    cantidad_reservas: r.cantidad_reservas,
+    monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
+  }));
+}
 
 exports.getIngresosPorProducto = async (req, res, next) => {
   try {
@@ -315,56 +367,80 @@ exports.getIngresosPorProducto = async (req, res, next) => {
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
     const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
-    const pipeline = [
-      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
-      {
-        $match: {
-          estado: { $ne: 'cancelada' },
-          created_at: { $gte: fechaInicio, $lte: fechaFin },
-        },
-      },
-      {
-        $group: {
-          _id: '$cot.producto_id',
-          cantidad_reservas: { $sum: 1 },
-          monto_total: { $sum: '$cot.precio_total' },
-        },
-      },
-      { $sort: { monto_total: -1 } },
-      {
-        $lookup: {
-          from: productoCollection(),
-          localField: '_id',
-          foreignField: '_id',
-          as: 'producto_info',
-        },
-      },
-      { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          _id: 0,
-          nombre: { $ifNull: ['$producto_info.nombre', 'Producto desconocido'] },
-          tipo: { $ifNull: ['$producto_info.tipo', 'N/A'] },
-          cantidad_reservas: 1,
-          monto_total: 1,
-        },
-      },
-    ];
-
-    const resultados = await Reserva.aggregate(pipeline);
-
-    const data = resultados.map((r) => ({
-      nombre: r.nombre,
-      tipo: r.tipo,
-      cantidad_reservas: r.cantidad_reservas,
-      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
-    }));
+    const data = await fetchProductosTopData(mayoristaId, fechaInicio, fechaFin);
 
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 };
+
+async function fetchRankingAgenciasData(mayoristaId, fechaInicio, fechaFin, itemsLimit = 10) {
+  const pipeline = [
+    ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
+    {
+      $match: {
+        estado: { $ne: 'cancelada' },
+        created_at: { $gte: fechaInicio, $lte: fechaFin },
+      },
+    },
+    {
+      $group: {
+        _id: { agencia_id: '$cot.agencia_id', producto_id: '$cot.producto_id' },
+        cantidad: { $sum: 1 },
+        monto: { $sum: '$cot.precio_total' },
+      },
+    },
+    { $sort: { cantidad: -1, monto: -1 } },
+    {
+      $group: {
+        _id: '$_id.agencia_id',
+        cantidad_reservas: { $sum: '$cantidad' },
+        monto_total: { $sum: '$monto' },
+        producto_top_id: { $first: '$_id.producto_id' },
+      },
+    },
+    { $sort: { cantidad_reservas: -1, monto_total: -1 } },
+    { $limit: itemsLimit },
+    {
+      $lookup: {
+        from: agenciaCollection(),
+        localField: '_id',
+        foreignField: '_id',
+        as: 'agencia_info',
+      },
+    },
+    { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: productoCollection(),
+        localField: 'producto_top_id',
+        foreignField: '_id',
+        as: 'producto_info',
+      },
+    },
+    { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        nombre_agencia: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
+        cantidad_reservas: 1,
+        monto_total: 1,
+        producto_mas_reservado: { $ifNull: ['$producto_info.nombre', 'N/A'] },
+      },
+    },
+  ];
+
+  const resultados = await Reserva.aggregate(pipeline);
+
+  return resultados.map((r, i) => ({
+    posicion: i + 1,
+    nombre_agencia: r.nombre_agencia,
+    cantidad_reservas: r.cantidad_reservas,
+    monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
+    producto_mas_reservado: r.producto_mas_reservado,
+  }));
+}
 
 exports.getRankingAgencias = async (req, res, next) => {
   try {
@@ -373,70 +449,7 @@ exports.getRankingAgencias = async (req, res, next) => {
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
     const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
-    const pipeline = [
-      ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
-      {
-        $match: {
-          estado: { $ne: 'cancelada' },
-          created_at: { $gte: fechaInicio, $lte: fechaFin },
-        },
-      },
-      {
-        $group: {
-          _id: { agencia_id: '$cot.agencia_id', producto_id: '$cot.producto_id' },
-          cantidad: { $sum: 1 },
-          monto: { $sum: '$cot.precio_total' },
-        },
-      },
-      { $sort: { cantidad: -1, monto: -1 } },
-      {
-        $group: {
-          _id: '$_id.agencia_id',
-          cantidad_reservas: { $sum: '$cantidad' },
-          monto_total: { $sum: '$monto' },
-          producto_top_id: { $first: '$_id.producto_id' },
-        },
-      },
-      { $sort: { cantidad_reservas: -1, monto_total: -1 } },
-      { $limit: itemsLimit },
-      {
-        $lookup: {
-          from: agenciaCollection(),
-          localField: '_id',
-          foreignField: '_id',
-          as: 'agencia_info',
-        },
-      },
-      { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
-      {
-        $lookup: {
-          from: productoCollection(),
-          localField: 'producto_top_id',
-          foreignField: '_id',
-          as: 'producto_info',
-        },
-      },
-      { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          _id: 0,
-          nombre_agencia: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
-          cantidad_reservas: 1,
-          monto_total: 1,
-          producto_mas_reservado: { $ifNull: ['$producto_info.nombre', 'N/A'] },
-        },
-      },
-    ];
-
-    const resultados = await Reserva.aggregate(pipeline);
-
-    const data = resultados.map((r, i) => ({
-      posicion: i + 1,
-      nombre_agencia: r.nombre_agencia,
-      cantidad_reservas: r.cantidad_reservas,
-      monto_total: r.monto_total ? parseFloat(r.monto_total.toString()) : 0,
-      producto_mas_reservado: r.producto_mas_reservado,
-    }));
+    const data = await fetchRankingAgenciasData(mayoristaId, fechaInicio, fechaFin, itemsLimit);
 
     res.json({ success: true, data });
   } catch (err) {
@@ -649,5 +662,155 @@ exports.getAgenciaDashboard = async (req, res, next) => {
     });
   } catch (err) {
     next(err);
+  }
+};
+
+// ==========================================
+// EXPORTACIÓN DE REPORTES A PDF
+// ==========================================
+
+const PERIODO_LABEL = { dia: 'Día', mes: 'Mes', anio: 'Año' };
+
+const formatMoney = (value) =>
+  `$${Number(value || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const slug = (str) =>
+  String(str || '')
+    .normalize('NFD')
+    .split('')
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return code < 0x300 || code > 0x36f; // descarta marcas diacríticas combinantes
+    })
+    .join('')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'reporte';
+
+/**
+ * Dibuja una tabla simple (encabezado + filas) en el PDFDocument, con salto
+ * de página automático cuando el contenido no entra en la página actual.
+ */
+function drawTable(doc, headers, rows, columnWidths) {
+  const startX = doc.page.margins.left;
+  const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const widths = columnWidths || headers.map(() => usableWidth / headers.length);
+  const rowHeight = 20;
+  const bottomLimit = doc.page.height - doc.page.margins.bottom;
+  let y = doc.y;
+
+  const drawRow = (cells, isHeader) => {
+    if (y + rowHeight > bottomLimit) {
+      doc.addPage();
+      y = doc.y;
+    }
+    let x = startX;
+    doc.font(isHeader ? 'Helvetica-Bold' : 'Helvetica').fontSize(10).fillColor(isHeader ? '#111' : '#333');
+    cells.forEach((cell, i) => {
+      doc.text(String(cell ?? ''), x, y, { width: widths[i], ellipsis: true });
+      x += widths[i];
+    });
+    y += rowHeight;
+  };
+
+  drawRow(headers, true);
+  doc.moveTo(startX, y).lineTo(startX + widths.reduce((a, b) => a + b, 0), y).strokeColor('#ddd').stroke();
+  y += 4;
+
+  if (rows.length === 0) {
+    doc.font('Helvetica').fontSize(10).fillColor('#888').text('Sin datos', startX, y);
+    y += rowHeight;
+  } else {
+    rows.forEach((row) => drawRow(row, false));
+  }
+
+  doc.fillColor('#000');
+  doc.x = startX;
+  doc.y = y + 10;
+}
+
+/**
+ * @route   GET /api/v1/reportes/exportar
+ * @desc    Genera un PDF con el resumen de ingresos, ranking de agencias y
+ *          productos más vendidos para el periodo seleccionado (mismo corte
+ *          de datos que se ve en la pantalla de Reportes).
+ * @access  Private (Mayorista)
+ */
+exports.exportarReportePDF = async (req, res, next) => {
+  try {
+    const periodoConfig = parsePeriodoIngresos(req.query.periodo, req.query.valor);
+
+    if (!periodoConfig) {
+      return res.status(400).json({
+        success: false,
+        message: 'Periodo o valor invalido. Use periodo=dia|mes|anio y valor=YYYY-MM-DD|YYYY-MM|YYYY.',
+      });
+    }
+
+    const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
+
+    const [mayorista, ingresosData, rankingAgencias, productosTop] = await Promise.all([
+      Mayorista.findById(mayoristaId).select('nombre').lean(),
+      fetchIngresosData(mayoristaId, periodoConfig),
+      fetchRankingAgenciasData(mayoristaId, periodoConfig.fechaInicio, periodoConfig.fechaFin, 10),
+      fetchProductosTopData(mayoristaId, periodoConfig.fechaInicio, periodoConfig.fechaFin),
+    ]);
+
+    const nombreMayorista = mayorista?.nombre || 'Mayorista';
+    const periodoLabel = PERIODO_LABEL[periodoConfig.periodo] || periodoConfig.periodo;
+    const filename = `reporte_${slug(nombreMayorista)}_${periodoConfig.valor}.pdf`;
+    const totalReservas = ingresosData.puntos.reduce((sum, p) => sum + (p.reservas || 0), 0);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    doc.pipe(res);
+
+    doc.fontSize(18).font('Helvetica-Bold').text('TourConnect — Reporte de Actividad');
+    doc.moveDown(0.3);
+    doc.fontSize(11).font('Helvetica').fillColor('#555');
+    doc.text(nombreMayorista);
+    doc.text(`Periodo: ${periodoLabel} — ${periodoConfig.valor}`);
+    doc.text(`Generado el: ${new Date().toLocaleString('es-AR')}`);
+    doc.fillColor('#000');
+    doc.moveDown(1.2);
+
+    doc.fontSize(14).font('Helvetica-Bold').text('Resumen de Ingresos');
+    doc.moveDown(0.4);
+    doc.fontSize(11).font('Helvetica');
+    doc.text(`Ingresos del periodo: ${formatMoney(ingresosData.total_ingresos)}`);
+    doc.text(`Reservas con ingresos: ${totalReservas}`);
+    doc.moveDown(1.2);
+
+    doc.fontSize(14).font('Helvetica-Bold').text('Ranking de Agencias');
+    doc.moveDown(0.4);
+    drawTable(
+      doc,
+      ['#', 'Agencia', 'Reservas', 'Monto Facturado'],
+      rankingAgencias.map((a) => [a.posicion, a.nombre_agencia, a.cantidad_reservas, formatMoney(a.monto_total)]),
+      [30, 235, 70, 155]
+    );
+
+    doc.moveDown(0.8);
+    doc.fontSize(14).font('Helvetica-Bold').text('Productos Más Vendidos');
+    doc.moveDown(0.4);
+    drawTable(
+      doc,
+      ['Producto', 'Tipo', 'Reservas', 'Ingresos'],
+      productosTop.map((p) => [p.nombre, p.tipo, p.cantidad_reservas, formatMoney(p.monto_total)]),
+      [200, 100, 75, 115]
+    );
+
+    doc.end();
+
+    registrarAuditoria({
+      req,
+      accion: 'REPORTE_EXPORTADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: mayoristaId,
+      detalle: { periodo: periodoConfig.periodo, valor: periodoConfig.valor },
+    });
+  } catch (error) {
+    next(error);
   }
 };

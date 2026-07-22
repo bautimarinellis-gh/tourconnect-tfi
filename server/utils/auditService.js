@@ -27,6 +27,7 @@ const CATEGORIA_POR_ACCION = {
   RESERVA_CANCELADA: 'negocio',
   MARKUP_ACTUALIZADO: 'negocio',
   PRODUCTOS_AGENCIA_SYNC: 'negocio',
+  REPORTE_EXPORTADO: 'negocio',
 };
 
 /**

@@ -7,7 +7,8 @@ const {
   getIngresosPorProducto,
   getRankingAgencias,
   getMayoristaDashboard,
-  getAgenciaDashboard
+  getAgenciaDashboard,
+  exportarReportePDF
 } = require('../controllers/reporteController');
 
 const auth = require('../middlewares/authMiddleware');
@@ -36,6 +37,7 @@ router.get('/ingresos/agencias', roleCheck(['mayorista']), getIngresosPorAgencia
 router.get('/ingresos/productos', roleCheck(['mayorista']), getIngresosPorProducto);
 router.get('/agencias/ranking', roleCheck(['mayorista']), getRankingAgencias);
 router.get('/dashboard', roleCheck(['mayorista']), getMayoristaDashboard);
+router.get('/exportar', roleCheck(['mayorista']), exportarReportePDF);
 
 // ==========================================
 // ENDPOINTS AGENCIA (rol: agencia)

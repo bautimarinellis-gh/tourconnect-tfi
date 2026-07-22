@@ -31,6 +31,7 @@ const ACCIONES = [
   'RESERVA_CANCELADA',
   'MARKUP_ACTUALIZADO',
   'PRODUCTOS_AGENCIA_SYNC',
+  'REPORTE_EXPORTADO',
 ];
 
 const auditLogSchema = new mongoose.Schema(

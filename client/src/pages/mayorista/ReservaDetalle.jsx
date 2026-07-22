@@ -193,33 +193,33 @@ export const MayoristaReservaDetalle = () => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', background: '#FFFBEB', padding: '1rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
               <div>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Agencia</p>
-                <p style={{ fontWeight: 600, margin: 0 }}>{reserva.agencia_id?.nombre || '—'}</p>
+                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Agencia</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{reserva.agencia_id?.nombre || '—'}</p>
               </div>
               <div>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Método de pago</p>
-                <p style={{ fontWeight: 600, margin: 0, textTransform: 'capitalize' }}>{pid.metodo}</p>
+                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Método de pago</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0, textTransform: 'capitalize' }}>{pid.metodo}</p>
               </div>
               <div>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Comprobante</p>
-                <p style={{ fontWeight: 600, margin: 0 }}>{pid.comprobante || '—'}</p>
+                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Comprobante</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.comprobante || '—'}</p>
               </div>
               <div>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Fecha del pago</p>
-                <p style={{ fontWeight: 600, margin: 0 }}>{pid.fecha_pago ? formatDate(pid.fecha_pago) : '—'}</p>
+                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Fecha del pago</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.fecha_pago ? formatDate(pid.fecha_pago) : '—'}</p>
               </div>
               <div>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Monto informado</p>
-                <p style={{ fontWeight: 700, margin: 0, fontSize: '1.1rem' }}>{formatCurrency(toFloat(pid.monto))}</p>
+                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Monto informado</p>
+                <p style={{ color: '#1F2937', fontWeight: 700, margin: 0, fontSize: '1.1rem' }}>{formatCurrency(toFloat(pid.monto))}</p>
               </div>
               <div>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Informado el</p>
-                <p style={{ fontWeight: 600, margin: 0 }}>{pid.informado_at ? formatDateTime(pid.informado_at) : '—'}</p>
+                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Informado el</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.informado_at ? formatDateTime(pid.informado_at) : '—'}</p>
               </div>
               {pid.notas && (
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Notas</p>
-                  <p style={{ fontWeight: 500, margin: 0, fontStyle: 'italic' }}>{pid.notas}</p>
+                  <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Notas</p>
+                  <p style={{ color: '#1F2937', fontWeight: 500, margin: 0, fontStyle: 'italic' }}>{pid.notas}</p>
                 </div>
               )}
             </div>

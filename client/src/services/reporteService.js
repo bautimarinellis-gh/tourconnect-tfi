@@ -7,7 +7,8 @@ const reporteService = {
   getIngresos: (params) => api.get('/reportes/ingresos', { params }).then(r => r.data?.data ?? r.data),
   getReservasPorMes: (params) => api.get('/reportes/reservas', { params }).then(r => r.data?.data ?? r.data),
   getRankingAgencias: (params) => api.get('/reportes/agencias/ranking', { params }).then(r => r.data?.data ?? r.data),
-  getProductosMasVendidos: (params) => api.get('/reportes/ingresos/productos', { params }).then(r => r.data?.data ?? r.data)
+  getProductosMasVendidos: (params) => api.get('/reportes/ingresos/productos', { params }).then(r => r.data?.data ?? r.data),
+  exportarPDF: (params) => api.get('/reportes/exportar', { params, responseType: 'blob' }).then(r => r.data)
 };
 
 export default reporteService;

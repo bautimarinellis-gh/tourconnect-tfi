@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
-import { CalendarDays, CalendarRange, Calendar, DollarSign, ClipboardCheck } from 'lucide-react';
+import { CalendarDays, CalendarRange, Calendar, DollarSign, ClipboardCheck, Download } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { useToast } from '../../components/ui/Toast';
 import { formatCurrency } from '../../utils/formatters';
 import reporteService from '../../services/reporteService';
 import './reportes.css';
@@ -101,9 +103,11 @@ const getXAxisInterval = (periodo) => {
 };
 
 export const MayoristaReportes = () => {
+  const toast = useToast();
   const [periodo, setPeriodo] = useState('mes');
   const [valor, setValor] = useState(() => getDefaultValor('mes'));
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [data, setData] = useState({
     ingresos: { total_ingresos: 0, puntos: [] },
     rankingAgencias: [],
@@ -154,6 +158,27 @@ export const MayoristaReportes = () => {
   const handlePeriodoChange = (nextPeriodo) => {
     setPeriodo(nextPeriodo);
     setValor(getDefaultValor(nextPeriodo));
+  };
+
+  const handleExportar = async () => {
+    if (!valor) return;
+    setExporting(true);
+    try {
+      const blob = await reporteService.exportarPDF({ periodo, valor });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reporte_${periodo}_${valor}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudo generar el PDF del reporte.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const chartData = useMemo(() => {
@@ -214,6 +239,10 @@ export const MayoristaReportes = () => {
             className="reportes-period-input"
             style={{ marginBottom: 0 }}
           />
+
+          <Button variant="ghost" onClick={handleExportar} isLoading={exporting} disabled={loading}>
+            <Download size={16} /> Exportar PDF
+          </Button>
         </div>
       </div>
 
