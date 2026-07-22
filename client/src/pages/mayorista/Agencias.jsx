@@ -9,11 +9,20 @@ import { Spinner } from '../../components/ui/Spinner';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Textarea } from '../../components/ui/Textarea';
 import { Alert } from '../../components/ui/Alert';
 import { useToast } from '../../components/ui/Toast';
 import agenciaService from '../../services/agenciaService';
 import { formatCuit, isValidCuit } from '../../utils/cuit';
 import { formatTelefono } from '../../utils/telefono';
+
+const MOTIVOS_DESACTIVACION = [
+  { value: 'incumplimiento_pago', label: 'Incumplimiento de pago' },
+  { value: 'incumplimiento_terminos', label: 'Incumplimiento de términos y condiciones' },
+  { value: 'inactividad', label: 'Inactividad prolongada' },
+  { value: 'solicitud_agencia', label: 'Solicitud de la propia agencia' },
+  { value: 'otro', label: 'Otro' },
+];
 
 export const MayoristaAgencias = () => {
   const toast = useToast();
@@ -45,6 +54,9 @@ export const MayoristaAgencias = () => {
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [deleteVerifying, setDeleteVerifying] = useState(false);
   const [deleteVerification, setDeleteVerification] = useState(null); // { puede_desactivar, cotizaciones_activas, reservas_activas }
+  const [deleteMotivo, setDeleteMotivo] = useState('');
+  const [deleteMensaje, setDeleteMensaje] = useState('');
+  const [deleteError, setDeleteError] = useState('');
 
   // --- Error de operaciones activas ---
   const [isBlockedModalOpen, setIsBlockedModalOpen] = useState(false);
@@ -141,6 +153,9 @@ export const MayoristaAgencias = () => {
     setDeleteAgencia(ag);
     setDeleteVerification(null);
     setDeleteVerifying(true);
+    setDeleteMotivo('');
+    setDeleteMensaje('');
+    setDeleteError('');
     setIsDeleteModalOpen(true);
     try {
       const verificacion = await agenciaService.verificarDesactivacion(ag._id);
@@ -153,13 +168,23 @@ export const MayoristaAgencias = () => {
   };
 
   const handleDelete = async () => {
+    setDeleteError('');
+    if (!deleteMotivo) {
+      setDeleteError('Seleccioná un motivo de desactivación.');
+      return;
+    }
+    if (deleteMotivo === 'otro' && !deleteMensaje.trim()) {
+      setDeleteError('Especificá un mensaje para el motivo "Otro".');
+      return;
+    }
     setDeleteSaving(true);
     try {
-      await agenciaService.delete(deleteAgencia._id);
+      await agenciaService.delete(deleteAgencia._id, { motivo: deleteMotivo, mensaje: deleteMensaje.trim() });
       setAgencias(prev => prev.map(ag =>
         ag._id === deleteAgencia._id ? { ...ag, activo: false } : ag
       ));
       setIsDeleteModalOpen(false);
+      toast.success('Agencia desactivada. Se le notificó el motivo por email.');
     } catch (err) {
       const data = err?.response?.data;
       if (err?.response?.status === 400 && data?.detalles) {
@@ -167,6 +192,8 @@ export const MayoristaAgencias = () => {
         setBlockedAgencia(deleteAgencia);
         setBlockedDetalles(data.detalles);
         setIsBlockedModalOpen(true);
+      } else {
+        setDeleteError(data?.message || 'Error al desactivar la agencia.');
       }
     } finally {
       setDeleteSaving(false);
@@ -417,9 +444,40 @@ export const MayoristaAgencias = () => {
           )}
 
           {deleteVerification && deleteVerification.puede_desactivar && (
-            <Alert variant="success">
-              Sin operaciones activas. La agencia puede ser desactivada.
-            </Alert>
+            <>
+              <Alert variant="success">
+                Sin operaciones activas. La agencia puede ser desactivada.
+              </Alert>
+
+              <div className="input-group">
+                <label className="input-label">Motivo de la desactivación *</label>
+                <select
+                  className="input-control"
+                  value={deleteMotivo}
+                  onChange={e => setDeleteMotivo(e.target.value)}
+                >
+                  <option value="">Seleccioná un motivo...</option>
+                  {MOTIVOS_DESACTIVACION.map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Textarea
+                label={`Mensaje para la agencia ${deleteMotivo === 'otro' ? '*' : '(opcional)'}`}
+                placeholder="Este mensaje se incluirá en el email de notificación a la agencia..."
+                rows={3}
+                value={deleteMensaje}
+                onChange={e => setDeleteMensaje(e.target.value)}
+                maxLength={500}
+              />
+
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+                Se le enviará un email a la agencia comunicando la desactivación y el motivo seleccionado.
+              </p>
+
+              {deleteError && <Alert variant="error">{deleteError}</Alert>}
+            </>
           )}
         </div>
       </Modal>
@@ -441,6 +499,20 @@ export const MayoristaAgencias = () => {
             ¿Estás seguro que querés reactivar <strong>{reactivarAgencia?.nombre}</strong>?
             La agencia y su usuario asociado volverán a tener acceso al sistema.
           </p>
+
+          {reactivarAgencia?.motivo_desactivacion && (
+            <Alert variant="warning">
+              <strong>Motivo de la desactivación:</strong> {MOTIVOS_DESACTIVACION.find(m => m.value === reactivarAgencia.motivo_desactivacion)?.label || reactivarAgencia.motivo_desactivacion}
+              {reactivarAgencia.motivo_desactivacion_mensaje && (
+                <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem' }}>{reactivarAgencia.motivo_desactivacion_mensaje}</p>
+              )}
+            </Alert>
+          )}
+
+          <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+            Se le enviará un email a la agencia dándole la bienvenida de nuevo.
+          </p>
+
           {reactivarError && <Alert variant="error">{reactivarError}</Alert>}
         </div>
       </Modal>

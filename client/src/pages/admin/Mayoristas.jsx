@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, KeyRound, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, RefreshCw, KeyRound, Search } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
+import { Textarea } from '../../components/ui/Textarea';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
@@ -19,6 +20,14 @@ const SUBSCRIPTION_PLANS = [
   { value: 'Starter', label: 'Starter', description: 'Hasta 20 agencias' },
   { value: 'Professional', label: 'Professional', description: '21 a 100 agencias' },
   { value: 'Enterprise', label: 'Enterprise', description: 'Más de 100 agencias' },
+];
+
+const MOTIVOS_DESACTIVACION = [
+  { value: 'incumplimiento_pago', label: 'Incumplimiento de pago' },
+  { value: 'incumplimiento_terminos', label: 'Incumplimiento de términos y condiciones' },
+  { value: 'inactividad', label: 'Inactividad prolongada' },
+  { value: 'solicitud_mayorista', label: 'Solicitud del propio mayorista' },
+  { value: 'otro', label: 'Otro' },
 ];
 
 const PLAN_BADGE_VARIANT = { Starter: 'info', Professional: 'success', Enterprise: 'warning' };
@@ -51,8 +60,11 @@ export const AdminMayoristas = () => {
   const [busqueda, setBusqueda] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMayorista, setEditingMayorista] = useState(null);
-  const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', cuit: '', plan_suscripcion: 'Starter', activo: true });
+  const [editFormData, setEditFormData] = useState({ nombre: '', razon_social: '', telefono: '', cuit: '', plan_suscripcion: 'Starter' });
   const [deletingMayorista, setDeletingMayorista] = useState(null);
+  const [deleteMotivo, setDeleteMotivo] = useState('');
+  const [deleteMensaje, setDeleteMensaje] = useState('');
+  const [reactivandoMayorista, setReactivandoMayorista] = useState(null);
   const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
   const [activarPassword, setActivarPassword] = useState('');
   const [formData, setFormData] = useState({
@@ -130,7 +142,6 @@ export const AdminMayoristas = () => {
       telefono: m.telefono || '',
       cuit: m.cuit || '',
       plan_suscripcion: m.plan_suscripcion || 'Starter',
-      activo: m.activo !== false,
     });
     setFormError('');
   };
@@ -154,7 +165,6 @@ export const AdminMayoristas = () => {
         telefono: editFormData.telefono || null,
         cuit: editFormData.cuit,
         plan_suscripcion: editFormData.plan_suscripcion,
-        activo: Boolean(editFormData.activo),
       });
       setEditingMayorista(null);
       fetchMayoristas();
@@ -166,8 +176,32 @@ export const AdminMayoristas = () => {
     }
   };
 
-  const handleDelete = async (m) => {
+  const handleDelete = (m) => {
     setDeletingMayorista(m);
+    setDeleteMotivo('');
+    setDeleteMensaje('');
+    setFormError('');
+  };
+
+  const handleOpenReactivar = (m) => {
+    setReactivandoMayorista(m);
+    setFormError('');
+  };
+
+  const handleReactivar = async () => {
+    if (!reactivandoMayorista) return;
+    setFormError('');
+    setSaving(true);
+    try {
+      await mayoristaService.reactivar(reactivandoMayorista._id);
+      setReactivandoMayorista(null);
+      fetchMayoristas();
+      toast.success('Mayorista reactivado. Se le notificó por email.');
+    } catch (err) {
+      showFormError(getErrorMessage(err, 'Error al reactivar mayorista'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleConfirmarActivarUsuario = async () => {
@@ -194,12 +228,20 @@ export const AdminMayoristas = () => {
   const confirmDelete = async () => {
     if (!deletingMayorista) return;
     setFormError('');
+    if (!deleteMotivo) {
+      showFormError('Seleccioná un motivo de desactivación.');
+      return;
+    }
+    if (deleteMotivo === 'otro' && !deleteMensaje.trim()) {
+      showFormError('Especificá un mensaje para el motivo "Otro".');
+      return;
+    }
     setSaving(true);
     try {
-      await mayoristaService.delete(deletingMayorista._id);
+      await mayoristaService.delete(deletingMayorista._id, { motivo: deleteMotivo, mensaje: deleteMensaje.trim() });
       setDeletingMayorista(null);
       fetchMayoristas();
-      toast.success('Mayorista desactivado.');
+      toast.success('Mayorista desactivado. Se le notificó el motivo por email.');
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al eliminar mayorista'));
     } finally {
@@ -282,7 +324,11 @@ export const AdminMayoristas = () => {
                         {sinAcceso && m.usuario_id && (
                           <Button variant="ghost" size="sm" onClick={() => { setActivarUsuarioMayorista(m); setActivarPassword(''); setFormError(''); }} title="Configurar contraseña"><KeyRound size={16} /></Button>
                         )}
-                        <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDelete(m)} title="Desactivar"><Trash2 size={16} /></Button>
+                        {m.activo ? (
+                          <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDelete(m)} title="Desactivar"><Trash2 size={16} /></Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" style={{ color: 'var(--color-success)' }} onClick={() => handleOpenReactivar(m)} title="Reactivar"><RefreshCw size={16} /></Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -344,16 +390,6 @@ export const AdminMayoristas = () => {
           <Input label="CUIT *" value={editFormData.cuit} onChange={e => setEditFormData({ ...editFormData, cuit: formatCuit(e.target.value) })} placeholder="20-12345678-9" maxLength={13} />
           <SubscriptionPlanSelect label="Plan de suscripción" value={editFormData.plan_suscripcion} onChange={e => setEditFormData({ ...editFormData, plan_suscripcion: e.target.value })} />
           <Input label="Teléfono" value={editFormData.telefono} onChange={e => setEditFormData({ ...editFormData, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem' }}>
-            <input
-              type="checkbox"
-              id="edit-activo"
-              checked={editFormData.activo}
-              onChange={e => setEditFormData({ ...editFormData, activo: e.target.checked })}
-              style={{ width: 18, height: 18, cursor: 'pointer' }}
-            />
-            <label htmlFor="edit-activo" style={{ cursor: 'pointer', fontWeight: 500 }}>Mayorista activo</label>
-          </div>
         </div>
       </Modal>
 
@@ -392,13 +428,78 @@ export const AdminMayoristas = () => {
       >
         {formError && <Alert variant="error">{formError}</Alert>}
         {deletingMayorista && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <p style={{ margin: 0 }}>
               ¿Estás seguro de que deseas desactivar <strong>{deletingMayorista.nombre}</strong>?
             </p>
             <Alert variant="warning">
               Se desactivarán también todas sus agencias y el usuario administrador asociado.
             </Alert>
+
+            <div className="input-group">
+              <label className="input-label">Motivo de la desactivación *</label>
+              <select
+                className="input-control"
+                value={deleteMotivo}
+                onChange={e => setDeleteMotivo(e.target.value)}
+              >
+                <option value="">Seleccioná un motivo...</option>
+                {MOTIVOS_DESACTIVACION.map(mot => (
+                  <option key={mot.value} value={mot.value}>{mot.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <Textarea
+              label={`Mensaje para el mayorista ${deleteMotivo === 'otro' ? '*' : '(opcional)'}`}
+              placeholder="Este mensaje se incluirá en el email de notificación..."
+              rows={3}
+              value={deleteMensaje}
+              onChange={e => setDeleteMensaje(e.target.value)}
+              maxLength={500}
+            />
+
+            <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+              Se le enviará un email al mayorista comunicando la desactivación y el motivo seleccionado.
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={!!reactivandoMayorista}
+        onClose={() => { setReactivandoMayorista(null); setFormError(''); }}
+        title="Reactivar Mayorista"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => { setReactivandoMayorista(null); setFormError(''); }}>Cancelar</Button>
+            <Button onClick={handleReactivar} isLoading={saving}>Confirmar reactivación</Button>
+          </>
+        }
+      >
+        {formError && <Alert variant="error">{formError}</Alert>}
+        {reactivandoMayorista && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ margin: 0, lineHeight: 1.6 }}>
+              ¿Estás seguro que querés reactivar <strong>{reactivandoMayorista.nombre}</strong>?
+              El mayorista y su usuario asociado volverán a tener acceso al sistema.
+            </p>
+            <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+              Sus agencias seguirán inactivas: deberán reactivarse individualmente desde el panel del mayorista.
+            </p>
+
+            {reactivandoMayorista.motivo_desactivacion && (
+              <Alert variant="warning">
+                <strong>Motivo de la desactivación:</strong> {MOTIVOS_DESACTIVACION.find(mot => mot.value === reactivandoMayorista.motivo_desactivacion)?.label || reactivandoMayorista.motivo_desactivacion}
+                {reactivandoMayorista.motivo_desactivacion_mensaje && (
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem' }}>{reactivandoMayorista.motivo_desactivacion_mensaje}</p>
+                )}
+              </Alert>
+            )}
+
+            <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+              Se le enviará un email al mayorista dándole la bienvenida de nuevo.
+            </p>
           </div>
         )}
       </Modal>

@@ -10,31 +10,34 @@ async function resolverContextoPersona(usuario) {
   let mayorista_id = null;
   let agencia_id = null;
   let nombre = null;
+  let telefono = null;
 
   if (usuario.rol === 'mayorista') {
     const mayorista = await Mayorista.findOne({ usuario_id: usuario._id })
-      .select('_id activo nombre')
+      .select('_id activo nombre telefono')
       .lean();
     if (mayorista) {
       mayorista_id = mayorista._id;
       nombre = mayorista.nombre;
+      telefono = mayorista.telefono;
     }
-    return { mayorista_id, agencia_id, nombre, persona: mayorista };
+    return { mayorista_id, agencia_id, nombre, telefono, persona: mayorista };
   }
 
   if (usuario.rol === 'agencia') {
     const agencia = await Agencia.findOne({ usuario_id: usuario._id })
-      .select('_id mayorista_id activo nombre')
+      .select('_id mayorista_id activo nombre telefono')
       .lean();
     if (agencia) {
       agencia_id = agencia._id;
       mayorista_id = agencia.mayorista_id;
       nombre = agencia.nombre;
+      telefono = agencia.telefono;
     }
-    return { mayorista_id, agencia_id, nombre, persona: agencia };
+    return { mayorista_id, agencia_id, nombre, telefono, persona: agencia };
   }
 
-  return { mayorista_id, agencia_id, nombre, persona: null };
+  return { mayorista_id, agencia_id, nombre, telefono, persona: null };
 }
 
 /**
@@ -45,6 +48,7 @@ function enriquecerUsuario(usuario, contexto) {
   return {
     ...json,
     nombre: contexto.nombre,
+    telefono: contexto.telefono,
     mayorista_id: contexto.mayorista_id,
     agencia_id: contexto.agencia_id,
   };

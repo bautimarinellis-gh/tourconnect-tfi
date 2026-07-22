@@ -6,7 +6,7 @@ const Usuario = require('../models/Usuario');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Cotizacion = require('../models/Cotizacion');
 const Reserva = require('../models/Reserva');
-const { enviarInvitacion } = require('../utils/mailer');
+const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { getSubscriptionPlan } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
 
@@ -378,6 +378,9 @@ exports.reactivarAgencia = async (req, res, next) => {
     }
 
     agencia.activo = true;
+    agencia.motivo_desactivacion = null;
+    agencia.motivo_desactivacion_mensaje = null;
+    agencia.fecha_desactivacion = null;
     await agencia.save({ session });
 
     const usuario = await Usuario.findById(agencia.usuario_id).session(session);
@@ -404,6 +407,12 @@ exports.reactivarAgencia = async (req, res, next) => {
         entidad_id: usuario._id,
         detalle: { email: usuario.email, rol: 'agencia' },
       });
+
+      try {
+        await enviarNotificacionReactivacion(usuario.email, agencia.nombre);
+      } catch (mailError) {
+        console.error('Error al enviar email de reactivación, pero la agencia fue reactivada:', mailError.message);
+      }
     }
 
     res.status(200).json({ success: true, data: {} });
@@ -424,6 +433,27 @@ exports.deleteAgencia = async (req, res, next) => {
   session.startTransaction();
 
   try {
+    const { motivo, mensaje } = req.body;
+
+    if (!motivo || !Agencia.MOTIVOS_DESACTIVACION.includes(motivo)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe seleccionar un motivo de desactivación válido.',
+      });
+    }
+
+    const mensajeTrim = typeof mensaje === 'string' ? mensaje.trim() : '';
+    if (motivo === 'otro' && !mensajeTrim) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe especificar un mensaje al elegir el motivo "Otro".',
+      });
+    }
+
     const agencia = await Agencia.findOne({
       _id: req.params.id,
       mayorista_id: req.usuario.mayorista_id,
@@ -455,6 +485,9 @@ exports.deleteAgencia = async (req, res, next) => {
     }
 
     agencia.activo = false;
+    agencia.motivo_desactivacion = motivo;
+    agencia.motivo_desactivacion_mensaje = mensajeTrim || null;
+    agencia.fecha_desactivacion = new Date();
     await agencia.save({ session });
 
     const usuario = await Usuario.findById(agencia.usuario_id).session(session);
@@ -471,7 +504,7 @@ exports.deleteAgencia = async (req, res, next) => {
       accion: 'AGENCIA_DESACTIVADA',
       entidad_afectada: 'Agencia',
       entidad_id: agencia._id,
-      detalle: { nombre: agencia.nombre },
+      detalle: { nombre: agencia.nombre, motivo, mensaje: mensajeTrim || undefined },
     });
     if (usuario) {
       registrarAuditoria({
@@ -481,6 +514,12 @@ exports.deleteAgencia = async (req, res, next) => {
         entidad_id: usuario._id,
         detalle: { email: usuario.email, rol: 'agencia' },
       });
+
+      try {
+        await enviarNotificacionDesactivacion(usuario.email, agencia.nombre, motivo, mensajeTrim);
+      } catch (mailError) {
+        console.error('Error al enviar email de desactivación, pero la agencia fue desactivada:', mailError.message);
+      }
     }
 
     res.status(200).json({

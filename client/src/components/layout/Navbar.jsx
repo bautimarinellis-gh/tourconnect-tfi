@@ -14,9 +14,11 @@ import {
   Shield,
   ShieldCheck,
   ShoppingBag,
+  User,
   Users,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { ProfileModal } from '../shared/ProfileModal';
 import './layout.css';
 import logoImg from '/logo.png';
 
@@ -24,6 +26,7 @@ export const Navbar = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -123,6 +126,17 @@ export const Navbar = () => {
                 <div className="dropdown-divider"></div>
                 <button
                   type="button"
+                  className="dropdown-item"
+                  onClick={() => {
+                    setShowDropdown(false);
+                    setShowProfileModal(true);
+                  }}
+                >
+                  <User size={16} />
+                  <span>Ver Perfil</span>
+                </button>
+                <button
+                  type="button"
                   className="dropdown-item text-danger"
                   onClick={() => {
                     setShowDropdown(false);
@@ -137,6 +151,8 @@ export const Navbar = () => {
           </div>
         </div>
       </div>
+
+      <ProfileModal isOpen={showProfileModal} onClose={() => setShowProfileModal(false)} />
     </nav>
   );
 };

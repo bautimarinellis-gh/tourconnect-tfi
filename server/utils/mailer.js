@@ -92,4 +92,73 @@ const enviarInvitacion = async (email, token, rol) => {
   });
 };
 
-module.exports = { enviarEmail, enviarInvitacion };
+const MOTIVOS_LABEL = {
+  incumplimiento_pago: 'Incumplimiento de pago',
+  incumplimiento_terminos: 'Incumplimiento de términos y condiciones',
+  inactividad: 'Inactividad prolongada',
+  solicitud_agencia: 'Solicitud de la propia agencia',
+  solicitud_mayorista: 'Solicitud del propio mayorista',
+  otro: 'Otro',
+};
+
+/**
+ * Envía el email notificando que una cuenta (agencia o mayorista) fue desactivada.
+ * @param {string} email — email del destinatario
+ * @param {string} nombreEntidad — nombre de la agencia/mayorista desactivado
+ * @param {string} motivo — clave del motivo (ver MOTIVOS_LABEL)
+ * @param {string} [mensaje] — mensaje adicional opcional de quien desactiva
+ */
+const enviarNotificacionDesactivacion = async (email, nombreEntidad, motivo, mensaje) => {
+  const motivoLabel = MOTIVOS_LABEL[motivo] || 'No especificado';
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #dc2626;">Cuenta desactivada</h2>
+      <p>Hola,</p>
+      <p>Te informamos que la cuenta de <strong>${nombreEntidad}</strong> en TourConnect fue desactivada.</p>
+      <p><strong>Motivo:</strong> ${motivoLabel}</p>
+      ${mensaje ? `<p><strong>Mensaje:</strong><br />${mensaje}</p>` : ''}
+      <p style="color: #6b7280; font-size: 14px;">
+        Si considerás que esto es un error, comunicate para más información.
+      </p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb;" />
+      <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>
+    </div>
+  `;
+
+  return enviarEmail({
+    para: email,
+    asunto: 'TourConnect — Tu cuenta fue desactivada',
+    html,
+  });
+};
+
+/**
+ * Envía el email notificando que una cuenta (agencia o mayorista) fue reactivada.
+ * @param {string} email — email del destinatario
+ * @param {string} nombreEntidad — nombre de la agencia/mayorista reactivado
+ */
+const enviarNotificacionReactivacion = async (email, nombreEntidad) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #16a34a;">¡Bienvenido de nuevo!</h2>
+      <p>Hola,</p>
+      <p>Te informamos que la cuenta de <strong>${nombreEntidad}</strong> en TourConnect fue reactivada. Ya podés volver a ingresar al sistema con normalidad.</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb;" />
+      <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>
+    </div>
+  `;
+
+  return enviarEmail({
+    para: email,
+    asunto: 'TourConnect — Tu cuenta fue reactivada',
+    html,
+  });
+};
+
+module.exports = {
+  enviarEmail,
+  enviarInvitacion,
+  enviarNotificacionDesactivacion,
+  enviarNotificacionReactivacion,
+};

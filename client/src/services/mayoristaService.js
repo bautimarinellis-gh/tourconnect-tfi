@@ -6,7 +6,8 @@ const mayoristaService = {
   create: (data) => api.post('/admin/mayoristas', data).then(r => r.data),
   update: (id, data) => api.put(`/admin/mayoristas/${id}`, data).then(r => r.data),
   activarUsuario: (id, password) => api.post(`/admin/mayoristas/${id}/activar-usuario`, { password }).then(r => r.data),
-  delete: (id) => api.delete(`/admin/mayoristas/${id}`).then(r => r.data)
+  delete: (id, data) => api.delete(`/admin/mayoristas/${id}`, { data }).then(r => r.data),
+  reactivar: (id) => api.patch(`/admin/mayoristas/${id}/reactivar`).then(r => r.data),
 };
 
 export default mayoristaService;

@@ -8,6 +8,7 @@ const {
   verifyResetCode,
   resetPassword,
   me,
+  changePassword,
   logout,
 } = require('../controllers/authController');
 
@@ -39,6 +40,7 @@ router.post('/reset-password', resetLimiter, resetPassword);
 
 // Rutas protegidas (requieren JWT válido)
 router.get('/me', auth, me);
+router.put('/change-password', auth, changePassword);
 router.post('/logout', auth, logout);
 
 module.exports = router;

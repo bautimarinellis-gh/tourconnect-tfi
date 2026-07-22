@@ -6,7 +6,7 @@ const Agencia = require('../models/Agencia');
 const Reserva = require('../models/Reserva');
 const Producto = require('../models/Producto');
 const Cotizacion = require('../models/Cotizacion');
-const { enviarInvitacion } = require('../utils/mailer');
+const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
 
@@ -171,10 +171,8 @@ exports.getMayoristaById = async (req, res, next) => {
  */
 exports.updateMayorista = async (req, res, next) => {
   try {
-    const { nombre, razon_social, telefono, cuit, plan_suscripcion, activo } = req.body;
+    const { nombre, razon_social, telefono, cuit, plan_suscripcion } = req.body;
     const id = req.params.id;
-
-    const activoBool = activo === true || activo === 'true' ? true : activo === false || activo === 'false' ? false : undefined;
 
     const updateFields = {};
     if (nombre !== undefined) updateFields.nombre = nombre;
@@ -189,7 +187,6 @@ exports.updateMayorista = async (req, res, next) => {
       validarPlanSuscripcion(planSuscripcion);
       updateFields.plan_suscripcion = planSuscripcion;
     }
-    if (typeof activoBool === 'boolean') updateFields.activo = activoBool;
 
     const mayorista = await Mayorista.findByIdAndUpdate(
       id,
@@ -199,13 +196,6 @@ exports.updateMayorista = async (req, res, next) => {
 
     if (!mayorista) {
       return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
-    }
-
-    if (typeof activoBool === 'boolean') {
-      await Agencia.updateMany({ mayorista_id: mayorista._id }, { activo: activoBool });
-      if (mayorista.usuario_id) {
-        await Usuario.findByIdAndUpdate(mayorista.usuario_id, { activo: activoBool });
-      }
     }
 
     registrarAuditoria({
@@ -263,13 +253,39 @@ exports.deleteMayorista = async (req, res, next) => {
   session.startTransaction();
 
   try {
+    const { motivo, mensaje } = req.body;
+
+    if (!motivo || !Mayorista.MOTIVOS_DESACTIVACION.includes(motivo)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe seleccionar un motivo de desactivación válido.',
+      });
+    }
+
+    const mensajeTrim = typeof mensaje === 'string' ? mensaje.trim() : '';
+    if (motivo === 'otro' && !mensajeTrim) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Debe especificar un mensaje al elegir el motivo "Otro".',
+      });
+    }
+
     const mayorista = await Mayorista.findById(req.params.id).session(session);
 
     if (!mayorista) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
     }
 
     mayorista.activo = false;
+    mayorista.motivo_desactivacion = motivo;
+    mayorista.motivo_desactivacion_mensaje = mensajeTrim || null;
+    mayorista.fecha_desactivacion = new Date();
     await mayorista.save({ session });
 
     // Desactivar todas sus agencias usando Mongoose
@@ -280,8 +296,13 @@ exports.deleteMayorista = async (req, res, next) => {
     );
 
     // Opcional: Desactivar también al usuario asociado
+    let usuario = null;
     if (mayorista.usuario_id) {
-       await Usuario.findByIdAndUpdate(mayorista.usuario_id, { activo: false }, { session });
+      usuario = await Usuario.findByIdAndUpdate(
+        mayorista.usuario_id,
+        { activo: false },
+        { session, new: true }
+      );
     }
 
     await session.commitTransaction();
@@ -292,14 +313,91 @@ exports.deleteMayorista = async (req, res, next) => {
       accion: 'MAYORISTA_DESACTIVADO',
       entidad_afectada: 'Mayorista',
       entidad_id: mayorista._id,
-      detalle: { nombre: mayorista.nombre },
+      detalle: { nombre: mayorista.nombre, motivo, mensaje: mensajeTrim || undefined },
     });
+
+    if (usuario) {
+      try {
+        await enviarNotificacionDesactivacion(usuario.email, mayorista.nombre, motivo, mensajeTrim);
+      } catch (mailError) {
+        console.error('Error al enviar email de desactivación, pero el mayorista fue desactivado:', mailError.message);
+      }
+    }
 
     res.json({
       success: true,
       data: {},
       message: 'Mayorista y agencias desactivados',
     });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    next(error);
+  }
+};
+
+/**
+ * @desc    Reactivar un mayorista desactivado y su usuario asociado
+ * @route   PATCH /api/v1/admin/mayoristas/:id/reactivar
+ * @access  Private/Admin
+ */
+exports.reactivarMayorista = async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const mayorista = await Mayorista.findById(req.params.id).session(session);
+
+    if (!mayorista) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
+    }
+
+    if (mayorista.activo) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: 'El mayorista ya está activo.' });
+    }
+
+    mayorista.activo = true;
+    mayorista.motivo_desactivacion = null;
+    mayorista.motivo_desactivacion_mensaje = null;
+    mayorista.fecha_desactivacion = null;
+    await mayorista.save({ session });
+
+    // Las agencias NO se reactivan en cascada: cada una debe reactivarse
+    // individualmente desde el panel del mayorista.
+
+    let usuario = null;
+    if (mayorista.usuario_id) {
+      usuario = await Usuario.findByIdAndUpdate(
+        mayorista.usuario_id,
+        { activo: true },
+        { session, new: true }
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    registrarAuditoria({
+      req,
+      accion: 'MAYORISTA_REACTIVADO',
+      entidad_afectada: 'Mayorista',
+      entidad_id: mayorista._id,
+      detalle: { nombre: mayorista.nombre },
+    });
+
+    if (usuario) {
+      try {
+        await enviarNotificacionReactivacion(usuario.email, mayorista.nombre);
+      } catch (mailError) {
+        console.error('Error al enviar email de reactivación, pero el mayorista fue reactivado:', mailError.message);
+      }
+    }
+
+    res.json({ success: true, data: {} });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();

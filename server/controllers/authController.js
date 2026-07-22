@@ -554,6 +554,66 @@ const me = async (req, res, next) => {
 };
 
 /**
+ * PUT /api/v1/auth/change-password
+ * Cambia la contraseña del usuario autenticado, verificando la actual.
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { password_actual, password_nueva } = req.body;
+
+    if (!password_actual || !password_nueva) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña actual y la nueva son obligatorias.',
+      });
+    }
+
+    if (String(password_nueva).length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'La nueva contraseña debe tener al menos 8 caracteres.',
+      });
+    }
+
+    const usuario = await Usuario.findById(req.usuario.id).select('+password_hash');
+    if (!usuario) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado.',
+      });
+    }
+
+    const passwordValido = await usuario.compararPassword(password_actual);
+    if (!passwordValido) {
+      return res.status(401).json({
+        success: false,
+        message: 'La contraseña actual es incorrecta.',
+      });
+    }
+
+    usuario.password_hash = await Usuario.hashPassword(password_nueva);
+    await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'CAMBIO_PASSWORD',
+      usuario_id: usuario._id,
+      mayorista_id: req.usuario.mayorista_id ?? null,
+      agencia_id: req.usuario.agencia_id ?? null,
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+    });
+
+    res.json({
+      success: true,
+      data: { message: 'Contraseña actualizada correctamente.' },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * POST /api/v1/auth/logout
  * Invalida el token actual.
  */
@@ -587,6 +647,7 @@ module.exports = {
   verifyResetCode,
   resetPassword,
   me,
+  changePassword,
   logout,
   tokenBlacklist,
 };
