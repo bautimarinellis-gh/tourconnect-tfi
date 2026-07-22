@@ -11,6 +11,8 @@ const {
   updateMayorista,
   deleteMayorista,
   reactivarMayorista,
+  verificarDesactivacionMayorista,
+  getHistorialMayorista,
   activarUsuarioMayorista,
   getGlobalStats,
 } = require('../controllers/adminController');
@@ -28,6 +30,8 @@ router.route('/mayoristas')
 
 router.post('/mayoristas/:id/activar-usuario', activarUsuarioMayorista);
 router.patch('/mayoristas/:id/reactivar', reactivarMayorista);
+router.get('/mayoristas/:id/verificar-desactivacion', verificarDesactivacionMayorista);
+router.get('/mayoristas/:id/historial', getHistorialMayorista);
 
 router.route('/mayoristas/:id')
   .get(getMayoristaById)

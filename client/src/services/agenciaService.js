@@ -9,6 +9,7 @@ const agenciaService = {
   updateProducts: (id, data) => api.put(`/agencias/${id}/productos`, data).then(r => r.data),
   verificarDesactivacion: (id) => api.get(`/agencias/${id}/verificar-desactivacion`).then(r => r.data?.data),
   reactivar: (id) => api.patch(`/agencias/${id}/reactivar`).then(r => r.data),
+  historial: (id) => api.get(`/agencias/${id}/historial`).then(r => r.data?.data ?? []),
 };
 
 export default agenciaService;

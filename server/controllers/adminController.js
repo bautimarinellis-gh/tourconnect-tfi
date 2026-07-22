@@ -9,6 +9,8 @@ const Cotizacion = require('../models/Cotizacion');
 const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
+const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
+const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
 
 const validarPlanSuscripcion = (plan) => {
   if (!SUBSCRIPTION_PLAN_NAMES.includes(plan)) {
@@ -244,6 +246,77 @@ exports.activarUsuarioMayorista = async (req, res, next) => {
 };
 
 /**
+ * Cuenta las operaciones activas de TODAS las agencias de un mayorista.
+ * Cotizaciones activas: estado IN ['pendiente', 'aprobada']
+ * Reservas activas:     estado = 'pendiente_pago'
+ *                    OR (estado = 'pagada' AND fecha_fin >= hoy)
+ */
+async function contarOperacionesActivasMayorista(mayoristaId) {
+  const ahora = new Date();
+  const cotizacionCollection = Cotizacion.collection.name;
+
+  const [cotizacionesActivas, reservasActivasAgg] = await Promise.all([
+    Cotizacion.countDocuments({
+      mayorista_id: mayoristaId,
+      estado: { $in: ['pendiente', 'aprobada'] },
+    }),
+    Reserva.aggregate([
+      {
+        $lookup: {
+          from: cotizacionCollection,
+          localField: 'cotizacion_id',
+          foreignField: '_id',
+          as: 'cot',
+        },
+      },
+      { $unwind: '$cot' },
+      {
+        $match: {
+          'cot.mayorista_id': mayoristaId,
+          $or: [
+            { estado: 'pendiente_pago' },
+            { estado: 'pagada', 'cot.fecha_fin': { $gte: ahora } },
+          ],
+        },
+      },
+      { $count: 'total' },
+    ]),
+  ]);
+
+  const reservasActivas = reservasActivasAgg[0]?.total ?? 0;
+
+  return { cotizacionesActivas, reservasActivas };
+}
+
+/**
+ * @desc    Previsualiza si el mayorista puede ser desactivado
+ * @route   GET /api/v1/admin/mayoristas/:id/verificar-desactivacion
+ * @access  Private/Admin
+ */
+exports.verificarDesactivacionMayorista = async (req, res, next) => {
+  try {
+    const mayorista = await Mayorista.findById(req.params.id).lean();
+    if (!mayorista) {
+      return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
+    }
+
+    const { cotizacionesActivas, reservasActivas } = await contarOperacionesActivasMayorista(mayorista._id);
+    const puede_desactivar = cotizacionesActivas === 0 && reservasActivas === 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        puede_desactivar,
+        cotizaciones_activas: cotizacionesActivas,
+        reservas_activas: reservasActivas,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
  * @desc    Desactivar un mayorista (borrado lógico) y sus agencias
  * @route   DELETE /api/v1/admin/mayoristas/:id
  * @access  Private/Admin
@@ -282,11 +355,33 @@ exports.deleteMayorista = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
     }
 
+    // Verificar integridad operacional dentro de la transacción
+    const { cotizacionesActivas, reservasActivas } = await contarOperacionesActivasMayorista(mayorista._id);
+
+    if (cotizacionesActivas > 0 || reservasActivas > 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        error: 'No se puede desactivar el mayorista',
+        motivo: 'Existen operaciones activas',
+        detalles: {
+          cotizaciones_activas: cotizacionesActivas,
+          reservas_activas: reservasActivas,
+        },
+        mensaje: 'Debe cerrar todas las cotizaciones y reservas activas de sus agencias antes de desactivar el mayorista',
+      });
+    }
+
     mayorista.activo = false;
     mayorista.motivo_desactivacion = motivo;
     mayorista.motivo_desactivacion_mensaje = mensajeTrim || null;
     mayorista.fecha_desactivacion = new Date();
     await mayorista.save({ session });
+
+    await registrarCambioEstadoPersona(
+      mayorista._id, 'Mayorista', req.usuario.id, true, false, motivo, mensajeTrim, session
+    );
 
     // Desactivar todas sus agencias usando Mongoose
     await Agencia.updateMany(
@@ -366,6 +461,10 @@ exports.reactivarMayorista = async (req, res, next) => {
     mayorista.fecha_desactivacion = null;
     await mayorista.save({ session });
 
+    await registrarCambioEstadoPersona(
+      mayorista._id, 'Mayorista', req.usuario.id, false, true, null, null, session
+    );
+
     // Las agencias NO se reactivan en cascada: cada una debe reactivarse
     // individualmente desde el panel del mayorista.
 
@@ -426,6 +525,32 @@ exports.getGlobalStats = async (req, res, next) => {
         total_cotizaciones_pendientes: totalCotizacionesPendientes,
       },
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Historial de activaciones/desactivaciones de un mayorista
+ * @route   GET /api/v1/admin/mayoristas/:id/historial
+ * @access  Private/Admin
+ */
+exports.getHistorialMayorista = async (req, res, next) => {
+  try {
+    const mayorista = await Mayorista.findById(req.params.id).lean();
+    if (!mayorista) {
+      return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
+    }
+
+    const historial = await HistorialEstadoPersona.find({
+      persona_id: mayorista._id,
+      persona_tipo: 'Mayorista',
+    })
+      .populate('usuario_id', 'email rol')
+      .sort({ created_at: -1 })
+      .lean();
+
+    res.json({ success: true, data: historial });
   } catch (error) {
     next(error);
   }

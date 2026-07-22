@@ -11,15 +11,17 @@ import { formatCurrency } from '../../utils/formatters';
 import agenciaService from '../../services/agenciaService';
 import productoService from '../../services/productoService';
 import { useToast } from '../../components/ui/Toast';
+import { HistorialEstadoPersonaTimeline } from '../../components/shared/HistorialEstadoPersonaTimeline';
 
 export const MayoristaAgenciaDetalle = () => {
   const { id } = useParams();
   const toast = useToast();
   const [agencia, setAgencia] = useState(null);
   const [productos, setProductos] = useState([]);
+  const [historial, setHistorial] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info'); // 'info' or 'products'
-  
+  const [activeTab, setActiveTab] = useState('info'); // 'info', 'products' or 'historial'
+
   // State for product markup form
   const [productStates, setProductStates] = useState({});
   const [saving, setSaving] = useState(false);
@@ -27,12 +29,14 @@ export const MayoristaAgenciaDetalle = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [agenciaData, productosData] = await Promise.all([
+        const [agenciaData, productosData, historialData] = await Promise.all([
           agenciaService.getById(id),
-          productoService.getAll({ activo: true })
+          productoService.getAll({ activo: true }),
+          agenciaService.historial(id)
         ]);
         setAgencia(agenciaData);
         setProductos(productosData);
+        setHistorial(historialData);
 
         // Initialize product states from agencia.productos
         const productosAgencia = agenciaData.productos || [];
@@ -129,6 +133,21 @@ export const MayoristaAgenciaDetalle = () => {
         >
           Productos Habilitados
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('historial')}
+          style={{
+            padding: '0.75rem 1rem',
+            background: 'none',
+            border: 'none',
+            borderBottom: `2px solid ${activeTab === 'historial' ? 'var(--color-primary)' : 'transparent'}`,
+            color: activeTab === 'historial' ? 'var(--color-primary)' : 'var(--color-text-soft)',
+            fontWeight: activeTab === 'historial' ? 600 : 500,
+            cursor: 'pointer'
+          }}
+        >
+          Historial
+        </button>
       </div>
 
       {activeTab === 'info' && (
@@ -223,6 +242,10 @@ export const MayoristaAgenciaDetalle = () => {
             </tbody>
           </Table>
         </Card>
+      )}
+
+      {activeTab === 'historial' && (
+        <HistorialEstadoPersonaTimeline historial={historial} title="Historial de Activaciones/Desactivaciones" />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, RefreshCw, KeyRound, Search } from 'lucide-react';
+import { Plus, Edit2, Trash2, RefreshCw, KeyRound, Search, History, AlertTriangle } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -15,6 +15,7 @@ import { useToast } from '../../components/ui/Toast';
 import mayoristaService from '../../services/mayoristaService';
 import { formatCuit, isValidCuit } from '../../utils/cuit';
 import { formatTelefono } from '../../utils/telefono';
+import { HistorialEstadoPersonaTimeline } from '../../components/shared/HistorialEstadoPersonaTimeline';
 
 const SUBSCRIPTION_PLANS = [
   { value: 'Starter', label: 'Starter', description: 'Hasta 20 agencias' },
@@ -64,7 +65,12 @@ export const AdminMayoristas = () => {
   const [deletingMayorista, setDeletingMayorista] = useState(null);
   const [deleteMotivo, setDeleteMotivo] = useState('');
   const [deleteMensaje, setDeleteMensaje] = useState('');
+  const [deleteVerifying, setDeleteVerifying] = useState(false);
+  const [deleteVerification, setDeleteVerification] = useState(null); // { puede_desactivar, cotizaciones_activas, reservas_activas }
   const [reactivandoMayorista, setReactivandoMayorista] = useState(null);
+  const [historialMayorista, setHistorialMayorista] = useState(null);
+  const [historialData, setHistorialData] = useState([]);
+  const [historialLoading, setHistorialLoading] = useState(false);
   const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
   const [activarPassword, setActivarPassword] = useState('');
   const [formData, setFormData] = useState({
@@ -176,11 +182,35 @@ export const AdminMayoristas = () => {
     }
   };
 
-  const handleDelete = (m) => {
+  const handleDelete = async (m) => {
     setDeletingMayorista(m);
     setDeleteMotivo('');
     setDeleteMensaje('');
     setFormError('');
+    setDeleteVerification(null);
+    setDeleteVerifying(true);
+    try {
+      const verificacion = await mayoristaService.verificarDesactivacion(m._id);
+      setDeleteVerification(verificacion);
+    } catch {
+      setDeleteVerification(null);
+    } finally {
+      setDeleteVerifying(false);
+    }
+  };
+
+  const handleVerHistorial = async (m) => {
+    setHistorialMayorista(m);
+    setHistorialData([]);
+    setHistorialLoading(true);
+    try {
+      const data = await mayoristaService.historial(m._id);
+      setHistorialData(data);
+    } catch {
+      setHistorialData([]);
+    } finally {
+      setHistorialLoading(false);
+    }
   };
 
   const handleOpenReactivar = (m) => {
@@ -228,6 +258,10 @@ export const AdminMayoristas = () => {
   const confirmDelete = async () => {
     if (!deletingMayorista) return;
     setFormError('');
+    if (deleteVerification && !deleteVerification.puede_desactivar) {
+      showFormError('No se puede desactivar: existen operaciones activas en sus agencias.');
+      return;
+    }
     if (!deleteMotivo) {
       showFormError('Seleccioná un motivo de desactivación.');
       return;
@@ -321,6 +355,7 @@ export const AdminMayoristas = () => {
                       </TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(m)} title="Editar"><Edit2 size={16} /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleVerHistorial(m)} title="Ver historial"><History size={16} /></Button>
                         {sinAcceso && m.usuario_id && (
                           <Button variant="ghost" size="sm" onClick={() => { setActivarUsuarioMayorista(m); setActivarPassword(''); setFormError(''); }} title="Configurar contraseña"><KeyRound size={16} /></Button>
                         )}
@@ -422,7 +457,14 @@ export const AdminMayoristas = () => {
         footer={
           <>
             <Button variant="ghost" onClick={() => { setDeletingMayorista(null); setFormError(''); }}>Cancelar</Button>
-            <Button variant="danger" onClick={confirmDelete} isLoading={saving}>Desactivar</Button>
+            <Button
+              variant="danger"
+              onClick={confirmDelete}
+              isLoading={saving || deleteVerifying}
+              disabled={deleteVerifying || (deleteVerification && !deleteVerification.puede_desactivar)}
+            >
+              Desactivar
+            </Button>
           </>
         }
       >
@@ -436,33 +478,77 @@ export const AdminMayoristas = () => {
               Se desactivarán también todas sus agencias y el usuario administrador asociado.
             </Alert>
 
-            <div className="input-group">
-              <label className="input-label">Motivo de la desactivación *</label>
-              <select
-                className="input-control"
-                value={deleteMotivo}
-                onChange={e => setDeleteMotivo(e.target.value)}
-              >
-                <option value="">Seleccioná un motivo...</option>
-                {MOTIVOS_DESACTIVACION.map(mot => (
-                  <option key={mot.value} value={mot.value}>{mot.label}</option>
-                ))}
-              </select>
-            </div>
+            {deleteVerifying && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
+                <Spinner size="sm" /> Verificando operaciones activas...
+              </div>
+            )}
 
-            <Textarea
-              label={`Mensaje para el mayorista ${deleteMotivo === 'otro' ? '*' : '(opcional)'}`}
-              placeholder="Este mensaje se incluirá en el email de notificación..."
-              rows={3}
-              value={deleteMensaje}
-              onChange={e => setDeleteMensaje(e.target.value)}
-              maxLength={500}
-            />
+            {deleteVerification && !deleteVerification.puede_desactivar && (
+              <Alert variant="error">
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                  <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '0.125rem' }} />
+                  <div>
+                    <strong>No se puede desactivar</strong>
+                    <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem' }}>
+                      Sus agencias tienen operaciones activas:{' '}
+                      {deleteVerification.cotizaciones_activas > 0 && (
+                        <span>{deleteVerification.cotizaciones_activas} cotización{deleteVerification.cotizaciones_activas !== 1 ? 'es' : ''} pendiente{deleteVerification.cotizaciones_activas !== 1 ? 's' : ''}</span>
+                      )}
+                      {deleteVerification.cotizaciones_activas > 0 && deleteVerification.reservas_activas > 0 && ' y '}
+                      {deleteVerification.reservas_activas > 0 && (
+                        <span>{deleteVerification.reservas_activas} reserva{deleteVerification.reservas_activas !== 1 ? 's' : ''} activa{deleteVerification.reservas_activas !== 1 ? 's' : ''}</span>
+                      )}.
+                      Deben cerrarse esas operaciones primero.
+                    </p>
+                  </div>
+                </div>
+              </Alert>
+            )}
 
-            <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
-              Se le enviará un email al mayorista comunicando la desactivación y el motivo seleccionado.
-            </p>
+            {deleteVerification && deleteVerification.puede_desactivar && (
+              <>
+                <div className="input-group">
+                  <label className="input-label">Motivo de la desactivación *</label>
+                  <select
+                    className="input-control"
+                    value={deleteMotivo}
+                    onChange={e => setDeleteMotivo(e.target.value)}
+                  >
+                    <option value="">Seleccioná un motivo...</option>
+                    {MOTIVOS_DESACTIVACION.map(mot => (
+                      <option key={mot.value} value={mot.value}>{mot.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <Textarea
+                  label={`Mensaje para el mayorista ${deleteMotivo === 'otro' ? '*' : '(opcional)'}`}
+                  placeholder="Este mensaje se incluirá en el email de notificación..."
+                  rows={3}
+                  value={deleteMensaje}
+                  onChange={e => setDeleteMensaje(e.target.value)}
+                  maxLength={500}
+                />
+
+                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+                  Se le enviará un email al mayorista comunicando la desactivación y el motivo seleccionado.
+                </p>
+              </>
+            )}
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={!!historialMayorista}
+        onClose={() => setHistorialMayorista(null)}
+        title={`Historial — ${historialMayorista?.nombre ?? ''}`}
+      >
+        {historialLoading ? (
+          <Spinner center />
+        ) : (
+          <HistorialEstadoPersonaTimeline historial={historialData} title="Línea de tiempo" />
         )}
       </Modal>
 

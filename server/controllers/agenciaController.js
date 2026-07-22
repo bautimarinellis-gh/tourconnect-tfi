@@ -9,6 +9,8 @@ const Reserva = require('../models/Reserva');
 const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { getSubscriptionPlan } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
+const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
+const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
 
 /**
  * @route   GET /api/v1/agencias
@@ -383,6 +385,10 @@ exports.reactivarAgencia = async (req, res, next) => {
     agencia.fecha_desactivacion = null;
     await agencia.save({ session });
 
+    await registrarCambioEstadoPersona(
+      agencia._id, 'Agencia', req.usuario.id, false, true, null, null, session
+    );
+
     const usuario = await Usuario.findById(agencia.usuario_id).session(session);
     if (usuario) {
       usuario.activo = true;
@@ -490,6 +496,10 @@ exports.deleteAgencia = async (req, res, next) => {
     agencia.fecha_desactivacion = new Date();
     await agencia.save({ session });
 
+    await registrarCambioEstadoPersona(
+      agencia._id, 'Agencia', req.usuario.id, true, false, motivo, mensajeTrim, session
+    );
+
     const usuario = await Usuario.findById(agencia.usuario_id).session(session);
     if (usuario) {
       usuario.activo = false;
@@ -536,6 +546,36 @@ exports.deleteAgencia = async (req, res, next) => {
         message: 'Agencia no encontrada.',
       });
     }
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/v1/agencias/:id/historial
+ * @desc    Historial de activaciones/desactivaciones de la agencia
+ * @access  Private (Mayorista)
+ */
+exports.getHistorialAgencia = async (req, res, next) => {
+  try {
+    const agencia = await Agencia.findOne({
+      _id: req.params.id,
+      mayorista_id: req.usuario.mayorista_id,
+    }).lean();
+
+    if (!agencia) {
+      return res.status(404).json({ success: false, message: 'Agencia no encontrada.' });
+    }
+
+    const historial = await HistorialEstadoPersona.find({
+      persona_id: agencia._id,
+      persona_tipo: 'Agencia',
+    })
+      .populate('usuario_id', 'email rol')
+      .sort({ created_at: -1 })
+      .lean();
+
+    res.status(200).json({ success: true, data: historial });
+  } catch (error) {
     next(error);
   }
 };

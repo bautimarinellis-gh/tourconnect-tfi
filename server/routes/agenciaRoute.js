@@ -9,6 +9,7 @@ const {
   deleteAgencia,
   verificarDesactivacion,
   reactivarAgencia,
+  getHistorialAgencia,
 } = require('../controllers/agenciaController');
 
 const {
@@ -35,6 +36,7 @@ router.route('/')
 
 router.get('/:id/verificar-desactivacion', verificarDesactivacion);
 router.patch('/:id/reactivar', reactivarAgencia);
+router.get('/:id/historial', getHistorialAgencia);
 
 router.route('/:id')
   .get(getAgencia)
