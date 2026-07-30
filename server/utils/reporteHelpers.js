@@ -30,14 +30,9 @@ function lookupCotizacionStages(cotMatch = {}) {
   return stages;
 }
 
-function matchReservaBase(extra = {}) {
-  return { estado: { $ne: 'cancelada' }, ...extra };
-}
-
 module.exports = {
   cotizacionCollection,
   productoCollection,
   agenciaCollection,
   lookupCotizacionStages,
-  matchReservaBase,
 };

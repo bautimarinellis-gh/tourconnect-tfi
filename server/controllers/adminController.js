@@ -43,7 +43,7 @@ exports.getMayoristas = async (req, res, next) => {
  * @access  Private/Admin
  */
 exports.crearMayorista = async (req, res, next) => {
-  const { nombre, razon_social, telefono, cuit, plan_suscripcion, email, nombre_usuario, password } = req.body;
+  const { nombre, razon_social, telefono, cuit, plan_suscripcion, email, password } = req.body;
   const planSuscripcion = plan_suscripcion || 'Starter';
 
   const session = await mongoose.startSession();
