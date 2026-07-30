@@ -86,7 +86,7 @@ export const AgenciaCotizaciones = () => {
     setCancelLoading(true);
     setCancelError('');
     try {
-      await cotizacionService.cancelar(cancelTarget._id);
+      await cotizacionService.cancelar(cancelTarget._id, cancelMotivo.trim());
       setIsCancelModalOpen(false);
       setCancelTarget(null);
       setCancelMotivo('');

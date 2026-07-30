@@ -74,7 +74,7 @@ export const AdminMayoristas = () => {
   const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
   const [activarPassword, setActivarPassword] = useState('');
   const [formData, setFormData] = useState({
-    nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: ''
+    nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', telefono: '', admin_email: ''
   });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -126,11 +126,10 @@ export const AdminMayoristas = () => {
         cuit: formData.cuit,
         plan_suscripcion: formData.plan_suscripcion,
         email: formData.admin_email,
-        nombre_usuario: formData.admin_nombre || formData.admin_email.split('@')[0],
       };
       await mayoristaService.create(payload);
       setIsModalOpen(false);
-      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '' });
+      setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', telefono: '', admin_email: '' });
       fetchMayoristas();
       toast.success('Mayorista creado. Se le envió un email de invitación para configurar su contraseña.');
     } catch (err) {
@@ -337,7 +336,7 @@ export const AdminMayoristas = () => {
                         <div style={{ fontWeight: 500 }}>{m.nombre}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap', marginTop: '0.125rem' }}>
                           <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>
-                            {m.usuario_id?.email ?? m.email_contacto ?? '-'}
+                            {m.usuario_id?.email ?? '-'}
                           </span>
                           {sinAcceso && (
                             <Badge variant="warning" style={{ fontSize: '0.65rem' }}>Sin acceso</Badge>
@@ -394,13 +393,9 @@ export const AdminMayoristas = () => {
           <Input label="CUIT *" value={formData.cuit} onChange={e => setFormData({ ...formData, cuit: formatCuit(e.target.value) })} placeholder="20-12345678-9" maxLength={13} />
           <SubscriptionPlanSelect label="Plan de suscripción" value={formData.plan_suscripcion} onChange={e => setFormData({ ...formData, plan_suscripcion: e.target.value })} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input label="Email de Contacto" type="email" value={formData.email_contacto} onChange={e => setFormData({ ...formData, email_contacto: e.target.value })} />
-          <Input label="Teléfono" value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
-        </div>
+        <Input label="Teléfono" value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
 
         <h4 style={{ margin: '1.5rem 0 1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Usuario Administrador</h4>
-        <Input label="Nombre del Administrador *" value={formData.admin_nombre} onChange={e => setFormData({ ...formData, admin_nombre: e.target.value })} />
         <Input label="Email del Administrador (Login) *" type="email" value={formData.admin_email} onChange={e => setFormData({ ...formData, admin_email: e.target.value })} />
         <Alert variant="info">
           Se le enviará un email a esta dirección con un link para que configure su propia contraseña.

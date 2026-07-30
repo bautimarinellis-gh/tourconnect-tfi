@@ -290,6 +290,18 @@ exports.cancelarCotizacion = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { agencia_id } = req.usuario;
+    const { motivo_cancelacion } = req.body;
+
+    const motivoTrim =
+      typeof motivo_cancelacion === 'string' ? motivo_cancelacion.trim() : '';
+
+    if (motivoTrim.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'El motivo de cancelación no puede superar los 500 caracteres.',
+      });
+    }
+
     const cotizacion = await Cotizacion.findById(id);
 
     if (!cotizacion) {
@@ -315,7 +327,7 @@ exports.cancelarCotizacion = async (req, res, next) => {
 
     const actualizada = await Cotizacion.findOneAndUpdate(
       { _id: id, estado: 'pendiente' },
-      { $set: { estado: 'cancelada' } },
+      { $set: { estado: 'cancelada', motivo_cancelacion: motivoTrim || null } },
       { new: true }
     );
 
@@ -331,6 +343,7 @@ exports.cancelarCotizacion = async (req, res, next) => {
       accion: 'COTIZACION_CANCELADA',
       entidad_afectada: 'Cotizacion',
       entidad_id: actualizada._id,
+      detalle: motivoTrim ? { motivo_cancelacion: motivoTrim } : null,
     });
 
     res.status(200).json({
