@@ -70,20 +70,20 @@
 
 ## Quitar
 
-- [ ] **`server/utils/testModule3.js`** — script huérfano que al ejecutarse se conecta a Mongo y crea un mayorista de prueba; no lo importa nadie. — **alta**
-- [ ] **`client/remove-bg.mjs`** — script one-off para el logo; importa `@napi-rs/canvas`, que ni siquiera está en `package.json`. — **media**
-- [ ] **`confirmarCotizacion` / `rechazarCotizacion` + rutas `PUT /:id/confirmar` y `PUT /:id/rechazar`** — `server/controllers/cotizacionController.js`, `server/routes/cotizacionRoute.js` — duplican exactamente `PATCH /:id/estado`, que es lo único que usa el frontend. — **media**
-- [ ] **`getReservasPorMes` y `getIngresosPorAgencia` + rutas `/reportes/reservas` y `/reportes/ingresos/agencias`** — `server/controllers/reporteController.js` — ninguna página los consume; `reporteService.getReservasPorMes` tampoco se usa. — **media**
-- [ ] **Los tres wrappers idénticos de auditoría** — `client/src/pages/{admin,mayorista,agencia}/Auditoria.jsx` — los tres son `<AuditoriaPage title="Mi actividad" />`; una sola ruta compartida alcanza. — **media**
-- [ ] **Campos muertos del form de producto** — `client/src/pages/mayorista/Productos.jsx` — `hotel_ciudad` y `dias_antelacion`: se editan en la UI, `buildPayload` no los envía y el modelo `Producto` no los tiene. — **media**
-- [ ] **Campos muertos del form de agencia** — `client/src/pages/mayorista/Agencias.jsx` — `email_contacto` nunca se envía; `admin_nombre` viaja como `nombre_usuario`, que el backend destructura y descarta. — **media**
-- [ ] **`datos_extra` y `cancelMotivo`** — `client/src/pages/agencia/Cotizaciones.jsx` — se recolectan (incluso con parseo de JSON) y el backend los ignora por completo. — **media**
-- [ ] **`nombre_usuario` en `crearMayorista` y `createAgencia`** — `server/controllers/adminController.js:46`, `agenciaController.js:57` — destructurado y nunca usado. — **baja**
-- [ ] **`POST /reservas` (`createReserva` sin id en URL)** — `server/routes/reservaRoute.js` — el cliente solo usa `POST /reservas/cotizacion/:cotizacionId`. — **baja**
-- [ ] **`GET /reservas/:id/historial`** — `server/routes/reservaRoute.js` — el endpoint de detalle ya devuelve el historial embebido; sin consumidor. — **baja**
-- [ ] **`reporteHelpers.matchReservaBase`** — `server/utils/reporteHelpers.js:33` — definido y exportado, nunca importado. — **baja**
-- [ ] **`productoService.getById` y `cotizacionService.getById`** — `client/src/services/` — métodos sin consumidor (y con ellos queda huérfano `GET /productos/:id`). — **baja**
-- [ ] **`client/README.md`** — sigue siendo la plantilla por defecto de Vite. — **baja**
+- [x] **`server/utils/testModule3.js`** — script huérfano que al ejecutarse se conecta a Mongo y crea un mayorista de prueba; no lo importa nadie. — **alta**
+- [x] **`client/remove-bg.mjs`** — script one-off para el logo; importa `@napi-rs/canvas`, que ni siquiera está en `package.json`. — **media**
+- [x] **`confirmarCotizacion` / `rechazarCotizacion` + rutas `PUT /:id/confirmar` y `PUT /:id/rechazar`** — `server/controllers/cotizacionController.js`, `server/routes/cotizacionRoute.js` — duplican exactamente `PATCH /:id/estado`, que es lo único que usa el frontend. — **media**
+- [x] **`getReservasPorMes` y `getIngresosPorAgencia` + rutas `/reportes/reservas` y `/reportes/ingresos/agencias`** — `server/controllers/reporteController.js` — ninguna página los consume; `reporteService.getReservasPorMes` tampoco se usa. — **media**
+- [x] **Los tres wrappers idénticos de auditoría** — `client/src/pages/{admin,mayorista,agencia}/Auditoria.jsx` — los tres son `<AuditoriaPage title="Mi actividad" />`; una sola ruta compartida alcanza. — **media**
+- [x] **Campos muertos del form de producto** — `client/src/pages/mayorista/Productos.jsx` — `hotel_ciudad` y `dias_antelacion`: se editan en la UI, `buildPayload` no los envía y el modelo `Producto` no los tiene. — **media**
+- [x] **Campos muertos del form de agencia** — `client/src/pages/mayorista/Agencias.jsx` — `email_contacto` nunca se envía; `admin_nombre` viaja como `nombre_usuario`, que el backend destructura y descarta. — **media**
+- [x] **`datos_extra` y `cancelMotivo`** — `client/src/pages/agencia/Cotizaciones.jsx` — se recolectan (incluso con parseo de JSON) y el backend los ignora por completo. — **media**
+- [x] **`nombre_usuario` en `crearMayorista` y `createAgencia`** — `server/controllers/adminController.js:46`, `agenciaController.js:57` — destructurado y nunca usado. — **baja**
+- [x] **`POST /reservas` (`createReserva` sin id en URL)** — `server/routes/reservaRoute.js` — el cliente solo usa `POST /reservas/cotizacion/:cotizacionId`. — **baja**
+- [x] **`GET /reservas/:id/historial`** — `server/routes/reservaRoute.js` — el endpoint de detalle ya devuelve el historial embebido; sin consumidor. — **baja**
+- [x] **`reporteHelpers.matchReservaBase`** — `server/utils/reporteHelpers.js:33` — definido y exportado, nunca importado. — **baja**
+- [x] **`productoService.getById` y `cotizacionService.getById`** — `client/src/services/` — métodos sin consumidor (y con ellos queda huérfano `GET /productos/:id`). — **baja**
+- [x] **`client/README.md`** — sigue siendo la plantilla por defecto de Vite. — **baja**
 
 ---
 
