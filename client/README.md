@@ -1,16 +1,39 @@
-# React + Vite
+# TourConnect — Cliente
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend de TourConnect (React 19 + Vite). Consume la API del backend que vive en `/server`.
 
-Currently, two official plugins are available:
+## Desarrollo
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Levanta Vite en `http://localhost:5173`. El dev server proxea `/api` → `http://localhost:3000`, así que **el backend tiene que estar corriendo en paralelo** (`cd ../server && npm run dev`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Dev server con HMR (puerto 5173) |
+| `npm run build` | Build de producción a `dist/` |
+| `npm run preview` | Sirve el build de `dist/` |
+| `npm run lint` | ESLint sobre todo el proyecto |
+| `npm test` | Tests unitarios con Vitest |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Estructura
+
+```
+src/
+  App.jsx        Router + guards de ruta por rol (ProtectedRoute)
+  context/       AuthContext (sesión), ThemeContext (dark/light)
+  services/      Wrappers de axios por dominio, sobre la instancia base de api.js
+  pages/         Una carpeta por rol: admin/, mayorista/, agencia/, auth/
+  components/
+    layout/      PageWrapper (shell con navbar)
+    shared/      Componentes de dominio compartidos entre roles
+    ui/          Primitivas reutilizables (Button, Modal, Table, Toast…)
+  utils/         Formatters, validaciones (CUIT, teléfono), rangos de fecha
+```
+
+La sesión se maneja con una cookie HttpOnly (`token`); en `localStorage` solo se guardan los metadatos del usuario bajo `tourconnect_user_v1`.
