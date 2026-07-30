@@ -7,8 +7,6 @@ const {
   createCotizacion,
   getCotizacionById,
   actualizarEstadoCotizacion,
-  confirmarCotizacion,
-  rechazarCotizacion,
   cancelarCotizacion,
 } = require('../controllers/cotizacionController');
 
@@ -29,14 +27,6 @@ router
 router
   .route('/:id/estado')
   .patch(role('mayorista'), actualizarEstadoCotizacion);
-
-router
-  .route('/:id/confirmar')
-  .put(role('mayorista'), confirmarCotizacion);
-
-router
-  .route('/:id/rechazar')
-  .put(role('mayorista'), rechazarCotizacion);
 
 router
   .route('/:id/cancelar')
