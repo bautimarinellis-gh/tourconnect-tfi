@@ -4,13 +4,11 @@ const role = require('../middlewares/roleMiddleware');
 
 const {
   getReservas,
-  createReserva,
   createReservaFromCotizacion,
   getReservaById,
   pagarReserva,
   cerrarReserva,
   cancelarReserva,
-  getHistorial,
   createPago,
   getPagos,
   informarPago,
@@ -28,11 +26,9 @@ router.use(auth);
 // ---------------------
 
 // GET  /api/v1/reservas     → Listar reservas (mayorista o agencia)
-// POST /api/v1/reservas     → Crear reserva desde cotización (solo agencia)
 router
   .route('/')
-  .get(role('mayorista', 'agencia'), getReservas)
-  .post(role('agencia'), createReserva);
+  .get(role('mayorista', 'agencia'), getReservas);
 
 // POST /api/v1/reservas/cotizacion/:cotizacionId → Crear reserva (ID en URL, solo agencia)
 router
@@ -58,15 +54,6 @@ router
 router
   .route('/:id/cancelar')
   .put(role('mayorista', 'agencia'), cancelarReserva);
-
-// ---------------------
-// Historial
-// ---------------------
-
-// GET /api/v1/reservas/:id/historial → Historial de estados (ambos roles)
-router
-  .route('/:id/historial')
-  .get(role('mayorista', 'agencia'), getHistorial);
 
 // ---------------------
 // Pagos

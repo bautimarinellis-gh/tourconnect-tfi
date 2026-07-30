@@ -65,6 +65,13 @@ export const CotizacionDetailModal = ({ isOpen, onClose, cotizacion, showAgencia
             </Alert>
           </div>
         )}
+        {cotizacion.motivo_cancelacion && (
+          <div style={{ marginTop: '0.25rem' }}>
+            <Alert variant="warning">
+              <strong>Motivo de cancelación:</strong> {cotizacion.motivo_cancelacion}
+            </Alert>
+          </div>
+        )}
       </div>
     )}
   </Modal>

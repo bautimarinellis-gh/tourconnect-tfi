@@ -52,6 +52,15 @@ const cotizacionSchema = new mongoose.Schema(
         return this.estado === 'rechazada';
       },
     },
+    // Opcional: lo escribe la agencia al cancelar su propia cotización.
+    // A diferencia de motivo_rechazo, no es obligatorio — cancelar una
+    // cotización propia no requiere justificarse ante nadie.
+    motivo_cancelacion: {
+      type: String,
+      trim: true,
+      maxlength: [500, 'El motivo no puede superar los 500 caracteres'],
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },

@@ -283,141 +283,6 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
   }
 };
 
-// @desc    Confirmar una cotización
-// @route   PUT /api/v1/cotizaciones/:id/confirmar
-// @access  Private (Solo Mayorista)
-exports.confirmarCotizacion = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { mayorista_id } = req.usuario;
-
-    const cotizacion = await Cotizacion.findById(id);
-
-    if (!cotizacion) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cotización no encontrada'
-      });
-    }
-
-    if (cotizacion.mayorista_id.toString() !== mayorista_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para modificar esta cotización'
-      });
-    }
-
-    if (cotizacion.estado !== 'pendiente') {
-      return res.status(400).json({
-        success: false,
-        message: 'Solo se puede confirmar una cotización en estado pendiente'
-      });
-    }
-
-    const cupo = await verificarCupoDisponible(cotizacion);
-    if (!cupo.ok) {
-      return res.status(400).json({ success: false, message: cupo.message });
-    }
-
-    const actualizada = await Cotizacion.findOneAndUpdate(
-      { _id: id, estado: 'pendiente' },
-      { $set: { estado: 'aprobada' } },
-      { new: true }
-    );
-
-    if (!actualizada) {
-      return res.status(409).json({
-        success: false,
-        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
-      });
-    }
-
-    registrarAuditoria({
-      req,
-      accion: 'COTIZACION_APROBADA',
-      entidad_afectada: 'Cotizacion',
-      entidad_id: actualizada._id,
-      detalle: { agencia_id: actualizada.agencia_id },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: actualizada
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Rechazar una cotización
-// @route   PUT /api/v1/cotizaciones/:id/rechazar
-// @access  Private (Solo Mayorista)
-exports.rechazarCotizacion = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { mayorista_id } = req.usuario;
-    const { motivo_rechazo } = req.body;
-
-    if (!motivo_rechazo) {
-      return res.status(400).json({
-        success: false,
-        message: 'El motivo de rechazo es obligatorio'
-      });
-    }
-
-    const cotizacion = await Cotizacion.findById(id);
-
-    if (!cotizacion) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cotización no encontrada'
-      });
-    }
-
-    if (cotizacion.mayorista_id.toString() !== mayorista_id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para modificar esta cotización'
-      });
-    }
-
-    if (cotizacion.estado !== 'pendiente') {
-      return res.status(400).json({
-        success: false,
-        message: 'Solo se puede rechazar una cotización en estado pendiente'
-      });
-    }
-
-    const actualizada = await Cotizacion.findOneAndUpdate(
-      { _id: id, estado: 'pendiente' },
-      { $set: { estado: 'rechazada', motivo_rechazo } },
-      { new: true }
-    );
-
-    if (!actualizada) {
-      return res.status(409).json({
-        success: false,
-        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
-      });
-    }
-
-    registrarAuditoria({
-      req,
-      accion: 'COTIZACION_RECHAZADA',
-      entidad_afectada: 'Cotizacion',
-      entidad_id: actualizada._id,
-      detalle: { motivo_rechazo, agencia_id: actualizada.agencia_id },
-    });
-
-    res.status(200).json({
-      success: true,
-      data: actualizada
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // @desc    Cancelar una cotización (por la agencia)
 // @route   PATCH /api/v1/cotizaciones/:id/cancelar
 // @access  Private (Solo Agencia)
@@ -425,6 +290,18 @@ exports.cancelarCotizacion = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { agencia_id } = req.usuario;
+    const { motivo_cancelacion } = req.body;
+
+    const motivoTrim =
+      typeof motivo_cancelacion === 'string' ? motivo_cancelacion.trim() : '';
+
+    if (motivoTrim.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'El motivo de cancelación no puede superar los 500 caracteres.',
+      });
+    }
+
     const cotizacion = await Cotizacion.findById(id);
 
     if (!cotizacion) {
@@ -450,7 +327,7 @@ exports.cancelarCotizacion = async (req, res, next) => {
 
     const actualizada = await Cotizacion.findOneAndUpdate(
       { _id: id, estado: 'pendiente' },
-      { $set: { estado: 'cancelada' } },
+      { $set: { estado: 'cancelada', motivo_cancelacion: motivoTrim || null } },
       { new: true }
     );
 
@@ -466,6 +343,7 @@ exports.cancelarCotizacion = async (req, res, next) => {
       accion: 'COTIZACION_CANCELADA',
       entidad_afectada: 'Cotizacion',
       entidad_id: actualizada._id,
+      detalle: motivoTrim ? { motivo_cancelacion: motivoTrim } : null,
     });
 
     res.status(200).json({

@@ -428,37 +428,6 @@ exports.cancelarReserva = async (req, res, next) => {
   }
 };
 
-exports.getHistorial = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE);
-
-    if (!reserva) {
-      return res.status(404).json({
-        success: false,
-        message: 'Reserva no encontrada',
-      });
-    }
-
-    const acceso = validarAccesoReserva(reserva, req.usuario);
-    if (!acceso.ok) {
-      return res.status(acceso.status).json({ success: false, message: acceso.message });
-    }
-
-    const historial = await HistorialEstadoReserva.find({ reserva_id: id })
-      .populate('usuario_id', 'email rol')
-      .sort({ created_at: 1 });
-
-    res.status(200).json({
-      success: true,
-      data: historial,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // =============================================
 // PAGOS
 // =============================================

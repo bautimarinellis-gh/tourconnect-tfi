@@ -171,7 +171,7 @@ export const MayoristaAgenciaDetalle = () => {
               </div>
               <div>
                 <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Email de Contacto</p>
-                <p style={{ fontWeight: 500 }}>{agencia.usuario_id?.email ?? agencia.email_contacto ?? '-'}</p>
+                <p style={{ fontWeight: 500 }}>{agencia.usuario_id?.email ?? '-'}</p>
               </div>
             </div>
           </CardBody>

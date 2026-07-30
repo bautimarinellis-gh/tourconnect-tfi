@@ -35,8 +35,7 @@ export const MayoristaAgencias = () => {
   // --- Crear ---
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
-    nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '',
-    admin_nombre: '', admin_email: ''
+    nombre: '', razon_social: '', cuit: '', telefono: '', admin_email: ''
   });
   const [createError, setCreateError] = useState('');
   const [createSaving, setCreateSaving] = useState(false);
@@ -106,11 +105,10 @@ export const MayoristaAgencias = () => {
         telefono: createForm.telefono || undefined,
         cuit: createForm.cuit,
         email: createForm.admin_email,
-        nombre_usuario: createForm.admin_nombre || createForm.admin_email?.split('@')[0],
       };
       await agenciaService.create(payload);
       setIsCreateModalOpen(false);
-      setCreateForm({ nombre: '', razon_social: '', cuit: '', email_contacto: '', telefono: '', admin_nombre: '', admin_email: '' });
+      setCreateForm({ nombre: '', razon_social: '', cuit: '', telefono: '', admin_email: '' });
       fetchAgencias();
       toast.success('Agencia creada. Se le envió un email de invitación para configurar su contraseña.');
     } catch (err) {
@@ -281,7 +279,7 @@ export const MayoristaAgencias = () => {
                   <TableCell>
                     <div style={{ fontWeight: 500 }}>{ag.nombre}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{ag.usuario_id?.email ?? ag.email_contacto ?? '-'}</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{ag.usuario_id?.email ?? '-'}</span>
                       {ag.usuario_id && ag.usuario_id.activo !== true && (
                         <Badge variant="warning" style={{ fontSize: '0.65rem' }}>Sin acceso</Badge>
                       )}
@@ -346,13 +344,9 @@ export const MayoristaAgencias = () => {
         <Input label="Nombre *" value={createForm.nombre} onChange={e => setCreateForm({ ...createForm, nombre: e.target.value })} />
         <Input label="Razón Social" value={createForm.razon_social} onChange={e => setCreateForm({ ...createForm, razon_social: e.target.value })} />
         <Input label="CUIT *" value={createForm.cuit} onChange={e => setCreateForm({ ...createForm, cuit: formatCuit(e.target.value) })} placeholder="20-12345678-9" maxLength={13} />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <Input label="Email de Contacto" type="email" value={createForm.email_contacto} onChange={e => setCreateForm({ ...createForm, email_contacto: e.target.value })} />
-          <Input label="Teléfono" value={createForm.telefono} onChange={e => setCreateForm({ ...createForm, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
-        </div>
+        <Input label="Teléfono" value={createForm.telefono} onChange={e => setCreateForm({ ...createForm, telefono: formatTelefono(e.target.value) })} placeholder="1122334455" />
 
         <h4 style={{ margin: '1.5rem 0 1rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Usuario Administrador</h4>
-        <Input label="Nombre" value={createForm.admin_nombre} onChange={e => setCreateForm({ ...createForm, admin_nombre: e.target.value })} />
         <Input label="Email de Login *" type="email" value={createForm.admin_email} onChange={e => setCreateForm({ ...createForm, admin_email: e.target.value })} />
         <Alert variant="info">
           Se le enviará un email a esta dirección con un link para que configure su propia contraseña.

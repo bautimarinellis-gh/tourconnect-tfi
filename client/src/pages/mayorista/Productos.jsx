@@ -22,9 +22,7 @@ const INITIAL_FORM = {
   precio_base: '',
   disponibilidad_desde: '',
   disponibilidad_hasta: '',
-  dias_antelacion: 1,
   // Hotel
-  hotel_ciudad: '',
   hotel_direccion: '',
   hotel_estrellas: 3,
   // Actividad
@@ -182,8 +180,6 @@ export const MayoristaProductos = () => {
       precio_base: p.precio_base ?? '',
       disponibilidad_desde: toDateInputValue(p.disponibilidad_desde),
       disponibilidad_hasta: toDateInputValue(p.disponibilidad_hasta),
-      dias_antelacion: p.dias_antelacion ?? 1,
-      hotel_ciudad: p.ciudad || '',
       hotel_direccion: p.direccion || '',
       hotel_estrellas: p.estrellas ?? 3,
       actividad_duracion: p.duracion_horas ?? 1,
@@ -428,10 +424,7 @@ export const MayoristaProductos = () => {
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
           {tipoProducto === 'hotel' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <Input label="Ciudad" value={formData.hotel_ciudad} onChange={e => set('hotel_ciudad', e.target.value)} />
-                <Input label="Dirección *" value={formData.hotel_direccion} onChange={e => set('hotel_direccion', e.target.value)} />
-              </div>
+              <Input label="Dirección *" value={formData.hotel_direccion} onChange={e => set('hotel_direccion', e.target.value)} />
               <NumberStepper label="Estrellas *" value={formData.hotel_estrellas} min={1} max={5} onChange={v => set('hotel_estrellas', v)} />
             </div>
           )}
@@ -541,10 +534,7 @@ export const MayoristaProductos = () => {
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
           {editTipo === 'hotel' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <Input label="Ciudad" value={editForm.hotel_ciudad} onChange={e => setEdit('hotel_ciudad', e.target.value)} />
-                <Input label="Dirección *" value={editForm.hotel_direccion} onChange={e => setEdit('hotel_direccion', e.target.value)} />
-              </div>
+              <Input label="Dirección *" value={editForm.hotel_direccion} onChange={e => setEdit('hotel_direccion', e.target.value)} />
               <NumberStepper label="Estrellas *" value={editForm.hotel_estrellas} min={1} max={5} onChange={v => setEdit('hotel_estrellas', v)} />
             </div>
           )}

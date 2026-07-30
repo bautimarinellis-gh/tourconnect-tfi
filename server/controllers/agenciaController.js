@@ -54,7 +54,7 @@ exports.createAgencia = async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const { nombre, razon_social, telefono, cuit, email, nombre_usuario, password } = req.body;
+    const { nombre, razon_social, telefono, cuit, email, password } = req.body;
     const mayoristaId = req.usuario.mayorista_id;
 
     const mayorista = await Mayorista.findById(mayoristaId).session(session);
