@@ -43,7 +43,6 @@ export const AgenciaCotizaciones = () => {
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedCotizacion, setSelectedCotizacion] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [datosExtra, setDatosExtra] = useState('');
   const [bookingError, setBookingError] = useState('');
 
   // Modal: Cancelar cotización
@@ -73,18 +72,7 @@ export const AgenciaCotizaciones = () => {
     setActionLoading(true);
     setBookingError('');
     try {
-      let extraParsed = {};
-      if (datosExtra && datosExtra.trim() !== '') {
-        try {
-          extraParsed = JSON.parse(datosExtra);
-        } catch(e) {
-          extraParsed = { notas_agencia: datosExtra };
-        }
-      }
-
-      const newReserva = await reservaService.createFromQuote(selectedCotizacion._id, {
-        datos_extra: extraParsed,
-      });
+      const newReserva = await reservaService.createFromQuote(selectedCotizacion._id);
       setIsBookingModalOpen(false);
       navigate(`/agencia/reservas/${newReserva.data._id}`);
     } catch (err) {
@@ -229,11 +217,11 @@ export const AgenciaCotizaciones = () => {
       {/* Modal: Convertir en Reserva */}
       <Modal
         isOpen={isBookingModalOpen}
-        onClose={() => { setIsBookingModalOpen(false); setBookingError(''); setDatosExtra(''); }}
+        onClose={() => { setIsBookingModalOpen(false); setBookingError(''); }}
         title="Convertir en Reserva"
         footer={
           <>
-            <Button variant="ghost" onClick={() => { setIsBookingModalOpen(false); setBookingError(''); setDatosExtra(''); }}>
+            <Button variant="ghost" onClick={() => { setIsBookingModalOpen(false); setBookingError(''); }}>
               Cancelar
             </Button>
             <Button variant="success" onClick={handleCreateBooking} isLoading={actionLoading}>
@@ -252,12 +240,6 @@ export const AgenciaCotizaciones = () => {
               <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: '1.25rem' }}>{formatCurrency(selectedCotizacion?.precio_total)}</span>
             </div>
           </div>
-          <Input
-            label="Notas adicionales (opcional)"
-            value={datosExtra}
-            onChange={e => setDatosExtra(e.target.value)}
-            placeholder="Requerimientos especiales, preferencias..."
-          />
         </div>
       </Modal>
 
