@@ -5,6 +5,7 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { AssistantChat } from '../../components/shared/AssistantChat';
 import reporteService from '../../services/reporteService';
+import { formatCurrency } from '../../utils/formatters';
 import './dashboard.css';
 
 export const MayoristaDashboard = () => {
@@ -29,7 +30,7 @@ export const MayoristaDashboard = () => {
 
   const kpis = [
     { label: 'Reservas Activas', value: data?.reservas_activas || 0, icon: <Calendar size={18} />, link: '/mayorista/reservas' },
-    { label: 'Ingresos del Mes', value: `$${(data?.ingresos_mes || 0).toLocaleString('es-AR')}`, icon: <DollarSign size={18} />, link: '/mayorista/reportes' },
+    { label: 'Ingresos del Mes', value: formatCurrency(data?.ingresos_mes || 0), icon: <DollarSign size={18} />, link: '/mayorista/reportes' },
     { label: 'Agencias Activas', value: data?.agencias_activas || 0, icon: <Users size={18} />, link: '/mayorista/agencias' },
     { label: 'Cotizaciones Pendientes', value: data?.cotizaciones_pendientes || 0, icon: <FileText size={18} />, link: '/mayorista/cotizaciones' },
     { label: 'Pagos por Confirmar', value: data?.pagos_por_confirmar || 0, icon: <CheckCircle size={18} />, link: '/mayorista/reservas?estado=pago_informado' },

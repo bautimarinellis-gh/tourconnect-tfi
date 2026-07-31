@@ -553,8 +553,8 @@ exports.getAgenciaDashboard = async (req, res, next) => {
 
 const PERIODO_LABEL = { dia: 'Día', mes: 'Mes', anio: 'Año' };
 
-const formatMoney = (value) =>
-  `$${Number(value || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const moneyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const formatMoney = (value) => moneyFormatter.format(Number(value) || 0);
 
 const slug = (str) =>
   String(str || '')

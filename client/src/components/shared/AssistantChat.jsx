@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Sparkles, ChevronRight, X } from 'lucide-react';
 import assistantService from '../../services/assistantService';
+import { formatCurrency } from '../../utils/formatters';
 import './assistant.css';
 
 // ─── Suggestions predefinidas ──────────────────────────────────────
@@ -32,7 +33,7 @@ function ResultTable({ data, columns, columnLabels }) {
               {columns.map((col) => (
                 <td key={col}>
                   {typeof row[col] === 'number' && col === 'facturacion'
-                    ? `$${Number(row[col]).toLocaleString('es-AR')}`
+                    ? formatCurrency(row[col])
                     : row[col] ?? '-'}
                 </td>
               ))}

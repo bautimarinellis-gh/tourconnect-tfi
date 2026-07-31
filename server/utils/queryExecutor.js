@@ -152,7 +152,7 @@ async function handleTopAgencias(params, mayoristaId) {
   return {
     data,
     summary: `Top ${data.length} agencias en ${timeRangeLabel(params)}. `
-      + `${totalReservas} reservas, $${totalFacturado.toLocaleString('es-AR')} facturados.`,
+      + `${totalReservas} reservas, $${totalFacturado.toLocaleString('en-US')} facturados.`,
     columns: ['agencia', 'reservas', 'facturacion'],
     columnLabels: { agencia: 'Agencia', reservas: 'Reservas', facturacion: 'Facturación ($)' },
   };
@@ -302,9 +302,9 @@ async function handleIngresosPeriodo(params, mayoristaId) {
 
   return {
     data: [{ label: 'Total ingresos', valor: totalIngresos, reservas: totalReservas }],
-    summary: `$${totalIngresos.toLocaleString('es-AR')} en ingresos durante ${timeRangeLabel(params)} (${totalReservas} reservas confirmadas).`,
+    summary: `$${totalIngresos.toLocaleString('en-US')} en ingresos durante ${timeRangeLabel(params)} (${totalReservas} reservas confirmadas).`,
     stat: {
-      value: `$${totalIngresos.toLocaleString('es-AR')}`,
+      value: `$${totalIngresos.toLocaleString('en-US')}`,
       label: `Ingresos en ${timeRangeLabel(params)}`,
       sub: `${totalReservas} reservas confirmadas`,
     },
