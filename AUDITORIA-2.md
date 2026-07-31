@@ -24,47 +24,47 @@
 
 ### Auditoría (logs que se pierden en silencio)
 
-- [ ] **`MAYORISTA_REACTIVADO` y `CAMBIO_PASSWORD` no están en el enum `ACCIONES`** — `server/models/AuditLog.js` vs `adminController.js:485` y `authController.js:599` — la validación de Mongoose falla, `auditService` atrapa el error y solo hace `console.error`: los eventos nunca se guardan. — **alta**
-- [ ] **`AGENCIA_REACTIVADA` y `USUARIO_REACTIVADO` no están en `CATEGORIA_POR_ACCION`** — `server/utils/auditService.js` — `categoria` queda `undefined`, el campo es `required`, y el log se descarta igual que el punto anterior. — **alta**
-- [ ] **`activarUsuarioMayorista` no registra auditoría** — `server/controllers/adminController.js:223` — el admin fija la contraseña de la cuenta de otro usuario y no queda ninguna traza. — **alta**
-- [ ] **`REPORTE_EXPORTADO` falta en las constantes del frontend** — `client/src/utils/auditoriaConstants.js` — el backend lo escribe, pero no tiene label (se muestra la clave cruda) ni aparece en el filtro del mayorista. — **media**
-- [ ] **`updateAgencia` y `updatePerfil` no auditan** — `agenciaController.js:227`, `mayoristaController.js:32` — inconsistente con el resto de mutaciones de negocio. — **media**
+- [x] **`MAYORISTA_REACTIVADO` y `CAMBIO_PASSWORD` no están en el enum `ACCIONES`** — `server/models/AuditLog.js` vs `adminController.js:485` y `authController.js:599` — la validación de Mongoose falla, `auditService` atrapa el error y solo hace `console.error`: los eventos nunca se guardan. — **alta**
+- [x] **`AGENCIA_REACTIVADA` y `USUARIO_REACTIVADO` no están en `CATEGORIA_POR_ACCION`** — `server/utils/auditService.js` — `categoria` queda `undefined`, el campo es `required`, y el log se descarta igual que el punto anterior. — **alta**
+- [x] **`activarUsuarioMayorista` no registra auditoría** — `server/controllers/adminController.js:223` — el admin fija la contraseña de la cuenta de otro usuario y no queda ninguna traza. — **alta**
+- [x] **`REPORTE_EXPORTADO` falta en las constantes del frontend** — `client/src/utils/auditoriaConstants.js` — el backend lo escribe, pero no tiene label (se muestra la clave cruda) ni aparece en el filtro del mayorista. — **media**
+- [x] **`updateAgencia` y `updatePerfil` no auditan** — `agenciaController.js:227`, `mayoristaController.js:32` — inconsistente con el resto de mutaciones de negocio. — **media**
 
 ### Flujo de pagos
 
-- [ ] **`rechazarPago` borra el registro de pago** — `server/controllers/reservaController.js:749` — `Pago.deleteOne({ reserva_id })` destruye la evidencia del pago rechazado y, sin `sort`, borra uno arbitrario si hay varios. Debería marcarse como rechazado, no eliminarse. — **alta**
-- [ ] **El pago manual del mayorista no valida el monto** — `reservaController.createPago` + `client/src/pages/mayorista/ReservaDetalle.jsx:90` — `createPago` solo exige `monto > 0`; luego `pagarReserva` saltea su chequeo de monto porque `pagosExistentes !== 0`. Resultado: se puede marcar `pagada` una reserva con un pago parcial. — **alta**
-- [ ] **`createPago` no registra historial de estado ni auditoría** — `server/controllers/reservaController.js:466` — es el único camino de pago que no deja rastro en `HistorialEstadoReserva` ni en `AuditLog`. — **alta**
-- [ ] **Registrar pago son dos llamadas no atómicas desde el cliente** — `client/src/pages/mayorista/ReservaDetalle.jsx:90-96` — `addPayment()` seguido de `pagar()`; si la segunda falla queda un `Pago` huérfano con la reserva en `pendiente_pago`. — **media**
+- [x] **`rechazarPago` borra el registro de pago** — `server/controllers/reservaController.js:749` — `Pago.deleteOne({ reserva_id })` destruye la evidencia del pago rechazado y, sin `sort`, borra uno arbitrario si hay varios. Debería marcarse como rechazado, no eliminarse. — **alta**
+- [x] **El pago manual del mayorista no valida el monto** — `reservaController.createPago` + `client/src/pages/mayorista/ReservaDetalle.jsx:90` — `createPago` solo exige `monto > 0`; luego `pagarReserva` saltea su chequeo de monto porque `pagosExistentes !== 0`. Resultado: se puede marcar `pagada` una reserva con un pago parcial. — **alta**
+- [x] **`createPago` no registra historial de estado ni auditoría** — `server/controllers/reservaController.js:466` — es el único camino de pago que no deja rastro en `HistorialEstadoReserva` ni en `AuditLog`. — **alta**
+- [ ] **Registrar pago son dos llamadas no atómicas desde el cliente** — `client/src/pages/mayorista/ReservaDetalle.jsx:90-96` — `addPayment()` seguido de `pagar()`; si la segunda falla queda un `Pago` huérfano con la reserva en `pendiente_pago`. — **media** — *dejado pendiente a propósito ([[PLAN-ARREGLAR]] 8.4): con el resto de la Fase 8 aplicado, el peor caso pasa de "se puede marcar pagada con el monto equivocado" (corregido) a "puede quedar un Pago sin aplicar si el segundo request falla" (raro, recuperable con un reintento). Resolverlo de raíz cambia el contrato de la API.*
 
 ### Backend
 
-- [ ] **`catch` que nunca matchea en agencia-producto** — `server/controllers/agenciaProductoController.js` (4 ocurrencias) — `error.message.includes('No encontrada')` con N mayúscula, pero el mensaje lanzado es `'Agencia no encontrada o no pertenece a este mayorista'`: devuelve 500 en vez de 404. — **media**
-- [ ] **`deleteProducto` cuenta un campo inexistente** — `server/controllers/productosController.js:328` — `Reserva.countDocuments({ producto_id: id })`; el modelo `Reserva` no tiene `producto_id` (se llega vía `cotizacion_id`), así que ese contador siempre da 0. — **media**
-- [ ] **`productosController` responde 500 con `error.message`** — `server/controllers/productosController.js` (5 handlers) — no usa `next(error)`, se saltea el error handler global y filtra detalles internos al cliente. — **media**
-- [ ] **N+1 en el listado de agencias** — `server/controllers/agenciaController.js:30` — un `countDocuments` por agencia dentro del `for`; reemplazar por un `aggregate` con `$group`. — **media**
-- [ ] **`/auth/set-password` sin rate limit** — `server/routes/authRoute.js` — es el único endpoint público del flujo de credenciales sin limiter; el `invite_token` es fuerza-bruteable en teoría. — **media**
-- [ ] **Falta `app.set('trust proxy', ...)`** — `server/index.js` — `express-rate-limit` y `auditService.getIp()` leen `X-Forwarded-For` sin que Express lo valide: la IP auditada es spoofeable y el rate limit se puede evadir. — **media**
-- [ ] **`contarOperacionesActivas` duplicada** — `adminController.js:254` y `agenciaController.js:259` — misma aggregation con distinto scope; unificar en `utils/`. — **baja**
-- [ ] **`createAgencia` manda el email antes del commit** — `server/controllers/agenciaController.js:139` — si la transacción aborta después, ya se envió la invitación de una agencia que no existe. — **baja**
-- [ ] **72h de vencimiento hardcodeadas en dos lugares** — `server/utils/cotizacionVencimiento.js:100` y `client/src/pages/agencia/Cotizaciones.jsx:20` — si cambia una, la UI miente. — **baja**
+- [x] **`catch` que nunca matchea en agencia-producto** — `server/controllers/agenciaProductoController.js` (eran 5 ocurrencias, no 4) — `error.message.includes('No encontrada')` con N mayúscula, pero el mensaje lanzado es `'Agencia no encontrada o no pertenece a este mayorista'`: devuelve 500 en vez de 404. — **media**
+- [x] **`deleteProducto` cuenta un campo inexistente** — `server/controllers/productosController.js:328` — `Reserva.countDocuments({ producto_id: id })`; el modelo `Reserva` no tiene `producto_id` (se llega vía `cotizacion_id`), así que ese contador siempre da 0. — **media**
+- [x] **`productosController` responde 500 con `error.message`** — `server/controllers/productosController.js` (eran 6 handlers, no 5 — `checkProductoAgencias` ni siquiera tenía `next` en su firma) — no usa `next(error)`, se saltea el error handler global y filtra detalles internos al cliente. — **media**
+- [x] **N+1 en el listado de agencias** — `server/controllers/agenciaController.js:30` — un `countDocuments` por agencia dentro del `for`; reemplazar por un `aggregate` con `$group`. — **media**
+- [x] **`/auth/set-password` sin rate limit** — `server/routes/authRoute.js` — es el único endpoint público del flujo de credenciales sin limiter; el `invite_token` es fuerza-bruteable en teoría. — **media**
+- [x] **Falta `app.set('trust proxy', ...)`** — `server/index.js` — `express-rate-limit` y `auditService.getIp()` leen `X-Forwarded-For` sin que Express lo valide: la IP auditada es spoofeable y el rate limit se puede evadir. — **media**
+- [x] **`contarOperacionesActivas` duplicada** — `adminController.js:254` y `agenciaController.js:259` — misma aggregation con distinto scope; unificar en `utils/`. — **baja**
+- [x] **`createAgencia` manda el email antes del commit** — `server/controllers/agenciaController.js:139` — si la transacción aborta después, ya se envió la invitación de una agencia que no existe. — **baja**
+- [x] **72h de vencimiento hardcodeadas en dos lugares** — `server/utils/cotizacionVencimiento.js:100` y `client/src/pages/agencia/Cotizaciones.jsx:20` — si cambia una, la UI miente. — **baja**
 
 ### Frontend
 
-- [ ] **`Toast.jsx` reasigna una variable de módulo durante el render** — `client/src/components/ui/Toast.jsx:37` — `_addToast = useCallback(...)` es un side-effect en render; ESLint lo marca como error de `react-hooks/globals`. — **media**
-- [ ] **`eslint-disable` de una regla que no existe** — `client/src/components/shared/AssistantChat.jsx:31` — `react-doctor/no-array-index-as-key` no está instalada, así que `npm run lint` falla con error. — **media**
-- [ ] **`AuthContext.loading` es siempre `false`** — `client/src/context/AuthContext.jsx:41` — las ramas `if (loading)` de `ProtectedRoute` y `RootRedirect` son código muerto, y nunca se revalida la sesión con `/auth/me` al montar: el usuario se ve logueado hasta que un request devuelve 401. — **media**
-- [ ] **Formato de moneda inconsistente** — `client/src/utils/formatters.js` usa `en-US`/`USD`, los dashboards usan `toLocaleString('es-AR')`, y `Productos.jsx` rotula "Precio Base (USD)" en un sistema con CUIT argentino. — **media**
-- [ ] **El modal de eliminar producto miente** — `client/src/pages/mayorista/Productos.jsx` — dice "Esta acción lo marcará como inactivo", pero `deleteProducto` hace hard delete + borrado en cascada de `AgenciaProducto`. — **media**
-- [ ] **`no-unused-vars` en el catch** — `client/src/pages/agencia/Cotizaciones.jsx:80` — `catch(e)` sin usar `e`. — **baja**
-- [ ] **`logout` sin `navigate` en las deps del `useCallback`** — `client/src/context/AuthContext.jsx:38` — warning de `exhaustive-deps`. — **baja**
-- [ ] **Las tres páginas de Auditoría se titulan "Mi actividad"** — `client/src/pages/{admin,mayorista,agencia}/Auditoria.jsx` — no distinguen rol ni scope. — **baja**
-- [ ] **Dashboard mayorista: kicker desalineado con los datos** — `client/src/pages/mayorista/Dashboard.jsx` — dice "Ultimos 30 dias" (además sin tildes) pero `getMayoristaDashboard` calcula sobre el mes calendario en curso. — **baja**
+- [x] **`Toast.jsx` reasigna una variable de módulo durante el render** — `client/src/components/ui/Toast.jsx:37` — `_addToast = useCallback(...)` es un side-effect en render; ESLint lo marca como error de `react-hooks/globals`. — **media**
+- [x] **`eslint-disable` de una regla que no existe** — `client/src/components/shared/AssistantChat.jsx:31` — `react-doctor/no-array-index-as-key` no está instalada, así que `npm run lint` falla con error. — **media**
+- [x] **`AuthContext.loading` es siempre `false`** — `client/src/context/AuthContext.jsx:41` — las ramas `if (loading)` de `ProtectedRoute` y `RootRedirect` son código muerto, y nunca se revalida la sesión con `/auth/me` al montar: el usuario se ve logueado hasta que un request devuelve 401. — **media** — *implementado con cuidado explícito de no introducir un loop de recarga en `/login`; pendiente de tu verificación manual en navegador (ver checklist en el commit).*
+- [x] **Formato de moneda inconsistente** — `client/src/utils/formatters.js` usa `en-US`/`USD`, los dashboards usan `toLocaleString('es-AR')`, y `Productos.jsx` rotula "Precio Base (USD)" en un sistema con CUIT argentino. — **media**
+- [x] **El modal de eliminar producto miente** — `client/src/pages/mayorista/Productos.jsx` — dice "Esta acción lo marcará como inactivo", pero `deleteProducto` hace hard delete + borrado en cascada de `AgenciaProducto`. — **media**
+- [x] **`no-unused-vars` en el catch** — `client/src/pages/agencia/Cotizaciones.jsx:80` — `catch(e)` sin usar `e`. — **baja** — *ya resuelto como efecto colateral de [[PLAN-QUITAR]] (se eliminó el bloque `datos_extra` que lo contenía).*
+- [x] **`logout` sin `navigate` en las deps del `useCallback`** — `client/src/context/AuthContext.jsx:38` — warning de `exhaustive-deps`. — **baja**
+- [x] **Las tres páginas de Auditoría se titulan "Mi actividad"** — `client/src/pages/{admin,mayorista,agencia}/Auditoria.jsx` — no distinguen rol ni scope. — **baja**
+- [x] **Dashboard mayorista: kicker desalineado con los datos** — `client/src/pages/mayorista/Dashboard.jsx` — dice "Ultimos 30 dias" (además sin tildes) pero `getMayoristaDashboard` calcula sobre el mes calendario en curso. — **baja**
 
 ### Documentación
 
-- [ ] **`CLAUDE.md` referencia `seeds/admin.seed.js`** — el archivo real es `server/seeds/adminSeed.js`. También omite el estado `cancelada` de `Cotizacion`. — **baja**
-- [ ] **`AGENTS_RULES.md` referencia un `AGENTS.md` inexistente** — el contexto de proyecto vive en `CLAUDE.md`. — **baja**
+- [x] **`CLAUDE.md` referencia `seeds/admin.seed.js`** — el archivo real es `server/seeds/adminSeed.js`. También omite el estado `cancelada` de `Cotizacion`. — **baja**
+- [x] **`AGENTS_RULES.md` referencia un `AGENTS.md` inexistente** — el contexto de proyecto vive en `CLAUDE.md`. — **baja**
 
 ---
 
