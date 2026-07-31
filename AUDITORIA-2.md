@@ -32,10 +32,10 @@
 
 ### Flujo de pagos
 
-- [x] **`rechazarPago` borra el registro de pago** — `server/controllers/reservaController.js:749` — `Pago.deleteOne({ reserva_id })` destruye la evidencia del pago rechazado y, sin `sort`, borra uno arbitrario si hay varios. Debería marcarse como rechazado, no eliminarse. — **alta**
-- [x] **El pago manual del mayorista no valida el monto** — `reservaController.createPago` + `client/src/pages/mayorista/ReservaDetalle.jsx:90` — `createPago` solo exige `monto > 0`; luego `pagarReserva` saltea su chequeo de monto porque `pagosExistentes !== 0`. Resultado: se puede marcar `pagada` una reserva con un pago parcial. — **alta**
-- [x] **`createPago` no registra historial de estado ni auditoría** — `server/controllers/reservaController.js:466` — es el único camino de pago que no deja rastro en `HistorialEstadoReserva` ni en `AuditLog`. — **alta**
-- [ ] **Registrar pago son dos llamadas no atómicas desde el cliente** — `client/src/pages/mayorista/ReservaDetalle.jsx:90-96` — `addPayment()` seguido de `pagar()`; si la segunda falla queda un `Pago` huérfano con la reserva en `pendiente_pago`. — **media** — *dejado pendiente a propósito ([[PLAN-ARREGLAR]] 8.4): con el resto de la Fase 8 aplicado, el peor caso pasa de "se puede marcar pagada con el monto equivocado" (corregido) a "puede quedar un Pago sin aplicar si el segundo request falla" (raro, recuperable con un reintento). Resolverlo de raíz cambia el contrato de la API.*
+- [x] **`rechazarPago` borra el registro de pago** — `server/controllers/reservaController.js:749` — resuelto: ahora marca `rechazado`/`motivo_rechazo`/`rechazado_at` en vez de borrar. — **alta**
+- [x] **El pago manual del mayorista no valida el monto** — resuelto de raíz, no parcheado: se probó en vivo que el parche inicial (validar el total en `pagarReserva`) no alcanzaba — `createPago` seguía creando `Pago` sin transacción ni validación, y cada reintento se sumaba sobre el intento fallido anterior en vez de reemplazarlo (100 + 1610 exigía 1710). Decisión de negocio: el mayorista no puede registrar un pago sin que la agencia lo informe antes. Se eliminaron `createPago`, `pagarReserva`, el botón "Registrar Pago" y sus rutas — el único camino a `pagada` es `informarPago` (monto ya validado exacto) → `confirmarPago`/`rechazarPago`. — **alta**
+- [x] **`createPago` no registra historial de estado ni auditoría** — moot: `createPago` ya no existe. — **alta**
+- [x] **Registrar pago son dos llamadas no atómicas desde el cliente** — moot: el flujo `addPayment()` + `pagar()` que era no atómico ya no existe. — **media**
 
 ### Backend
 
