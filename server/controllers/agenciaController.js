@@ -227,10 +227,11 @@ exports.getAgencia = async (req, res, next) => {
 exports.updateAgencia = async (req, res, next) => {
   try {
     const { nombre, razon_social, telefono } = req.body;
+    const updateFields = { nombre, razon_social, telefono };
 
     const agencia = await Agencia.findOneAndUpdate(
       { _id: req.params.id, mayorista_id: req.usuario.mayorista_id },
-      { nombre, razon_social, telefono },
+      updateFields,
       { new: true, runValidators: true }
     );
 
@@ -240,6 +241,14 @@ exports.updateAgencia = async (req, res, next) => {
         message: 'Agencia no encontrada.',
       });
     }
+
+    registrarAuditoria({
+      req,
+      accion: 'AGENCIA_ACTUALIZADA',
+      entidad_afectada: 'Agencia',
+      entidad_id: agencia._id,
+      detalle: { cambios: updateFields },
+    });
 
     res.status(200).json({
       success: true,

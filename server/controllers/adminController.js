@@ -239,6 +239,15 @@ exports.activarUsuarioMayorista = async (req, res, next) => {
     usuario.invite_token = undefined;
     usuario.invite_token_expires = undefined;
     await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'ACTIVACION_MANUAL_USUARIO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email, mayorista_id: mayorista._id },
+    });
+
     res.json({ success: true, data: { message: 'Usuario activado. Puede iniciar sesión.' } });
   } catch (error) {
     next(error);
