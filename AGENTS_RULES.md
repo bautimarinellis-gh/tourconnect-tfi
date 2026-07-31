@@ -1,7 +1,7 @@
 # AGENTS_RULES.md — Reglas generales de comportamiento
 
 > Archivo genérico. Copiarlo en la raíz de cualquier proyecto.
-> Se aplica en combinación con el AGENTS.md específico del proyecto.
+> Se aplica en combinación con el CLAUDE.md específico del proyecto.
 > El agente debe leer este archivo antes de ejecutar cualquier tarea.
 
 ---
@@ -100,7 +100,7 @@ Si en el medio de la tarea aparece una decisión no trivial → pausar y consult
 
 ## 7. Lo que nunca hacer
 
-- No modificar archivos marcados como protegidos en el AGENTS.md del proyecto
+- No modificar archivos marcados como protegidos en el CLAUDE.md del proyecto
 - No instalar dependencias sin avisar
 - No hacer commits o pushes sin instrucción explícita
 - No reescribir lógica existente que funciona si la tarea no lo requiere
@@ -110,4 +110,4 @@ Si en el medio de la tarea aparece una decisión no trivial → pausar y consult
 ---
 
 *Este archivo es genérico y no contiene contexto de proyecto.*
-*Para contexto específico, ver AGENTS.md en la raíz del repositorio.*
+*Para contexto específico, ver CLAUDE.md en la raíz del repositorio.*

@@ -41,7 +41,7 @@ The `tenantMiddleware` (`server/middlewares/tenantMiddleware.js`) injects `req.m
 ### Data model (MongoDB/Mongoose)
 - `Persona` is the discriminator base with `__t` key. `Mayorista` and `Agencia` extend it.
 - `Usuario` stores credentials separately from `Persona`; linked by `usuario_id`.
-- `Cotizacion` connects Agencia → Producto → Mayorista. States: `pendiente → aprobada/rechazada/vencida → reserva_generada`.
+- `Cotizacion` connects Agencia → Producto → Mayorista. States: `pendiente → aprobada/rechazada/vencida/cancelada → reserva_generada`.
 - `Reserva` is 1:1 with `Cotizacion`. States: `pendiente_pago → pago_informado → pagada → cerrada/cancelada`.
 - `HistorialEstadoReserva` tracks every state transition with timestamps.
 - Cotizaciones auto-expire via a polling loop in `server/utils/cotizacionVencimiento.js` (runs hourly).
@@ -56,7 +56,7 @@ server/
   routes/               # Express routers, one file per domain
   middlewares/          # auth, role, tenant
   utils/                # Email (mailer), pricing calc, report helpers, AI assistant internals
-  seeds/admin.seed.js   # One-time admin bootstrap
+  seeds/adminSeed.js    # One-time admin bootstrap
 ```
 
 ### Frontend structure
