@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import './toast.css';
 
@@ -34,7 +34,7 @@ export const useToast = () => {
 export const ToastContainer = () => {
   const [toasts, setToasts] = useState([]);
 
-  _addToast = useCallback(({ message, variant, title }) => {
+  const handleAdd = useCallback(({ message, variant, title }) => {
     const id = Date.now() + Math.random();
     setToasts(prev => [...prev, { id, message, variant, title, hiding: false }]);
 
@@ -47,6 +47,13 @@ export const ToastContainer = () => {
       }, 250);
     }, 3500);
   }, []);
+
+  // Publica el handler en la variable a nivel de módulo desde un efecto,
+  // no durante el render: _addToast es un event-bus fuera del árbol de
+  // React (lo usa useToast), no un valor que la UI lea.
+  useEffect(() => {
+    _addToast = handleAdd;
+  }, [handleAdd]);
 
   const dismiss = (id) => {
     setToasts(prev =>

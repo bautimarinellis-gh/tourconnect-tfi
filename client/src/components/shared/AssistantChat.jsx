@@ -28,7 +28,6 @@ function ResultTable({ data, columns, columnLabels }) {
         </thead>
         <tbody>
           {data.map((row, i) => (
-            // eslint-disable-next-line react-doctor/no-array-index-as-key
             <tr key={i}>
               {columns.map((col) => (
                 <td key={col}>
