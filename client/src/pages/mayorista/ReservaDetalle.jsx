@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Check, X, CreditCard, Lock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, X, Lock, AlertTriangle } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -27,9 +27,6 @@ export const MayoristaReservaDetalle = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState('');
-
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentData, setPaymentData] = useState({ monto: '', metodo: 'transferencia', comprobante: '' });
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -78,27 +75,6 @@ export const MayoristaReservaDetalle = () => {
       fetchReserva();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al cerrar la reserva.');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRegistrarPago = async () => {
-    if (!paymentData.monto || Number(paymentData.monto) <= 0) return;
-    setActionLoading(true);
-    try {
-      await reservaService.addPayment(id, {
-        monto: Number(paymentData.monto),
-        metodo: paymentData.metodo,
-        comprobante: paymentData.comprobante || undefined,
-        fecha_pago: new Date().toISOString(),
-      });
-      await reservaService.pagar(id);
-      setIsPaymentModalOpen(false);
-      setPaymentData({ monto: '', metodo: 'transferencia', comprobante: '' });
-      fetchReserva();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Error al registrar el pago.');
     } finally {
       setActionLoading(false);
     }
@@ -157,12 +133,6 @@ export const MayoristaReservaDetalle = () => {
           <Badge variant={reserva.estado} style={{ fontSize: '1rem', padding: '0.5rem 1rem' }}>
             {formatEstadoReserva(reserva.estado)}
           </Badge>
-
-          {reserva.estado === 'pendiente_pago' && (
-            <Button onClick={() => setIsPaymentModalOpen(true)} isLoading={actionLoading}>
-              <CreditCard size={16} /> Registrar Pago
-            </Button>
-          )}
 
           {reserva.estado === 'pagada' && (
             <Button variant="secondary" onClick={handleCerrar} isLoading={actionLoading}>
@@ -325,49 +295,6 @@ export const MayoristaReservaDetalle = () => {
             value={cancelReason}
             onChange={e => { setCancelReason(e.target.value); setCancelError(''); }}
             placeholder="Ingresá el motivo de cancelación"
-          />
-        </div>
-      </Modal>
-
-      {/* Modal Registrar Pago (flujo antiguo) */}
-      <Modal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        title="Registrar Pago"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setIsPaymentModalOpen(false)}>Atrás</Button>
-            <Button onClick={handleRegistrarPago} isLoading={actionLoading}>Registrar</Button>
-          </>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <Input
-            label="Monto *"
-            type="number"
-            value={paymentData.monto}
-            onChange={e => setPaymentData({ ...paymentData, monto: e.target.value })}
-            placeholder={formatCurrency(precioFinal)}
-          />
-          <div>
-            <label className="input-label" htmlFor="mayorista-metodo-pago">Método de pago</label>
-            <select
-              id="mayorista-metodo-pago"
-              className="input-control"
-              value={paymentData.metodo}
-              onChange={e => setPaymentData({ ...paymentData, metodo: e.target.value })}
-            >
-              <option value="transferencia">Transferencia</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="cheque">Cheque</option>
-              <option value="mercadopago">Mercado Pago</option>
-              <option value="otro">Otro</option>
-            </select>
-          </div>
-          <Input
-            label="Comprobante"
-            value={paymentData.comprobante}
-            onChange={e => setPaymentData({ ...paymentData, comprobante: e.target.value })}
           />
         </div>
       </Modal>

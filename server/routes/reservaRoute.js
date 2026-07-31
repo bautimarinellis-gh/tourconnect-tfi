@@ -6,10 +6,8 @@ const {
   getReservas,
   createReservaFromCotizacion,
   getReservaById,
-  pagarReserva,
   cerrarReserva,
   cancelarReserva,
-  createPago,
   getPagos,
   informarPago,
   confirmarPago,
@@ -40,11 +38,6 @@ router
   .route('/:id')
   .get(role('mayorista', 'agencia'), getReservaById);
 
-// PUT /api/v1/reservas/:id/pagar   → Marcar como pagada (solo mayorista)
-router
-  .route('/:id/pagar')
-  .put(role('mayorista'), pagarReserva);
-
 // PUT /api/v1/reservas/:id/cerrar  → Cerrar reserva (solo mayorista)
 router
   .route('/:id/cerrar')
@@ -59,11 +52,11 @@ router
 // Pagos
 // ---------------------
 
-// POST /api/v1/reservas/:id/pagos → Registrar pago (solo mayorista)
-// GET  /api/v1/reservas/:id/pagos → Listar pagos (ambos roles)
+// GET /api/v1/reservas/:id/pagos → Listar pagos (ambos roles). El mayorista
+// ya no puede registrar un pago directo: siempre tiene que pasar primero
+// por que la agencia lo informe (informar-pago) y él lo confirme o rechace.
 router
   .route('/:id/pagos')
-  .post(role('mayorista'), createPago)
   .get(role('mayorista', 'agencia'), getPagos);
 
 // ---------------------
