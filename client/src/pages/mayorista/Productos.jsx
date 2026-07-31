@@ -493,7 +493,7 @@ export const MayoristaProductos = () => {
                 <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.9375rem' }}>
                   ¿Estás seguro de que deseas eliminar{' '}
                   <strong style={{ color: 'var(--color-text)' }}>{deleteTarget?.nombre}</strong>?
-                  Esta acción lo marcará como inactivo.
+                  Esta acción es irreversible: el producto y sus vínculos con agencias se eliminarán definitivamente.
                 </p>
               </>
             )}

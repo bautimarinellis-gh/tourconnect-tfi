@@ -68,7 +68,7 @@ function App() {
                 <Routes>
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="mayoristas" element={<AdminMayoristas />} />
-                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad" />} />
+                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad — Administrador" />} />
                 </Routes>
               </PageWrapper>
             } />
@@ -86,7 +86,7 @@ function App() {
                   <Route path="cotizaciones" element={<MayoristaCotizaciones />} />
                   <Route path="reservas" element={<MayoristaReservas />} />
                   <Route path="reservas/:id" element={<MayoristaReservaDetalle />} />
-                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad" />} />
+                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad — Mayorista" />} />
                   <Route path="reportes" element={
                     <React.Suspense fallback={<Spinner center size="lg" />}>
                       <MayoristaReportes />
@@ -107,7 +107,7 @@ function App() {
                   <Route path="cotizaciones" element={<AgenciaCotizaciones />} />
                   <Route path="reservas" element={<AgenciaReservas />} />
                   <Route path="reservas/:id" element={<AgenciaReservaDetalle />} />
-                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad" />} />
+                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad — Agencia" />} />
                 </Routes>
               </PageWrapper>
             } />

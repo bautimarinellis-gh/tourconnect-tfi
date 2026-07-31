@@ -39,7 +39,7 @@ export const MayoristaDashboard = () => {
     <div className="dashboard-page">
       <div className="page-header dashboard-heading">
         <div>
-          <p className="page-kicker">Ultimos 30 dias</p>
+          <p className="page-kicker">Mes actual</p>
           <h1 className="page-title">Panel de control</h1>
         </div>
         <Link className="dashboard-quick-link" to="/mayorista/reportes">
