@@ -81,7 +81,8 @@ export const AgenciaReservaDetalle = () => {
 
   const precioFinal = toFloat(reserva.precio_final);
   const pagos = reserva.pagos ?? [];
-  const totalPagado = pagos.reduce((acc, p) => acc + toFloat(p.monto), 0);
+  const pagosConfirmados = pagos.filter(p => !p.rechazado);
+  const totalPagado = pagosConfirmados.reduce((acc, p) => acc + toFloat(p.monto), 0);
   const saldo = ['pagada', 'cerrada'].includes(reserva.estado) ? 0 : precioFinal - totalPagado;
 
   const pid = reserva.pago_informado_datos;
@@ -173,13 +174,16 @@ export const AgenciaReservaDetalle = () => {
             </Card>
           )}
 
-          {/* Pagos confirmados por el mayorista */}
+          {/* Pagos confirmados por el mayorista. Los rechazados no se
+              muestran acá: ya se avisan aparte con el banner de "Pago
+              rechazado" más abajo, y esta lista es específicamente de
+              pagos confirmados. */}
           <Card>
             <CardHeader><h3>Pagos Confirmados</h3></CardHeader>
             <CardBody>
-              {pagos.length > 0 ? (
+              {pagosConfirmados.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {pagos.map((p) => (
+                  {pagosConfirmados.map((p) => (
                     <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--color-surface-subtle)', borderRadius: 'var(--radius-sm)' }}>
                       <div>
                         <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>{formatCurrency(toFloat(p.monto))}</p>

@@ -140,7 +140,7 @@ export const MayoristaReservaDetalle = () => {
 
   const precioFinal = toFloat(reserva.precio_final);
   const pagos = reserva.pagos ?? [];
-  const totalPagado = pagos.reduce((acc, p) => acc + toFloat(p.monto), 0);
+  const totalPagado = pagos.filter(p => !p.rechazado).reduce((acc, p) => acc + toFloat(p.monto), 0);
   const saldo = ['pagada', 'cerrada'].includes(reserva.estado) ? 0 : precioFinal - totalPagado;
   const pid = reserva.pago_informado_datos;
 
@@ -271,12 +271,20 @@ export const MayoristaReservaDetalle = () => {
               {pagos.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   {pagos.map((p) => (
-                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)' }}>
+                    <div key={p._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', opacity: p.rechazado ? 0.6 : 1 }}>
                       <div>
-                        <p style={{ fontWeight: 600, margin: '0 0 0.25rem' }}>{formatCurrency(toFloat(p.monto))}</p>
+                        <p style={{ fontWeight: 600, margin: '0 0 0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ textDecoration: p.rechazado ? 'line-through' : 'none' }}>{formatCurrency(toFloat(p.monto))}</span>
+                          {p.rechazado && <Badge variant="error">Rechazado</Badge>}
+                        </p>
                         <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0, textTransform: 'capitalize' }}>
                           {p.metodo || 'N/A'} — Comp: {p.comprobante || 'N/A'}
                         </p>
+                        {p.rechazado && p.motivo_rechazo && (
+                          <p style={{ fontSize: '0.75rem', color: 'var(--color-error, #DC2626)', margin: '0.25rem 0 0' }}>
+                            Motivo: {p.motivo_rechazo}
+                          </p>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>
                         {formatDateTime(p.fecha_pago)}

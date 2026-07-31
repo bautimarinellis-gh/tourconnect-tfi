@@ -38,6 +38,21 @@ const pagoSchema = new mongoose.Schema(
       type: Date,
       required: [true, 'La fecha de pago es obligatoria'],
     },
+    // Un pago rechazado no se elimina (es evidencia de la operación): se
+    // marca y se excluye de los totales pagados y de la validación de
+    // monto en pagarReserva.
+    rechazado: {
+      type: Boolean,
+      default: false,
+    },
+    motivo_rechazo: {
+      type: String,
+      default: null,
+    },
+    rechazado_at: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: false },

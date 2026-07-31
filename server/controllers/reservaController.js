@@ -220,20 +220,7 @@ exports.pagarReserva = async (req, res, next) => {
       });
     }
 
-    const pagosExistentes = await Pago.countDocuments({ reserva_id: reserva._id }).session(session);
-    if (pagosExistentes === 0 && monto && fecha_pago) {
-      const precioFinal = obtenerPrecioFinal(reserva);
-      const montoNum = parseFloat(monto);
-
-      if (precioFinal === null || Math.abs(montoNum - precioFinal) > 0.01) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: `El monto informado ($${montoNum}) no coincide con el precio total de la reserva ($${precioFinal})`,
-        });
-      }
-
+    if (monto && fecha_pago) {
       await Pago.create(
         [
           {
@@ -248,6 +235,25 @@ exports.pagarReserva = async (req, res, next) => {
         ],
         { session }
       );
+    }
+
+    // Antes de marcar la reserva como pagada, el total acumulado de pagos
+    // NO rechazados debe coincidir con el precio final. Esto es
+    // independiente de cómo haya llegado el dinero: por este mismo
+    // request, por un createPago previo, o por ambos — cierra el caso en
+    // que el mayorista podía marcar "pagada" una reserva con un monto que
+    // no coincidía, sin que ninguna validación corriera.
+    const precioFinal = obtenerPrecioFinal(reserva);
+    const pagosValidos = await Pago.find({ reserva_id: reserva._id, rechazado: false }).session(session);
+    const totalPagado = pagosValidos.reduce((sum, p) => sum + parseFloat(p.monto.toString()), 0);
+
+    if (precioFinal === null || Math.abs(totalPagado - precioFinal) > 0.01) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: `El total pagado ($${totalPagado.toFixed(2)}) no coincide con el precio total de la reserva ($${precioFinal}).`,
+      });
     }
 
     const estadoAnterior = reserva.estado;
@@ -475,6 +481,18 @@ exports.createPago = async (req, res, next) => {
       fecha_pago,
       comprobante: comprobante || null,
       notas: notas || null,
+    });
+
+    // Reusa PAGO_CONFIRMADO: semánticamente es lo mismo que ya registra
+    // pagarReserva/confirmarPago ("el mayorista confirma haber recibido
+    // dinero"), solo que por esta otra vía. Antes este endpoint no dejaba
+    // ninguna traza en Auditoría.
+    registrarAuditoria({
+      req,
+      accion: 'PAGO_CONFIRMADO',
+      entidad_afectada: 'Reserva',
+      entidad_id: reserva._id,
+      detalle: { monto, metodo: metodo || 'transferencia' },
     });
 
     res.status(201).json({
@@ -715,7 +733,19 @@ exports.rechazarPago = async (req, res, next) => {
       });
     }
 
-    await Pago.deleteOne({ reserva_id: reserva._id }).session(session);
+    // Marcar el pago vigente como rechazado en vez de borrarlo — queda
+    // como evidencia de la operación. .sort({ created_at: -1 }) toma el
+    // más reciente, igual que confirmarPago, para no tocar por error un
+    // pago de un ciclo informar→rechazar anterior si hubiera más de uno.
+    const pagoVigente = await Pago.findOne({ reserva_id: reserva._id, rechazado: false })
+      .sort({ created_at: -1 })
+      .session(session);
+    if (pagoVigente) {
+      pagoVigente.rechazado = true;
+      pagoVigente.motivo_rechazo = motivo.trim();
+      pagoVigente.rechazado_at = new Date();
+      await pagoVigente.save({ session });
+    }
 
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pendiente_pago';
