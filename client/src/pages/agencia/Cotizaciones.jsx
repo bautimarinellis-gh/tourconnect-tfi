@@ -17,6 +17,8 @@ import reservaService from '../../services/reservaService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 
+// Debe coincidir con HORAS_VENCIMIENTO_COTIZACION en
+// server/utils/cotizacionVencimiento.js (no hay endpoint que lo exponga).
 const HORAS_VENCIMIENTO = 72;
 
 const getVencimientoInfo = (cotizacion) => {

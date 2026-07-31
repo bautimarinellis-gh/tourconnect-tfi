@@ -1,13 +1,20 @@
 const Cotizacion = require('../models/Cotizacion');
 
+// Ventana de vigencia de una cotización pendiente antes de vencer automáticamente.
+// El frontend (client/src/pages/agencia/Cotizaciones.jsx) tiene su propia
+// constante HORAS_VENCIMIENTO con el mismo valor, solo para mostrar la
+// cuenta regresiva — no hay endpoint que exponga este valor, así que si
+// se cambia acá hay que actualizarlo ahí también.
+const HORAS_VENCIMIENTO_COTIZACION = 72;
+
 const checkCotizacionesVencidas = async () => {
   try {
-    const hace72Horas = new Date(Date.now() - 72 * 60 * 60 * 1000);
-    
+    const fechaCorte = new Date(Date.now() - HORAS_VENCIMIENTO_COTIZACION * 60 * 60 * 1000);
+
     const result = await Cotizacion.updateMany(
       {
         estado: 'pendiente',
-        created_at: { $lt: hace72Horas }
+        created_at: { $lt: fechaCorte }
       },
       {
         $set: { estado: 'vencida' }
@@ -23,5 +30,6 @@ const checkCotizacionesVencidas = async () => {
 };
 
 module.exports = {
-  checkCotizacionesVencidas
+  checkCotizacionesVencidas,
+  HORAS_VENCIMIENTO_COTIZACION,
 };

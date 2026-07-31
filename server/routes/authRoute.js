@@ -33,7 +33,7 @@ const resetLimiter = rateLimit({
 
 // Rutas públicas (no requieren autenticación)
 router.post('/login', authLimiter, login);
-router.post('/set-password', setPassword);
+router.post('/set-password', authLimiter, setPassword);
 router.post('/forgot-password', authLimiter, forgotPassword);
 router.post('/verify-reset-code', resetLimiter, verifyResetCode);
 router.post('/reset-password', resetLimiter, resetPassword);

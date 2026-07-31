@@ -37,7 +37,7 @@ exports.getProductosAgencia = async (req, res, next) => {
       data: productos,
     });
   } catch (error) {
-    if (error.message.includes('No encontrada')) {
+    if (error.message.includes('no encontrada')) {
       return res.status(404).json({ success: false, message: error.message });
     }
     next(error);
@@ -87,7 +87,7 @@ exports.addProductoAgencia = async (req, res, next) => {
         message: 'El producto ya está asociado a esta agencia',
       });
     }
-    if (error.message.includes('No encontrada')) {
+    if (error.message.includes('no encontrada')) {
       return res.status(404).json({ success: false, message: error.message });
     }
     next(error);
@@ -185,7 +185,7 @@ exports.syncProductosAgencia = async (req, res, next) => {
     await session.abortTransaction();
     session.endSession();
 
-    if (error.message.includes('No encontrada') || error.message.includes('no pertenece')) {
+    if (error.message.includes('no encontrada') || error.message.includes('no pertenece')) {
       return res.status(404).json({ success: false, message: error.message });
     }
     next(error);
@@ -246,7 +246,7 @@ exports.updateProductoAgencia = async (req, res, next) => {
       data: mapping,
     });
   } catch (error) {
-    if (error.message.includes('No encontrada')) {
+    if (error.message.includes('no encontrada')) {
       return res.status(404).json({ success: false, message: error.message });
     }
     next(error);
@@ -284,7 +284,7 @@ exports.deleteProductoAgencia = async (req, res, next) => {
       data: {},
     });
   } catch (error) {
-    if (error.message.includes('No encontrada')) {
+    if (error.message.includes('no encontrada')) {
       return res.status(404).json({ success: false, message: error.message });
     }
     next(error);

@@ -75,7 +75,7 @@ exports.getProductos = async (req, res, next) => {
 
     return res.status(403).json({ success: false, message: 'Rol no autorizado' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -173,7 +173,7 @@ exports.createProducto = async (req, res, next) => {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({ success: false, message: messages.join(', ') });
     }
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -237,7 +237,7 @@ exports.getProductoById = async (req, res, next) => {
     if (error.kind === 'ObjectId') {
       return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -291,20 +291,20 @@ exports.updateProducto = async (req, res, next) => {
       const messages = Object.values(error.errors).map(val => val.message);
       return res.status(400).json({ success: false, message: messages.join(', ') });
     }
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
 /**
  * Verificar cuántas agencias tienen vinculado un producto (Solo Mayoristas)
  */
-exports.checkProductoAgencias = async (req, res) => {
+exports.checkProductoAgencias = async (req, res, next) => {
   try {
     const { id } = req.params;
     const count = await AgenciaProducto.countDocuments({ producto_id: id });
     res.status(200).json({ success: true, agencias_count: count });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
@@ -323,9 +323,11 @@ exports.deleteProducto = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
 
+    const cotizacionIds = await Cotizacion.find({ producto_id: id }).distinct('_id');
+
     const [cotizaciones, reservas] = await Promise.all([
-      Cotizacion.countDocuments({ producto_id: id }),
-      Reserva.countDocuments({ producto_id: id }),
+      cotizacionIds.length,
+      Reserva.countDocuments({ cotizacion_id: { $in: cotizacionIds } }),
     ]);
 
     if (cotizaciones > 0 || reservas > 0) {
@@ -351,6 +353,6 @@ exports.deleteProducto = async (req, res, next) => {
     if (error.kind === 'ObjectId') {
       return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };

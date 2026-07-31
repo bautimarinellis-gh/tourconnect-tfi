@@ -4,13 +4,12 @@ const Agencia = require('../models/Agencia');
 const Mayorista = require('../models/Mayorista');
 const Usuario = require('../models/Usuario');
 const AgenciaProducto = require('../models/AgenciaProducto');
-const Cotizacion = require('../models/Cotizacion');
-const Reserva = require('../models/Reserva');
 const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { getSubscriptionPlan } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
 const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
 const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
+const { contarOperacionesActivas } = require('../utils/operacionesActivas');
 
 /**
  * @route   GET /api/v1/agencias
@@ -27,13 +26,15 @@ exports.getAgencias = async (req, res, next) => {
       .lean(); // usar lean para modificar el objeto y agregar campos extras
 
     // Calcular la cantidad de productos habilitados para cada agencia
-    for (let agencia of agencias) {
-      const productosCount = await AgenciaProducto.countDocuments({
-        agencia_id: agencia._id,
-        habilitado: true,
-      });
-      agencia.productos_habilitados = productosCount;
-    }
+    // en una sola aggregation en vez de un countDocuments por agencia.
+    const counts = await AgenciaProducto.aggregate([
+      { $match: { agencia_id: { $in: agencias.map((a) => a._id) }, habilitado: true } },
+      { $group: { _id: '$agencia_id', count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(counts.map((c) => [c._id.toString(), c.count]));
+    agencias.forEach((agencia) => {
+      agencia.productos_habilitados = countMap.get(agencia._id.toString()) ?? 0;
+    });
 
     res.status(200).json({
       success: true,
@@ -135,15 +136,6 @@ exports.createAgencia = async (req, res, next) => {
 
     await nuevaAgencia.save({ session });
 
-    // Enviar correo de invitación (solo si no se configuró password)
-    if (!tienePassword && inviteToken) {
-      try {
-        await enviarInvitacion(email, inviteToken, 'Agencia');
-      } catch (mailError) {
-        console.error('Error al enviar email de invitación, pero la agencia fue creada:', mailError.message);
-      }
-    }
-
     // Confirmar transacción
     await session.commitTransaction();
     session.endSession();
@@ -162,6 +154,17 @@ exports.createAgencia = async (req, res, next) => {
       entidad_id: nuevoUsuario._id,
       detalle: { email, rol: 'agencia', con_invitacion: !tienePassword },
     });
+
+    // Enviar correo de invitación (solo si no se configuró password). Se
+    // envía después del commit: si la transacción abortara más tarde, no
+    // queremos haber invitado a una cuenta que nunca existió.
+    if (!tienePassword && inviteToken) {
+      try {
+        await enviarInvitacion(email, inviteToken, 'Agencia');
+      } catch (mailError) {
+        console.error('Error al enviar email de invitación, pero la agencia fue creada:', mailError.message);
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -261,47 +264,12 @@ exports.updateAgencia = async (req, res, next) => {
 
 /**
  * Cuenta las operaciones activas de una agencia dentro de un mayorista.
- * Cotizaciones activas: estado IN ['pendiente', 'aprobada']
- * Reservas activas:     estado = 'pendiente_pago'
- *                    OR (estado = 'pagada' AND fecha_fin >= hoy)
  */
-async function contarOperacionesActivas(agenciaId, mayoristaId) {
-  const ahora = new Date();
-  const cotizacionCollection = Cotizacion.collection.name;
-
-  const [cotizacionesActivas, reservasActivasAgg] = await Promise.all([
-    Cotizacion.countDocuments({
-      agencia_id: agenciaId,
-      mayorista_id: mayoristaId,
-      estado: { $in: ['pendiente', 'aprobada'] },
-    }),
-    Reserva.aggregate([
-      {
-        $lookup: {
-          from: cotizacionCollection,
-          localField: 'cotizacion_id',
-          foreignField: '_id',
-          as: 'cot',
-        },
-      },
-      { $unwind: '$cot' },
-      {
-        $match: {
-          'cot.agencia_id': agenciaId,
-          'cot.mayorista_id': mayoristaId,
-          $or: [
-            { estado: 'pendiente_pago' },
-            { estado: 'pagada', 'cot.fecha_fin': { $gte: ahora } },
-          ],
-        },
-      },
-      { $count: 'total' },
-    ]),
-  ]);
-
-  const reservasActivas = reservasActivasAgg[0]?.total ?? 0;
-
-  return { cotizacionesActivas, reservasActivas };
+async function contarOperacionesActivasAgencia(agenciaId, mayoristaId) {
+  return contarOperacionesActivas(
+    { agencia_id: agenciaId, mayorista_id: mayoristaId },
+    { 'cot.agencia_id': agenciaId, 'cot.mayorista_id': mayoristaId }
+  );
 }
 
 /**
@@ -320,7 +288,7 @@ exports.verificarDesactivacion = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Agencia no encontrada.' });
     }
 
-    const { cotizacionesActivas, reservasActivas } = await contarOperacionesActivas(
+    const { cotizacionesActivas, reservasActivas } = await contarOperacionesActivasAgencia(
       agencia._id,
       req.usuario.mayorista_id
     );
@@ -479,7 +447,7 @@ exports.deleteAgencia = async (req, res, next) => {
     }
 
     // Verificar integridad operacional dentro de la transacción
-    const { cotizacionesActivas, reservasActivas } = await contarOperacionesActivas(
+    const { cotizacionesActivas, reservasActivas } = await contarOperacionesActivasAgencia(
       agencia._id,
       req.usuario.mayorista_id
     );

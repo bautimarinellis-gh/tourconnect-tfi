@@ -12,6 +12,11 @@ dotenv.config({ path: '../.env' });
 // Crear app de Express
 const app = express();
 
+// Confía en el primer proxy (Nginx en producción). Sin esto, express-rate-limit
+// y auditService.getIp() leen X-Forwarded-For sin validar que venga de un
+// proxy conocido: la IP auditada es spoofeable y el rate limit, evadible.
+app.set('trust proxy', 1);
+
 // ---------------------
 // Middlewares globales
 // ---------------------

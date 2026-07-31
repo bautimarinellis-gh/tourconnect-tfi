@@ -11,6 +11,7 @@ const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
 const { registrarAuditoria } = require('../utils/auditService');
 const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
 const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
+const { contarOperacionesActivas } = require('../utils/operacionesActivas');
 
 const validarPlanSuscripcion = (plan) => {
   if (!SUBSCRIPTION_PLAN_NAMES.includes(plan)) {
@@ -256,45 +257,12 @@ exports.activarUsuarioMayorista = async (req, res, next) => {
 
 /**
  * Cuenta las operaciones activas de TODAS las agencias de un mayorista.
- * Cotizaciones activas: estado IN ['pendiente', 'aprobada']
- * Reservas activas:     estado = 'pendiente_pago'
- *                    OR (estado = 'pagada' AND fecha_fin >= hoy)
  */
 async function contarOperacionesActivasMayorista(mayoristaId) {
-  const ahora = new Date();
-  const cotizacionCollection = Cotizacion.collection.name;
-
-  const [cotizacionesActivas, reservasActivasAgg] = await Promise.all([
-    Cotizacion.countDocuments({
-      mayorista_id: mayoristaId,
-      estado: { $in: ['pendiente', 'aprobada'] },
-    }),
-    Reserva.aggregate([
-      {
-        $lookup: {
-          from: cotizacionCollection,
-          localField: 'cotizacion_id',
-          foreignField: '_id',
-          as: 'cot',
-        },
-      },
-      { $unwind: '$cot' },
-      {
-        $match: {
-          'cot.mayorista_id': mayoristaId,
-          $or: [
-            { estado: 'pendiente_pago' },
-            { estado: 'pagada', 'cot.fecha_fin': { $gte: ahora } },
-          ],
-        },
-      },
-      { $count: 'total' },
-    ]),
-  ]);
-
-  const reservasActivas = reservasActivasAgg[0]?.total ?? 0;
-
-  return { cotizacionesActivas, reservasActivas };
+  return contarOperacionesActivas(
+    { mayorista_id: mayoristaId },
+    { 'cot.mayorista_id': mayoristaId }
+  );
 }
 
 /**
