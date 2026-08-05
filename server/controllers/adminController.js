@@ -12,6 +12,8 @@ const { registrarAuditoria } = require('../utils/auditService');
 const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
 const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
 const { contarOperacionesActivas } = require('../utils/operacionesActivas');
+const Rol = require('../models/Rol');
+const { ROL_ADMINISTRADOR } = require('../utils/permisosCatalogo');
 
 const validarPlanSuscripcion = (plan) => {
   if (!SUBSCRIPTION_PLAN_NAMES.includes(plan)) {
@@ -70,10 +72,30 @@ exports.crearMayorista = async (req, res, next) => {
       expiresIn = new Date(Date.now() + 48 * 60 * 60 * 1000);
     }
 
+    // El rol Administrador es protegido y no se puede asignar desde la
+    // aplicación: esta alta que ejecuta el super-admin es la única vía por la
+    // que un usuario lo obtiene, y con él el permiso GestionarRoles.
+    const rolAdministrador = await Rol.findOne({
+      nombre: ROL_ADMINISTRADOR,
+      mayorista_id: null,
+    })
+      .select('_id')
+      .session(session);
+
+    if (!rolAdministrador) {
+      // No debería pasar: lo crea bootstrapSeguridad() al arrancar el server.
+      const error = new Error(
+        'El rol Administrador no está inicializado. Reiniciá el servidor.'
+      );
+      error.statusCode = 500;
+      throw error;
+    }
+
     // 2. Crear el Usuario
     const nuevoUsuario = new Usuario({
       email,
       rol: 'mayorista',
+      rol_id: rolAdministrador._id,
       activo: tienePassword,
       invite_token: tienePassword ? undefined : inviteToken,
       invite_token_expires: tienePassword ? undefined : expiresIn,
@@ -94,6 +116,12 @@ exports.crearMayorista = async (req, res, next) => {
       activo: true,
     });
     await nuevoMayorista.save({ session });
+
+    // 4. Cerrar el vínculo en la dirección Usuario → Mayorista. Es circular
+    //    (el Mayorista necesita el usuario_id y el Usuario el mayorista_id),
+    //    así que se completa recién acá, dentro de la misma transacción.
+    nuevoUsuario.mayorista_id = nuevoMayorista._id;
+    await nuevoUsuario.save({ session });
 
     // Commit de la transacción
     await session.commitTransaction();

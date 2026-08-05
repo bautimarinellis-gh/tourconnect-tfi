@@ -23,6 +23,7 @@ const {
 const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
 const { tenant } = require('../middlewares/tenantMiddleware');
+const { checkPermiso } = require('../middlewares/permisoMiddleware');
 
 // Proteger todas las rutas, requerir rol mayorista y validar tenant_id
 router.use(auth);
@@ -31,26 +32,28 @@ router.use(tenant);
 
 // Rutas de Agencia
 router.route('/')
-  .get(getAgencias)
-  .post(createAgencia);
+  .get(checkPermiso('GestionarAgencias'), getAgencias)
+  .post(checkPermiso('GestionarAgencias'), createAgencia);
 
-router.get('/:id/verificar-desactivacion', verificarDesactivacion);
-router.patch('/:id/reactivar', reactivarAgencia);
-router.get('/:id/historial', getHistorialAgencia);
+router.get('/:id/verificar-desactivacion', checkPermiso('GestionarAgencias'), verificarDesactivacion);
+router.patch('/:id/reactivar', checkPermiso('GestionarAgencias'), reactivarAgencia);
+router.get('/:id/historial', checkPermiso('GestionarAgencias'), getHistorialAgencia);
 
 router.route('/:id')
-  .get(getAgencia)
-  .put(updateAgencia)
-  .delete(deleteAgencia);
+  .get(checkPermiso('GestionarAgencias'), getAgencia)
+  .put(checkPermiso('GestionarAgencias'), updateAgencia)
+  .delete(checkPermiso('GestionarAgencias'), deleteAgencia);
 
-// Rutas de AgenciaProducto (nested bajo agencia/:id/productos)
+// Rutas de AgenciaProducto (nested bajo agencia/:id/productos).
+// Qué productos vende cada agencia y con qué margen es configuración de la
+// agencia, así que todo el subárbol se resuelve con GestionarAgencias.
 router.route('/:id/productos')
-  .get(getProductosAgencia)
-  .post(addProductoAgencia)
-  .put(syncProductosAgencia);
+  .get(checkPermiso('GestionarAgencias'), getProductosAgencia)
+  .post(checkPermiso('GestionarAgencias'), addProductoAgencia)
+  .put(checkPermiso('GestionarAgencias'), syncProductosAgencia);
 
 router.route('/:id/productos/:productoId')
-  .put(updateProductoAgencia)
-  .delete(deleteProductoAgencia);
+  .put(checkPermiso('GestionarAgencias'), updateProductoAgencia)
+  .delete(checkPermiso('GestionarAgencias'), deleteProductoAgencia);
 
 module.exports = router;

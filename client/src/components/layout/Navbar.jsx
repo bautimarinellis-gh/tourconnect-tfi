@@ -4,20 +4,17 @@ import {
   BriefcaseBusiness,
   Building2,
   ClipboardList,
-  FileBarChart,
-  FileText,
   LayoutDashboard,
   LogOut,
   Map,
-  Package,
   PanelLeft,
   Shield,
   ShieldCheck,
   ShoppingBag,
   User,
-  Users,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { navegacionVisible } from '../../config/navegacion';
 import { ProfileModal } from '../shared/ProfileModal';
 import './layout.css';
 import logoImg from '/logo.png';
@@ -47,15 +44,10 @@ export const Navbar = () => {
       { name: 'Auditoría', path: '/admin/auditoria', icon: ShieldCheck },
     ];
   } else if (user?.rol === 'mayorista') {
-    links = [
-      { name: 'Dashboard', path: '/mayorista/dashboard', icon: LayoutDashboard },
-      { name: 'Agencias', path: '/mayorista/agencias', icon: Users },
-      { name: 'Productos', path: '/mayorista/productos', icon: Package },
-      { name: 'Cotizaciones', path: '/mayorista/cotizaciones', icon: FileText },
-      { name: 'Reservas', path: '/mayorista/reservas', icon: ClipboardList },
-      { name: 'Reportes', path: '/mayorista/reportes', icon: FileBarChart },
-      { name: 'Auditoría', path: '/mayorista/auditoria', icon: ShieldCheck },
-    ];
+    // El menú del mayorista se arma según los permisos efectivos: una sección
+    // que el usuario no puede usar directamente no aparece. El bloqueo por
+    // contenido sigue existiendo en App.jsx para quien llegue por URL.
+    links = navegacionVisible(user?.permisos ?? []);
   } else if (user?.rol === 'agencia') {
     links = [
       { name: 'Dashboard', path: '/agencia/dashboard', icon: LayoutDashboard },

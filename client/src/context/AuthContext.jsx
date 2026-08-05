@@ -1,8 +1,13 @@
-import React, { createContext, useState, useCallback, useMemo, useEffect } from 'react';
+import React, { createContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
+import { marcarCierreDeSesion, marcarSesionIniciada } from '../services/api';
 
 export const AuthContext = createContext();
+
+// Ventana mínima entre revalidaciones por foco. Sin esto, alt-tabear varias
+// veces seguidas dispara un /auth/me por cada cambio de pestaña.
+const REVALIDACION_MIN_MS = 30 * 1000;
 
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
@@ -17,9 +22,11 @@ export const AuthProvider = ({ children }) => {
     }
   });
   const [loading, setLoading] = useState(true);
+  const ultimaRevalidacion = useRef(0);
 
   const login = useCallback(async (email, password) => {
     const response = await authService.login(email, password);
+    marcarSesionIniciada();
     const userData = { ...response.data.usuario };
     localStorage.setItem('tourconnect_user_v1', JSON.stringify(userData));
     setUser(userData);
@@ -27,6 +34,10 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(async () => {
+    // Se marca antes de invalidar el token: a partir de acá los 401 de las
+    // requests que hayan quedado en vuelo son esperables y no deben disparar
+    // la recarga de página del interceptor.
+    marcarCierreDeSesion();
     try {
       await authService.logout();
     } catch (err) {
@@ -62,6 +73,7 @@ export const AuthProvider = ({ children }) => {
         if (userData) {
           localStorage.setItem('tourconnect_user_v1', JSON.stringify(userData));
           setUser(userData);
+          ultimaRevalidacion.current = Date.now();
         }
       })
       .catch(() => {
@@ -73,6 +85,39 @@ export const AuthProvider = ({ children }) => {
       });
 
     return () => { cancelled = true; };
+  }, []);
+
+  // Revalida al volver a la pestaña. Los permisos del usuario viajan en este
+  // payload, así que si un administrador le cambia el rol mientras tiene la
+  // sesión abierta, el menú y los bloqueos se actualizan solos sin recargar.
+  // El backend igual decide en cada request: esto sincroniza la UI, no la
+  // seguridad.
+  useEffect(() => {
+    const revalidar = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!localStorage.getItem('tourconnect_user_v1')) return;
+      if (Date.now() - ultimaRevalidacion.current < REVALIDACION_MIN_MS) return;
+
+      ultimaRevalidacion.current = Date.now();
+
+      authService.getMe()
+        .then((res) => {
+          const userData = res?.data?.usuario;
+          if (!userData) return;
+          localStorage.setItem('tourconnect_user_v1', JSON.stringify(userData));
+          setUser(userData);
+        })
+        .catch(() => {
+          // Mismo criterio que arriba: lo maneja el interceptor.
+        });
+    };
+
+    document.addEventListener('visibilitychange', revalidar);
+    window.addEventListener('focus', revalidar);
+    return () => {
+      document.removeEventListener('visibilitychange', revalidar);
+      window.removeEventListener('focus', revalidar);
+    };
   }, []);
 
   const value = useMemo(() => ({ user, login, logout, loading }), [user, login, logout, loading]);

@@ -5,12 +5,14 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import { AssistantChat } from '../../components/shared/AssistantChat';
 import reporteService from '../../services/reporteService';
+import { usePermiso } from '../../hooks/usePermiso';
 import { formatCurrency } from '../../utils/formatters';
 import './dashboard.css';
 
 export const MayoristaDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const puedeVerReportes = usePermiso('VerReportes');
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -43,9 +45,13 @@ export const MayoristaDashboard = () => {
           <p className="page-kicker">Mes actual</p>
           <h1 className="page-title">Panel de control</h1>
         </div>
-        <Link className="dashboard-quick-link" to="/mayorista/reportes">
-          Ver reportes <ArrowRight size={14} />
-        </Link>
+        {/* Sin VerReportes el acceso rápido no se muestra: llevaría a una
+            sección que este usuario no tiene en el menú. */}
+        {puedeVerReportes && (
+          <Link className="dashboard-quick-link" to="/mayorista/reportes">
+            Ver reportes <ArrowRight size={14} />
+          </Link>
+        )}
       </div>
 
       <div className="dashboard-kpi-grid">

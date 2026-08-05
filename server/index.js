@@ -77,6 +77,9 @@ app.use('/api/v1/assistant', require('./routes/assistantRoute'));
 // Módulo 10 — Auditoría transversal
 app.use('/api/v1/auditoria', require('./routes/auditoriaRoute'));
 
+// Módulo 11 — Seguridad (roles y permisos)
+app.use('/api/v1/seguridad', require('./routes/seguridadRoute'));
+
 // ---------------------
 // Manejo de ruta no encontrada
 // ---------------------
@@ -135,6 +138,7 @@ app.use((err, _req, res, _next) => {
 // ---------------------
 const PORT = process.env.PORT || 3000;
 const { checkCotizacionesVencidas } = require('./utils/cotizacionVencimiento');
+const { bootstrapSeguridad } = require('./utils/bootstrapSeguridad');
 
 const startServer = async () => {
   await connectDB();
@@ -142,6 +146,17 @@ const startServer = async () => {
   require('./models/Persona');
   require('./models/Mayorista');
   require('./models/Agencia');
+
+  // El catálogo de permisos y el rol Administrador se sincronizan solos en
+  // cada arranque: son datos derivados de permisosCatalogo.js, no algo que
+  // haya que sembrar a mano. Si falla, el server igual levanta — los upserts
+  // son idempotentes y el próximo arranque lo corrige. Caerse acá dejaría la
+  // aplicación entera abajo por un problema que se repara solo.
+  try {
+    await bootstrapSeguridad();
+  } catch (error) {
+    console.error('❌ Falló el bootstrap de seguridad:', error.message);
+  }
 
   app.listen(PORT, () => {
     console.log(`🚀 TourConnect corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);

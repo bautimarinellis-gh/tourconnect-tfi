@@ -29,6 +29,9 @@ import { MayoristaProductos } from './pages/mayorista/Productos';
 import { MayoristaCotizaciones } from './pages/mayorista/Cotizaciones';
 import { MayoristaReservas } from './pages/mayorista/Reservas';
 import { MayoristaReservaDetalle } from './pages/mayorista/ReservaDetalle';
+import { MayoristaSeguridad } from './pages/mayorista/Seguridad';
+import { ConPermiso } from './components/shared/SinPermiso';
+import { PERMISO_POR_SECCION as P } from './config/navegacion';
 
 // Agencia Pages
 import { AgenciaDashboard } from './pages/agencia/Dashboard';
@@ -78,19 +81,34 @@ function App() {
           <Route element={<ProtectedRoute allowedRoles={['mayorista']} />}>
             <Route path="/mayorista/*" element={
               <PageWrapper>
+                {/* El Dashboard no exige permiso: es la home de cualquier
+                    usuario autenticado del tenant. El resto se bloquea por
+                    contenido — el ítem del menú sigue visible, ocultarlo
+                    queda para una fase posterior. */}
+                {/* Los códigos salen de config/navegacion.js, la misma tabla
+                    que arma el menú, para que ocultar y bloquear no se
+                    desincronicen. Las rutas de detalle heredan el permiso de
+                    su sección. */}
                 <Routes>
                   <Route path="dashboard" element={<MayoristaDashboard />} />
-                  <Route path="agencias" element={<MayoristaAgencias />} />
-                  <Route path="agencias/:id" element={<MayoristaAgenciaDetalle />} />
-                  <Route path="productos" element={<MayoristaProductos />} />
-                  <Route path="cotizaciones" element={<MayoristaCotizaciones />} />
-                  <Route path="reservas" element={<MayoristaReservas />} />
-                  <Route path="reservas/:id" element={<MayoristaReservaDetalle />} />
-                  <Route path="auditoria" element={<AuditoriaPage title="Mi actividad — Mayorista" />} />
+                  <Route path="agencias" element={<ConPermiso codigo={P.agencias}><MayoristaAgencias /></ConPermiso>} />
+                  <Route path="agencias/:id" element={<ConPermiso codigo={P.agencias}><MayoristaAgenciaDetalle /></ConPermiso>} />
+                  <Route path="productos" element={<ConPermiso codigo={P.productos}><MayoristaProductos /></ConPermiso>} />
+                  <Route path="cotizaciones" element={<ConPermiso codigo={P.cotizaciones}><MayoristaCotizaciones /></ConPermiso>} />
+                  <Route path="reservas" element={<ConPermiso codigo={P.reservas}><MayoristaReservas /></ConPermiso>} />
+                  <Route path="reservas/:id" element={<ConPermiso codigo={P.reservas}><MayoristaReservaDetalle /></ConPermiso>} />
+                  <Route path="auditoria" element={<ConPermiso codigo={P.auditoria}><AuditoriaPage title="Mi actividad — Mayorista" /></ConPermiso>} />
+                  <Route path="seguridad" element={
+                    <ConPermiso codigo={P.seguridad}>
+                      <MayoristaSeguridad />
+                    </ConPermiso>
+                  } />
                   <Route path="reportes" element={
-                    <React.Suspense fallback={<Spinner center size="lg" />}>
-                      <MayoristaReportes />
-                    </React.Suspense>
+                    <ConPermiso codigo={P.reportes}>
+                      <React.Suspense fallback={<Spinner center size="lg" />}>
+                        <MayoristaReportes />
+                      </React.Suspense>
+                    </ConPermiso>
                   } />
                 </Routes>
               </PageWrapper>

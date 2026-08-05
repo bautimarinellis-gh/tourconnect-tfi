@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
 import './toast.css';
 
@@ -23,12 +23,16 @@ export const useToast = () => {
     if (_addToast) _addToast({ message, variant, title });
   }, []);
 
-  return {
+  // El objeto se memoiza para que su identidad sea estable entre renders.
+  // Sin esto, cualquier useCallback/useEffect que dependa de `toast` se
+  // re-crea en cada render, y si ese efecto hace un fetch que actualiza
+  // estado, queda en un loop infinito de requests.
+  return useMemo(() => ({
     success: (message, title) => show(message, 'success', title),
     error:   (message, title) => show(message, 'error', title),
     warning: (message, title) => show(message, 'warning', title),
     info:    (message, title) => show(message, 'info', title),
-  };
+  }), [show]);
 };
 
 export const ToastContainer = () => {

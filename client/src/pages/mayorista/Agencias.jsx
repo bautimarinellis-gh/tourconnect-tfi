@@ -13,6 +13,7 @@ import { Textarea } from '../../components/ui/Textarea';
 import { Alert } from '../../components/ui/Alert';
 import { useToast } from '../../components/ui/Toast';
 import agenciaService from '../../services/agenciaService';
+import { usePermiso } from '../../hooks/usePermiso';
 import { formatCuit, isValidCuit } from '../../utils/cuit';
 import { formatTelefono } from '../../utils/telefono';
 
@@ -26,6 +27,8 @@ const MOTIVOS_DESACTIVACION = [
 
 export const MayoristaAgencias = () => {
   const toast = useToast();
+  const puedeVerCotizaciones = usePermiso('GestionarCotizaciones');
+  const puedeVerReservas = usePermiso('GestionarReservas');
   const [agencias, setAgencias] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [loading, setLoading] = useState(true);
@@ -518,20 +521,26 @@ export const MayoristaAgencias = () => {
         title="No se puede desactivar esta agencia"
         footer={
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setIsBlockedModalOpen(false); navigate('/mayorista/cotizaciones'); }}
-            >
-              <FileText size={15} /> Ver Cotizaciones
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { setIsBlockedModalOpen(false); navigate('/mayorista/reservas'); }}
-            >
-              <CalendarCheck size={15} /> Ver Reservas
-            </Button>
+            {/* Los atajos solo aparecen si el usuario tiene acceso a esas
+                secciones: si no, lo mandarían a una pantalla bloqueada. */}
+            {puedeVerCotizaciones && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setIsBlockedModalOpen(false); navigate('/mayorista/cotizaciones'); }}
+              >
+                <FileText size={15} /> Ver Cotizaciones
+              </Button>
+            )}
+            {puedeVerReservas && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setIsBlockedModalOpen(false); navigate('/mayorista/reservas'); }}
+              >
+                <CalendarCheck size={15} /> Ver Reservas
+              </Button>
+            )}
             <Button onClick={() => setIsBlockedModalOpen(false)}>Cerrar</Button>
           </div>
         }

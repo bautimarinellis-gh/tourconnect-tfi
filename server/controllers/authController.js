@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const Usuario = require('../models/Usuario');
 const { enviarEmail } = require('../utils/mailer');
 const { resolverContextoPersona, enriquecerUsuario } = require('../utils/personaContext');
+const { resolverPermisosEfectivos } = require('../utils/permisos');
 const { registrarAuditoria } = require('../utils/auditService');
 
 // ---------------------
@@ -207,10 +208,18 @@ const login = async (req, res, next) => {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
+    // Los permisos se resuelven acá solo para la respuesta: no viajan en el
+    // JWT, así que revocarlos surte efecto en la request siguiente.
+    await usuario.populate([
+      { path: 'rol_id', populate: { path: 'permisos' } },
+      { path: 'permisos_individuales' },
+    ]);
+    const permisos = await resolverPermisosEfectivos(usuario);
+
     res.json({
       success: true,
       data: {
-        usuario: enriquecerUsuario(usuario, contexto),
+        usuario: enriquecerUsuario(usuario, contexto, permisos),
       },
     });
   } catch (error) {
@@ -546,7 +555,8 @@ const me = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: { usuario: enriquecerUsuario(usuario, contexto) },
+      // req.permisos ya viene resuelto por authMiddleware contra la base.
+      data: { usuario: enriquecerUsuario(usuario, contexto, req.permisos) },
     });
   } catch (error) {
     next(error);

@@ -19,7 +19,6 @@ Levanta Vite en `http://localhost:5173`. El dev server proxea `/api` → `http:/
 | `npm run build` | Build de producción a `dist/` |
 | `npm run preview` | Sirve el build de `dist/` |
 | `npm run lint` | ESLint sobre todo el proyecto |
-| `npm test` | Tests unitarios con Vitest |
 
 ## Estructura
 

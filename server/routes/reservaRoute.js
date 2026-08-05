@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
+const { checkPermiso, checkPermisoMayorista } = require('../middlewares/permisoMiddleware');
 
 const {
   getReservas,
@@ -26,7 +27,7 @@ router.use(auth);
 // GET  /api/v1/reservas     → Listar reservas (mayorista o agencia)
 router
   .route('/')
-  .get(role('mayorista', 'agencia'), getReservas);
+  .get(role('mayorista', 'agencia'), checkPermisoMayorista('GestionarReservas'), getReservas);
 
 // POST /api/v1/reservas/cotizacion/:cotizacionId → Crear reserva (ID en URL, solo agencia)
 router
@@ -36,17 +37,17 @@ router
 // GET /api/v1/reservas/:id  → Detalle de reserva con historial y pagos
 router
   .route('/:id')
-  .get(role('mayorista', 'agencia'), getReservaById);
+  .get(role('mayorista', 'agencia'), checkPermisoMayorista('GestionarReservas'), getReservaById);
 
 // PUT /api/v1/reservas/:id/cerrar  → Cerrar reserva (solo mayorista)
 router
   .route('/:id/cerrar')
-  .put(role('mayorista'), cerrarReserva);
+  .put(role('mayorista'), checkPermiso('GestionarReservas'), cerrarReserva);
 
 // PUT /api/v1/reservas/:id/cancelar → Cancelar reserva (ambos roles)
 router
   .route('/:id/cancelar')
-  .put(role('mayorista', 'agencia'), cancelarReserva);
+  .put(role('mayorista', 'agencia'), checkPermisoMayorista('GestionarReservas'), cancelarReserva);
 
 // ---------------------
 // Pagos
@@ -57,7 +58,7 @@ router
 // por que la agencia lo informe (informar-pago) y él lo confirme o rechace.
 router
   .route('/:id/pagos')
-  .get(role('mayorista', 'agencia'), getPagos);
+  .get(role('mayorista', 'agencia'), checkPermisoMayorista('GestionarReservas'), getPagos);
 
 // ---------------------
 // Flujo bidireccional de pagos
@@ -67,9 +68,9 @@ router
 router.route('/:id/informar-pago').post(role('agencia'), informarPago);
 
 // POST /api/v1/reservas/:id/confirmar-pago → El mayorista confirma el pago informado
-router.route('/:id/confirmar-pago').post(role('mayorista'), confirmarPago);
+router.route('/:id/confirmar-pago').post(role('mayorista'), checkPermiso('GestionarReservas'), confirmarPago);
 
 // POST /api/v1/reservas/:id/rechazar-pago → El mayorista rechaza el pago informado
-router.route('/:id/rechazar-pago').post(role('mayorista'), rechazarPago);
+router.route('/:id/rechazar-pago').post(role('mayorista'), checkPermiso('GestionarReservas'), rechazarPago);
 
 module.exports = router;

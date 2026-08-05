@@ -10,6 +10,7 @@ const {
 const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
 const { tenant, checkOwnership } = require('../middlewares/tenantMiddleware');
+const { checkPermiso, checkPermisoMayorista } = require('../middlewares/permisoMiddleware');
 const Producto = require('../models/Producto');
 
 const router = express.Router();
@@ -21,22 +22,23 @@ router.use(auth);
 // GET /api/v1/productos
 // - Mayoristas listan sus productos
 // - Agencias listan los productos habilitados para ellos
-router.get('/', role('mayorista', 'agencia'), getProductos);
+router.get('/', role('mayorista', 'agencia'), checkPermisoMayorista('GestionarProductos'), getProductos);
 
 // POST /api/v1/productos
 // - Solo mayoristas
-router.post('/', role('mayorista'), createProducto);
+router.post('/', role('mayorista'), checkPermiso('GestionarProductos'), createProducto);
 
 // GET /api/v1/productos/:id
 // - Mayoristas devuelven info total
 // - Agencias devuelven info modificada si está habilitado
-router.get('/:id', role('mayorista', 'agencia'), getProductoById);
+router.get('/:id', role('mayorista', 'agencia'), checkPermisoMayorista('GestionarProductos'), getProductoById);
 
 // GET /api/v1/productos/:id/agencias
 // - Solo mayoristas: retorna cuántas agencias tienen vinculado el producto
 router.get(
   '/:id/agencias',
   role('mayorista'),
+  checkPermiso('GestionarProductos'),
   tenant,
   checkOwnership(Producto, 'mayorista_id'),
   checkProductoAgencias
@@ -48,6 +50,7 @@ router.get(
 router.put(
   '/:id',
   role('mayorista'),
+  checkPermiso('GestionarProductos'),
   tenant,
   checkOwnership(Producto, 'mayorista_id'),
   updateProducto
@@ -59,6 +62,7 @@ router.put(
 router.delete(
   '/:id',
   role('mayorista'),
+  checkPermiso('GestionarProductos'),
   tenant,
   checkOwnership(Producto, 'mayorista_id'),
   deleteProducto
