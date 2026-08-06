@@ -59,6 +59,10 @@ export const AgenciaReservaDetalle = () => {
       setError('El método de pago y la fecha son obligatorios.');
       return;
     }
+    if (pagoForm.comprobante && !/^\d+$/.test(pagoForm.comprobante)) {
+      setError('El número de comprobante solo puede contener números.');
+      return;
+    }
     setActionLoading(true);
     try {
       await reservaService.informarPago(id, {
@@ -286,8 +290,9 @@ export const AgenciaReservaDetalle = () => {
 
           <Input
             label="Número de comprobante"
+            inputMode="numeric"
             value={pagoForm.comprobante}
-            onChange={e => setPagoForm({ ...pagoForm, comprobante: e.target.value })}
+            onChange={e => setPagoForm({ ...pagoForm, comprobante: e.target.value.replace(/\D/g, '') })}
             placeholder="Ej: 0012345678"
           />
 

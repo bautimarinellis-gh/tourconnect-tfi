@@ -1,20 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BriefcaseBusiness,
-  Building2,
-  ClipboardList,
-  LayoutDashboard,
   LogOut,
-  Map,
   PanelLeft,
   Shield,
-  ShieldCheck,
-  ShoppingBag,
   User,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { navegacionVisible } from '../../config/navegacion';
+import { navegacionAgrupada } from '../../config/navegacion';
 import { ProfileModal } from '../shared/ProfileModal';
 import './layout.css';
 import logoImg from '/logo.png';
@@ -36,27 +30,13 @@ export const Navbar = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  let links = [];
-  if (user?.rol === 'admin') {
-    links = [
-      { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-      { name: 'Mayoristas', path: '/admin/mayoristas', icon: Building2 },
-      { name: 'Auditoría', path: '/admin/auditoria', icon: ShieldCheck },
-    ];
-  } else if (user?.rol === 'mayorista') {
-    // El menú del mayorista se arma según los permisos efectivos: una sección
-    // que el usuario no puede usar directamente no aparece. El bloqueo por
-    // contenido sigue existiendo en App.jsx para quien llegue por URL.
-    links = navegacionVisible(user?.permisos ?? []);
-  } else if (user?.rol === 'agencia') {
-    links = [
-      { name: 'Dashboard', path: '/agencia/dashboard', icon: LayoutDashboard },
-      { name: 'Catálogo', path: '/agencia/catalogo', icon: Map },
-      { name: 'Cotizaciones', path: '/agencia/cotizaciones', icon: ShoppingBag },
-      { name: 'Reservas', path: '/agencia/reservas', icon: ClipboardList },
-      { name: 'Auditoría', path: '/agencia/auditoria', icon: ShieldCheck },
-    ];
-  }
+  // El menú se arma según los permisos efectivos: una sección que el usuario no
+  // puede usar no aparece, y un grupo que queda sin secciones tampoco. El
+  // bloqueo por contenido sigue existiendo en App.jsx para quien llegue por URL.
+  const grupos = useMemo(
+    () => navegacionAgrupada(user?.rol, user?.permisos ?? []),
+    [user?.rol, user?.permisos]
+  );
 
   const roleLabel = {
     admin: 'Administrador',
@@ -64,7 +44,9 @@ export const Navbar = () => {
     agencia: 'Agencia',
   }[user?.rol] || 'Usuario';
 
-  const activeLink = links.find(link => location.pathname.startsWith(link.path));
+  const activeLink = grupos
+    .flatMap(grupo => grupo.items)
+    .find(link => location.pathname.startsWith(link.path));
 
   return (
     <nav className="navbar">
@@ -78,16 +60,25 @@ export const Navbar = () => {
             <span>{roleLabel}</span>
           </div>
           <div className="navbar-links">
-            {links.map(link => {
-              const isActive = location.pathname.startsWith(link.path);
-              const Icon = link.icon;
-              return (
-                <Link key={link.path} to={link.path} className={`nav-item ${isActive ? 'active' : ''}`}>
-                  <Icon size={16} />
-                  {link.name}
-                </Link>
-              );
-            })}
+            {grupos.map(grupo => (
+              <div key={grupo.id ?? '_sueltos'} className="nav-group">
+                {grupo.label && <p className="nav-group-label">{grupo.label}</p>}
+                {grupo.items.map(link => {
+                  const isActive = location.pathname.startsWith(link.path);
+                  const Icon = link.icon;
+                  return (
+                    <Link
+                      key={link.path}
+                      to={link.path}
+                      className={`nav-item ${isActive ? 'active' : ''}`}
+                    >
+                      <Icon size={16} />
+                      {link.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
 

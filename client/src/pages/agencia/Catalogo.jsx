@@ -9,7 +9,7 @@ import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { addDays, applyRangePreset, daysBetween, isValidDateRange, toDateInputValue } from '../../utils/dateRanges';
+import { addDays, applyRangePreset, daysBetween, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
 import productoService from '../../services/productoService';
 import cotizacionService from '../../services/cotizacionService';
 import { useToast } from '../../components/ui/Toast';
@@ -102,7 +102,10 @@ export const AgenciaCatalogo = () => {
 
   if (fetchError) return <Alert variant="error" style={{ margin: '2rem' }}>{fetchError}</Alert>;
 
-  const minDisponible = toDateInputValue(selectedProduct?.disponibilidad_desde);
+  const minDisponible = [toDateInputValue(selectedProduct?.disponibilidad_desde), todayDateInput()]
+    .filter(Boolean)
+    .sort()
+    .pop();
   const maxDisponible = toDateInputValue(selectedProduct?.disponibilidad_hasta);
   const cantidadNoches =
     formData.fecha_inicio && formData.fecha_fin

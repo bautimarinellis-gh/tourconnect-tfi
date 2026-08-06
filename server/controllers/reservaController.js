@@ -353,6 +353,15 @@ exports.informarPago = async (req, res, next) => {
       });
     }
 
+    if (comprobante && !/^\d+$/.test(comprobante)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'El número de comprobante solo puede contener números',
+      });
+    }
+
     const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);
 
     if (!reserva) {
