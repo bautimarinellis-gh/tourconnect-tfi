@@ -48,6 +48,8 @@ const cotizacionSchema = new mongoose.Schema(
     },
     motivo_rechazo: {
       type: String,
+      trim: true,
+      maxlength: [500, 'El motivo no puede superar los 500 caracteres'],
       required: function () {
         return this.estado === 'rechazada';
       },

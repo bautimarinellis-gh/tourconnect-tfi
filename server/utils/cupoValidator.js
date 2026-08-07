@@ -7,8 +7,8 @@ const Producto = require('../models/Producto');
  * Cuenta pasajeros de otras cotizaciones activas (aprobada o reserva_generada)
  * cuyas fechas se solapan con la cotización a aprobar.
  */
-async function verificarCupoDisponible(cotizacion) {
-  const producto = await Producto.findById(cotizacion.producto_id);
+async function verificarCupoDisponible(cotizacion, { session } = {}) {
+  const producto = await Producto.findById(cotizacion.producto_id).session(session || null);
   if (!producto || producto.tipo !== 'actividad' || !producto.cupo_maximo) {
     return { ok: true };
   }
@@ -19,7 +19,7 @@ async function verificarCupoDisponible(cotizacion) {
     _id: { $ne: cotizacion._id },
     fecha_inicio: { $lt: cotizacion.fecha_fin },
     fecha_fin: { $gt: cotizacion.fecha_inicio },
-  });
+  }).session(session || null);
 
   const pasajerosComprometidos = solapadas.reduce((sum, c) => sum + c.pasajeros, 0);
   const disponible = producto.cupo_maximo - pasajerosComprometidos;

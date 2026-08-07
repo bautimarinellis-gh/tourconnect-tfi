@@ -1,9 +1,20 @@
+const mongoose = require('mongoose');
 const Cotizacion = require('../models/Cotizacion');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Producto = require('../models/Producto');
 const { calcularPrecioTotal } = require('../utils/precioCalculator');
 const { registrarAuditoria } = require('../utils/auditService');
 const { verificarCupoDisponible } = require('../utils/cupoValidator');
+
+// Error de negocio (no de DB) usada para abortar la transacción de aprobación
+// sin disparar el retry automático de session.withTransaction (solo reintenta
+// errores etiquetados TransientTransactionError).
+class AprobacionRechazada extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
 
 const MAX_PASAJEROS = 30;
 
@@ -220,10 +231,20 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
       });
     }
 
-    if (estado === 'rechazada' && !motivo_rechazo) {
+    const motivoRechazoTrim =
+      typeof motivo_rechazo === 'string' ? motivo_rechazo.trim() : '';
+
+    if (estado === 'rechazada' && !motivoRechazoTrim) {
       return res.status(400).json({
         success: false,
         message: 'El motivo de rechazo es obligatorio',
+      });
+    }
+
+    if (motivoRechazoTrim.length > 500) {
+      return res.status(400).json({
+        success: false,
+        message: 'El motivo de rechazo no puede superar los 500 caracteres',
       });
     }
 
@@ -250,30 +271,79 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
       });
     }
 
+    // Revalidar vigencia: la fecha de inicio se valida contra "hoy" al crear
+    // la cotización, pero el mayorista puede tardar días en aprobarla (hasta
+    // que vence a las 72hs). Si para entonces el viaje ya empezó, no debe
+    // poder aprobarse.
     if (estado === 'aprobada') {
-      const cupo = await verificarCupoDisponible(cotizacion);
-      if (!cupo.ok) {
-        return res.status(400).json({ success: false, message: cupo.message });
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      if (new Date(cotizacion.fecha_inicio) < hoy) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se puede aprobar: la fecha de inicio del viaje ya pasó.',
+        });
       }
     }
 
-    // Update atómico filtrando por el estado esperado: si otra request ya
-    // cambió el estado entre el chequeo de arriba y este punto, no matchea
-    // ningún documento y devolvemos 409 en vez de pisar el cambio ajeno.
-    const update = { estado };
-    if (estado === 'rechazada') update.motivo_rechazo = motivo_rechazo;
+    let actualizada;
 
-    const actualizada = await Cotizacion.findOneAndUpdate(
-      { _id: id, estado: 'pendiente' },
-      { $set: update },
-      { new: true }
-    );
+    if (estado === 'aprobada') {
+      // El chequeo de cupo (lectura de otras cotizaciones) y el cambio de
+      // estado deben ser una sola operación atómica: si no, dos aprobaciones
+      // concurrentes para el mismo producto pueden leer cupo disponible antes
+      // de que ninguna haya escrito, y ambas pasar (sobreventa). Se resuelve
+      // con una transacción que además toca `cupo_lock_version` del producto:
+      // dos transacciones que escriben el mismo documento generan un write
+      // conflict real, y la que pierde se reintenta con datos frescos.
+      const session = await mongoose.startSession();
+      try {
+        await session.withTransaction(async () => {
+          const cotizacionActual = await Cotizacion.findById(id).session(session);
+          if (!cotizacionActual || cotizacionActual.estado !== 'pendiente') {
+            throw new AprobacionRechazada(409, 'La cotización ya no está pendiente (fue modificada por otra acción).');
+          }
 
-    if (!actualizada) {
-      return res.status(409).json({
-        success: false,
-        message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
-      });
+          await Producto.findByIdAndUpdate(
+            cotizacionActual.producto_id,
+            { $inc: { cupo_lock_version: 1 } },
+            { session }
+          );
+
+          const cupo = await verificarCupoDisponible(cotizacionActual, { session });
+          if (!cupo.ok) {
+            throw new AprobacionRechazada(400, cupo.message);
+          }
+
+          actualizada = await Cotizacion.findOneAndUpdate(
+            { _id: id, estado: 'pendiente' },
+            { $set: { estado: 'aprobada' } },
+            { new: true, session }
+          );
+        });
+      } catch (error) {
+        if (error instanceof AprobacionRechazada) {
+          return res.status(error.status).json({ success: false, message: error.message });
+        }
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      // Rechazo: no hay chequeo de cupo, el update atómico filtrando por
+      // estado esperado alcanza para evitar pisar un cambio concurrente.
+      actualizada = await Cotizacion.findOneAndUpdate(
+        { _id: id, estado: 'pendiente' },
+        { $set: { estado, motivo_rechazo: motivoRechazoTrim } },
+        { new: true }
+      );
+
+      if (!actualizada) {
+        return res.status(409).json({
+          success: false,
+          message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
+        });
+      }
     }
 
     registrarAuditoria({
@@ -281,7 +351,7 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
       accion: estado === 'aprobada' ? 'COTIZACION_APROBADA' : 'COTIZACION_RECHAZADA',
       entidad_afectada: 'Cotizacion',
       entidad_id: actualizada._id,
-      detalle: estado === 'rechazada' ? { motivo_rechazo, agencia_id: actualizada.agencia_id } : { agencia_id: actualizada.agencia_id },
+      detalle: estado === 'rechazada' ? { motivo_rechazo: motivoRechazoTrim, agencia_id: actualizada.agencia_id } : { agencia_id: actualizada.agencia_id },
     });
 
     res.status(200).json({

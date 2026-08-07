@@ -67,6 +67,14 @@ const productoSchema = new mongoose.Schema(
     itinerario: {
       type: String,
     },
+    // Incrementado dentro de la transacción de aprobación de cotizaciones para
+    // forzar un write conflict real entre dos aprobaciones concurrentes sobre
+    // el mismo producto (evita sobreventa de cupo por TOCTOU).
+    cupo_lock_version: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },

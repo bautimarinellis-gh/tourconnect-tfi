@@ -98,6 +98,20 @@ exports.createReserva = async (req, res, next) => {
       });
     }
 
+    // Igual que en la aprobación: pueden pasar días entre que se aprueba la
+    // cotización y que la agencia genera la reserva. Si para entonces el
+    // viaje ya empezó, no tiene sentido reservarlo.
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (new Date(cotizacion.fecha_inicio) < hoy) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede generar la reserva: la fecha de inicio del viaje ya pasó.',
+      });
+    }
+
     const reservaExistente = await Reserva.findOne({ cotizacion_id: cotizacion._id }).session(session);
     if (reservaExistente) {
       await session.abortTransaction();
@@ -252,14 +266,24 @@ exports.cancelarReserva = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { id: usuario_id } = req.usuario;
-    const { motivo_cancelacion } = req.body;
+    const motivoCancelacionTrim =
+      typeof req.body.motivo_cancelacion === 'string' ? req.body.motivo_cancelacion.trim() : '';
 
-    if (!motivo_cancelacion) {
+    if (!motivoCancelacionTrim) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
         success: false,
         message: 'El motivo de cancelación es obligatorio',
+      });
+    }
+
+    if (motivoCancelacionTrim.length > 500) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'El motivo de cancelación no puede superar los 500 caracteres',
       });
     }
 
@@ -298,7 +322,7 @@ exports.cancelarReserva = async (req, res, next) => {
 
     const estadoAnterior = reserva.estado;
     reserva.estado = 'cancelada';
-    reserva.motivo_cancelacion = motivo_cancelacion;
+    reserva.motivo_cancelacion = motivoCancelacionTrim;
     await reserva.save({ session });
 
     await registrarCambioEstado(
@@ -306,7 +330,7 @@ exports.cancelarReserva = async (req, res, next) => {
       usuario_id,
       estadoAnterior,
       'cancelada',
-      motivo_cancelacion,
+      motivoCancelacionTrim,
       session
     );
 
@@ -320,7 +344,7 @@ exports.cancelarReserva = async (req, res, next) => {
       accion: 'RESERVA_CANCELADA',
       entidad_afectada: 'Reserva',
       entidad_id: reserva._id,
-      detalle: { motivo_cancelacion },
+      detalle: { motivo_cancelacion: motivoCancelacionTrim },
     });
 
     res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });

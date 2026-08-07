@@ -38,6 +38,11 @@ async function buildCotizacionIdsFilter(reqUsuario, query = {}) {
   if (rol === 'mayorista') {
     cotQuery.mayorista_id = new mongoose.Types.ObjectId(mayorista_id);
     if (query.agencia_id) {
+      if (!mongoose.Types.ObjectId.isValid(query.agencia_id)) {
+        const error = new Error('El parámetro agencia_id no es un identificador válido');
+        error.statusCode = 400;
+        throw error;
+      }
       cotQuery.agencia_id = new mongoose.Types.ObjectId(query.agencia_id);
     }
   } else if (rol === 'agencia') {

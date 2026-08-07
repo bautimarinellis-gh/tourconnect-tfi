@@ -259,6 +259,17 @@ exports.updateProducto = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
 
+    // Revalidar campos obligatorios por tipo contra el resultado efectivo del
+    // update (existente + cambios), no solo contra lo que vino en el body:
+    // si no, un PATCH parcial puede vaciar un campo requerido (ej. cupo_maximo)
+    // sin que nadie lo haya decidido explícitamente.
+    const tipoEfectivo = updates.tipo ?? existente.tipo;
+    const bodyEfectivo = { ...existente.toObject(), ...updates };
+    const validationErrors = validateTipoFields(tipoEfectivo, bodyEfectivo);
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ success: false, message: validationErrors.join(', ') });
+    }
+
     // Fechas efectivas: las del payload, o las ya guardadas si no se modifican.
     // "Desde >= hoy" solo se exige si la fecha de inicio realmente cambia,
     // para no bloquear la edición de productos cuya vigencia ya comenzó.

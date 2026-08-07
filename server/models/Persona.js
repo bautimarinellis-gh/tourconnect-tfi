@@ -42,6 +42,7 @@ const personaSchema = new mongoose.Schema(
     cuit: {
       type: String,
       required: [true, 'El CUIT es obligatorio'],
+      unique: true,
       // Normaliza "20111111111", "20.11111111.1" o "20-11111111-1" al formato canónico.
       // Si no reduce a 11 dígitos (p. ej. contiene letras), se deja tal cual para que el validator lo rechace.
       set: (v) => {
