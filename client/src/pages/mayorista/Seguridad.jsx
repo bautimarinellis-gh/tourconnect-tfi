@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2, Users, ShieldCheck, Lock, Mail } from 'lucide-react';
+import { Plus, Pencil, Trash2, Users, ShieldCheck, Lock, Mail, RotateCcw, KeyRound } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -37,6 +37,17 @@ const agruparPorModulo = (permisos) =>
     return acc;
   }, {});
 
+/**
+ * `activo:false` puede significar "invitación nunca aceptada" o "cuenta
+ * desactivada": el backend ya las distingue en `estado`, acá solo se mapea a
+ * cómo se muestran.
+ */
+const ESTADO_BADGE = {
+  activo: { label: 'Activo', variant: 'success' },
+  desactivado: { label: 'Desactivado', variant: 'error' },
+  invitacion_pendiente: { label: 'Invitación pendiente', variant: 'warning' },
+};
+
 // ---------------------------------------------------------------------------
 // Tab: Usuarios
 // ---------------------------------------------------------------------------
@@ -49,6 +60,13 @@ const TabUsuarios = ({ roles, catalogo }) => {
 
   const [modalAlta, setModalAlta] = useState(false);
   const [formAlta, setFormAlta] = useState({ nombre: '', email: '', rol_id: '' });
+
+  const [modalEditar, setModalEditar] = useState(null);
+  const [formEditar, setFormEditar] = useState({ nombre: '', email: '' });
+
+  // { tipo: 'desactivar' | 'resetear', usuario } — confirmación de las dos
+  // acciones sensibles, en vez de window.confirm.
+  const [confirmAccion, setConfirmAccion] = useState(null);
 
   const [usuarioPermisos, setUsuarioPermisos] = useState(null);
   const [seleccionPermisos, setSeleccionPermisos] = useState([]);
@@ -95,6 +113,67 @@ const TabUsuarios = ({ roles, catalogo }) => {
       cargar();
     } catch (err) {
       notificarError(toast, err, 'No se pudo cambiar el rol');
+    }
+  };
+
+  const abrirEditar = (usuario) => {
+    setFormEditar({ nombre: usuario.nombre || '', email: usuario.email });
+    setModalEditar(usuario);
+  };
+
+  const guardarEdicion = async () => {
+    if (!formEditar.nombre.trim() || !formEditar.email.trim()) {
+      toast.warning('El nombre y el email son obligatorios');
+      return;
+    }
+    setGuardando(true);
+    try {
+      await seguridadService.updateUsuario(modalEditar._id, {
+        nombre: formEditar.nombre.trim(),
+        email: formEditar.email.trim(),
+      });
+      toast.success('Usuario actualizado');
+      setModalEditar(null);
+      cargar();
+    } catch (err) {
+      notificarError(toast, err, 'No se pudo actualizar el usuario');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const reactivar = async (usuario) => {
+    try {
+      await seguridadService.reactivarUsuario(usuario._id);
+      toast.success('Usuario reactivado');
+      cargar();
+    } catch (err) {
+      notificarError(toast, err, 'No se pudo reactivar el usuario');
+    }
+  };
+
+  const confirmarAccion = async () => {
+    if (!confirmAccion) return;
+    const { tipo, usuario } = confirmAccion;
+    setGuardando(true);
+    try {
+      if (tipo === 'desactivar') {
+        await seguridadService.desactivarUsuario(usuario._id);
+        toast.success('Usuario desactivado');
+        cargar();
+      } else {
+        await seguridadService.resetearClave(usuario._id);
+        toast.success('Se le envió el email para resetear su contraseña');
+      }
+      setConfirmAccion(null);
+    } catch (err) {
+      notificarError(
+        toast,
+        err,
+        tipo === 'desactivar' ? 'No se pudo desactivar el usuario' : 'No se pudo resetear la clave'
+      );
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -189,24 +268,69 @@ const TabUsuarios = ({ roles, catalogo }) => {
                         : '—'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={usuario.activo ? 'success' : 'warning'}>
-                        {usuario.activo ? 'Activo' : 'Invitación pendiente'}
+                      <Badge variant={ESTADO_BADGE[usuario.estado]?.variant ?? 'warning'}>
+                        {ESTADO_BADGE[usuario.estado]?.label ?? usuario.estado}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={esAdministrador}
-                        title={
-                          esAdministrador
-                            ? 'El Administrador ya tiene todos los permisos'
-                            : undefined
-                        }
-                        onClick={() => abrirPermisos(usuario)}
-                      >
-                        <ShieldCheck size={14} /> Permisos
-                      </Button>
+                      <div className="seguridad-acciones">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          title="Editar nombre y email"
+                          onClick={() => abrirEditar(usuario)}
+                        >
+                          <Pencil size={14} />
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={esAdministrador}
+                          title={
+                            esAdministrador
+                              ? 'El Administrador ya tiene todos los permisos'
+                              : 'Permisos individuales'
+                          }
+                          onClick={() => abrirPermisos(usuario)}
+                        >
+                          <ShieldCheck size={14} />
+                        </Button>
+                        {usuario.estado === 'activo' && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            title="Resetear clave"
+                            onClick={() => setConfirmAccion({ tipo: 'resetear', usuario })}
+                          >
+                            <KeyRound size={14} />
+                          </Button>
+                        )}
+                        {usuario.estado === 'desactivado' && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            title="Reactivar usuario"
+                            onClick={() => reactivar(usuario)}
+                          >
+                            <RotateCcw size={14} />
+                          </Button>
+                        )}
+                        {usuario.estado === 'activo' && (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            disabled={esAdministrador}
+                            title={
+                              esAdministrador
+                                ? 'El Administrador no se puede desactivar'
+                                : 'Desactivar usuario'
+                            }
+                            onClick={() => setConfirmAccion({ tipo: 'desactivar', usuario })}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -248,6 +372,63 @@ const TabUsuarios = ({ roles, catalogo }) => {
           value={formAlta.rol_id}
           onChange={e => setFormAlta({ ...formAlta, rol_id: e.target.value })}
         />
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(modalEditar)}
+        onClose={() => setModalEditar(null)}
+        title="Editar usuario"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setModalEditar(null)}>Cancelar</Button>
+            <Button onClick={guardarEdicion} isLoading={guardando}>Guardar</Button>
+          </>
+        }
+      >
+        <Input
+          label="Nombre *"
+          value={formEditar.nombre}
+          onChange={e => setFormEditar({ ...formEditar, nombre: e.target.value })}
+        />
+        <Input
+          label="Email *"
+          type="email"
+          value={formEditar.email}
+          onChange={e => setFormEditar({ ...formEditar, email: e.target.value })}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(confirmAccion)}
+        onClose={() => setConfirmAccion(null)}
+        title={confirmAccion?.tipo === 'desactivar' ? 'Desactivar usuario' : 'Resetear clave'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmAccion(null)}>Cancelar</Button>
+            <Button
+              variant={confirmAccion?.tipo === 'desactivar' ? 'danger' : 'primary'}
+              onClick={confirmarAccion}
+              isLoading={guardando}
+            >
+              {confirmAccion?.tipo === 'desactivar' ? 'Desactivar' : 'Enviar link'}
+            </Button>
+          </>
+        }
+      >
+        {confirmAccion?.tipo === 'desactivar' && (
+          <Alert variant="warning">
+            ¿Desactivar a <strong>{confirmAccion.usuario.nombre || confirmAccion.usuario.email}</strong>?
+            No va a poder iniciar sesión hasta que lo reactives. Sus datos y su historial de
+            auditoría se conservan.
+          </Alert>
+        )}
+        {confirmAccion?.tipo === 'resetear' && (
+          <Alert variant="info">
+            <Mail size={14} /> Le vamos a enviar a <strong>{confirmAccion.usuario.email}</strong>{' '}
+            un link para definir una nueva contraseña. Expira en 48 horas y nadie, ni vos, llega
+            a ver la clave.
+          </Alert>
+        )}
       </Modal>
 
       <Modal
@@ -323,6 +504,7 @@ const TabRoles = ({ roles, catalogo, onCambio }) => {
   const [guardando, setGuardando] = useState(false);
   const [modal, setModal] = useState(null); // { rol } — rol null = alta
   const [form, setForm] = useState({ nombre: '', permisos: [] });
+  const [rolAEliminar, setRolAEliminar] = useState(null);
 
   const abrirAlta = () => {
     setForm({ nombre: '', permisos: [] });
@@ -363,14 +545,18 @@ const TabRoles = ({ roles, catalogo, onCambio }) => {
     }
   };
 
-  const eliminar = async (rol) => {
-    if (!window.confirm(`¿Eliminar el rol "${rol.nombre}"?`)) return;
+  const confirmarEliminar = async () => {
+    if (!rolAEliminar) return;
+    setGuardando(true);
     try {
-      await seguridadService.deleteRol(rol._id);
+      await seguridadService.deleteRol(rolAEliminar._id);
       toast.success('Rol eliminado');
+      setRolAEliminar(null);
       onCambio();
     } catch (err) {
       notificarError(toast, err, 'No se pudo eliminar el rol');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -416,7 +602,7 @@ const TabRoles = ({ roles, catalogo, onCambio }) => {
                       <Button variant="secondary" size="sm" onClick={() => abrirEdicion(rol)}>
                         <Pencil size={14} />
                       </Button>
-                      <Button variant="danger" size="sm" onClick={() => eliminar(rol)}>
+                      <Button variant="danger" size="sm" onClick={() => setRolAEliminar(rol)}>
                         <Trash2 size={14} />
                       </Button>
                     </div>
@@ -456,6 +642,28 @@ const TabRoles = ({ roles, catalogo, onCambio }) => {
           seleccion={form.permisos}
           onChange={permisos => setForm({ ...form, permisos })}
         />
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(rolAEliminar)}
+        onClose={() => setRolAEliminar(null)}
+        title="Eliminar rol"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRolAEliminar(null)}>Cancelar</Button>
+            <Button variant="danger" onClick={confirmarEliminar} isLoading={guardando}>
+              Eliminar
+            </Button>
+          </>
+        }
+      >
+        {rolAEliminar && (
+          <Alert variant="warning">
+            ¿Eliminar el rol <strong>{rolAEliminar.nombre}</strong>? Esta acción no se puede
+            deshacer. Si hay usuarios con este rol asignado, no se va a poder eliminar hasta que
+            les asignes otro.
+          </Alert>
+        )}
       </Modal>
     </>
   );

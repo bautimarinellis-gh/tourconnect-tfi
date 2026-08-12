@@ -10,6 +10,10 @@ const seguridadService = {
 
   getUsuarios: () => api.get('/seguridad/usuarios').then(r => r.data?.data),
   createUsuario: (data) => api.post('/seguridad/usuarios', data).then(r => r.data?.data),
+  updateUsuario: (id, data) => api.put(`/seguridad/usuarios/${id}`, data).then(r => r.data?.data),
+  desactivarUsuario: (id) => api.delete(`/seguridad/usuarios/${id}`).then(r => r.data),
+  reactivarUsuario: (id) => api.patch(`/seguridad/usuarios/${id}/reactivar`).then(r => r.data),
+  resetearClave: (id) => api.patch(`/seguridad/usuarios/${id}/resetear-clave`).then(r => r.data),
   asignarRol: (id, rol_id) =>
     api.patch(`/seguridad/usuarios/${id}/rol`, { rol_id }).then(r => r.data?.data),
   asignarPermisos: (id, permisos) =>

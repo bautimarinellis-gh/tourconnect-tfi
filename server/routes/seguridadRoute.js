@@ -9,6 +9,10 @@ const {
   deleteRol,
   getUsuarios,
   createUsuario,
+  updateUsuario,
+  deleteUsuario,
+  reactivarUsuario,
+  resetearClave,
   asignarRol,
   asignarPermisos,
 } = require('../controllers/seguridadController');
@@ -41,6 +45,10 @@ router.delete('/roles/:id', deleteRol);
 // Usuarios
 router.get('/usuarios', getUsuarios);
 router.post('/usuarios', createUsuario);
+router.put('/usuarios/:id', updateUsuario);
+router.delete('/usuarios/:id', deleteUsuario);
+router.patch('/usuarios/:id/reactivar', reactivarUsuario);
+router.patch('/usuarios/:id/resetear-clave', resetearClave);
 router.patch('/usuarios/:id/rol', asignarRol);
 router.patch('/usuarios/:id/permisos', asignarPermisos);
 

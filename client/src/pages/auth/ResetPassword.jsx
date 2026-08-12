@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { PasswordInput } from '../../components/ui/PasswordInput';
@@ -22,10 +22,16 @@ const SUBTITULOS = {
 };
 
 export const ResetPassword = () => {
-  const [paso, setPaso] = useState(PASOS.EMAIL);
+  // Un link de reseteo enviado por un administrador (ver módulo Seguridad)
+  // trae el token en la URL y salta directo al paso de nueva contraseña,
+  // sin pasar por email + código: quien lo dispara ya está autenticado.
+  const [searchParams] = useSearchParams();
+  const tokenDeLink = searchParams.get('token');
+
+  const [paso, setPaso] = useState(tokenDeLink ? PASOS.PASSWORD : PASOS.EMAIL);
   const [email, setEmail] = useState('');
   const [codigo, setCodigo] = useState('');
-  const [resetToken, setResetToken] = useState('');
+  const [resetToken, setResetToken] = useState(tokenDeLink || '');
   const [nuevaPassword, setNuevaPassword] = useState('');
   const [confirmarPassword, setConfirmarPassword] = useState('');
   const [loading, setLoading] = useState(false);

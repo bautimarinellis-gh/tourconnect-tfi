@@ -3,11 +3,12 @@ const mongoose = require('mongoose');
 const Usuario = require('../models/Usuario');
 const Rol = require('../models/Rol');
 const Permiso = require('../models/Permiso');
-const { enviarInvitacion } = require('../utils/mailer');
+const { enviarInvitacion, enviarResetClave } = require('../utils/mailer');
 const { registrarAuditoria } = require('../utils/auditService');
 const { PERMISOS_NO_ASIGNABLES } = require('../utils/permisosCatalogo');
 
 const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
+const RESET_ADMIN_TTL_MS = 48 * 60 * 60 * 1000;
 
 const error = (message, statusCode) => {
   const err = new Error(message);
@@ -299,13 +300,22 @@ exports.getUsuarios = async (req, res, next) => {
       rol: 'mayorista',
       mayorista_id: req.mayorista_id,
     })
-      .select('email nombre activo rol_id permisos_individuales created_at')
+      .select('email nombre activo rol_id permisos_individuales created_at +password_hash')
       .populate('rol_id', 'nombre protegido personalizado')
       .populate('permisos_individuales', 'codigo descripcion modulo')
       .sort({ created_at: 1 })
       .lean();
 
-    res.json({ success: true, data: usuarios });
+    // `activo: false` significa dos cosas distintas según haya password_hash
+    // o no: invitación nunca aceptada vs. cuenta desactivada a propósito. El
+    // frontend necesita distinguirlas para ofrecer la acción correcta (no
+    // tiene sentido "reactivar" a alguien que nunca aceptó la invitación).
+    const data = usuarios.map(({ password_hash, ...u }) => ({
+      ...u,
+      estado: u.activo ? 'activo' : password_hash ? 'desactivado' : 'invitacion_pendiente',
+    }));
+
+    res.json({ success: true, data });
   } catch (err) {
     next(err);
   }
@@ -540,6 +550,179 @@ exports.asignarPermisos = async (req, res, next) => {
     }
 
     res.json({ success: true, data: usuario });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Editar nombre y/o email de un usuario interno
+ * @route   PUT /api/v1/seguridad/usuarios/:id
+ * @access  Private/GestionarRoles
+ */
+exports.updateUsuario = async (req, res, next) => {
+  try {
+    const { nombre, email } = req.body;
+    const usuario = await buscarUsuarioDelTenant(req.params.id, req.mayorista_id);
+
+    const antes = { nombre: usuario.nombre, email: usuario.email };
+
+    if (nombre !== undefined) {
+      if (!String(nombre).trim()) throw error('El nombre es obligatorio', 400);
+      usuario.nombre = String(nombre).trim();
+    }
+
+    if (email !== undefined) {
+      const emailNormalizado = String(email).trim().toLowerCase();
+      if (!emailNormalizado) throw error('El email es obligatorio', 400);
+
+      if (emailNormalizado !== usuario.email) {
+        const existente = await Usuario.findOne({
+          email: emailNormalizado,
+          _id: { $ne: usuario._id },
+        });
+        if (existente) throw error('El email ya está registrado', 400);
+        usuario.email = emailNormalizado;
+      }
+    }
+
+    await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_ACTUALIZADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { antes, despues: { nombre: usuario.nombre, email: usuario.email } },
+    });
+
+    res.json({ success: true, data: usuario });
+  } catch (err) {
+    if (err.code === 11000) return next(error('El email ya está registrado', 400));
+    next(err);
+  }
+};
+
+/**
+ * @desc    Desactivar un usuario interno. No se elimina físicamente para no
+ *          perder la trazabilidad de auditoría de lo que hizo mientras
+ *          estuvo activo.
+ * @route   DELETE /api/v1/seguridad/usuarios/:id
+ * @access  Private/GestionarRoles
+ */
+exports.deleteUsuario = async (req, res, next) => {
+  try {
+    const usuario = await buscarUsuarioDelTenant(req.params.id, req.mayorista_id);
+    await usuario.populate('rol_id', 'protegido');
+
+    // El rol Administrador es el único con GestionarRoles: desactivar a quien
+    // lo tiene dejaría al mayorista sin nadie que pueda administrar la
+    // seguridad de su propia cuenta.
+    if (usuario.rol_id?.protegido) {
+      throw error('No se puede desactivar al Administrador del mayorista', 403);
+    }
+
+    if (!usuario.activo) {
+      throw error('El usuario ya está desactivado', 400);
+    }
+
+    usuario.activo = false;
+    await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_DESACTIVADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email },
+    });
+
+    res.json({ success: true, message: 'Usuario desactivado' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    Reactivar un usuario interno previamente desactivado
+ * @route   PATCH /api/v1/seguridad/usuarios/:id/reactivar
+ * @access  Private/GestionarRoles
+ */
+exports.reactivarUsuario = async (req, res, next) => {
+  try {
+    await buscarUsuarioDelTenant(req.params.id, req.mayorista_id);
+    const usuario = await Usuario.findById(req.params.id).select('+password_hash');
+
+    if (usuario.activo) {
+      throw error('El usuario ya está activo', 400);
+    }
+    // Sin password_hash nunca aceptó la invitación: no hay nada que
+    // reactivar, hay que reinvitarlo en su lugar.
+    if (!usuario.password_hash) {
+      throw error('Este usuario todavía no aceptó su invitación', 400);
+    }
+
+    usuario.activo = true;
+    await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_REACTIVADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email },
+    });
+
+    res.json({ success: true, message: 'Usuario reactivado' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * @desc    El administrador fuerza el reseteo de la clave de un usuario:
+ *          genera un link de un solo uso y se lo reenvía por email. No pasa
+ *          por el código de verificación del autoservicio porque quien lo
+ *          dispara ya está autenticado como administrador.
+ * @route   PATCH /api/v1/seguridad/usuarios/:id/resetear-clave
+ * @access  Private/GestionarRoles
+ */
+exports.resetearClave = async (req, res, next) => {
+  try {
+    const usuario = await buscarUsuarioDelTenant(req.params.id, req.mayorista_id);
+
+    if (!usuario.activo) {
+      throw error('El usuario debe estar activo para poder resetear su clave', 400);
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    usuario.reset_token = resetToken;
+    usuario.reset_token_expires = new Date(Date.now() + RESET_ADMIN_TTL_MS);
+    // Invalida cualquier código de verificación del autoservicio que haya
+    // quedado pendiente, para no dejar dos vías de reseteo abiertas a la vez.
+    usuario.reset_code_hash = undefined;
+    usuario.reset_code_expires = undefined;
+    usuario.reset_code_attempts = 0;
+    await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'RESET_PASSWORD_SOLICITADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email, solicitado_por: 'administrador' },
+    });
+
+    try {
+      await enviarResetClave(usuario.email, usuario.nombre, resetToken);
+    } catch (mailError) {
+      console.error('Error al enviar el email de reseteo de clave:', mailError.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Se le envió un email para que defina una nueva contraseña.',
+    });
   } catch (err) {
     next(err);
   }

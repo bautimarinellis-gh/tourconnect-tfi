@@ -92,6 +92,43 @@ const enviarInvitacion = async (email, token, rol) => {
   });
 };
 
+/**
+ * Envía el email de reseteo de clave forzado por un administrador: un link
+ * de un solo uso para que el usuario defina una contraseña nueva.
+ * @param {string} email — email del destinatario
+ * @param {string} nombre — nombre del usuario, para personalizar el saludo
+ * @param {string} token — reset_token de un solo uso
+ */
+const enviarResetClave = async (email, nombre, token) => {
+  const baseUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+  const link = `${baseUrl}/reset-password?token=${token}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #2563eb;">Restablecer contraseña</h2>
+      <p>Hola${nombre ? ` ${nombre}` : ''},</p>
+      <p>Un administrador solicitó restablecer tu contraseña en TourConnect.</p>
+      <p>Hacé clic en el siguiente botón para definir una contraseña nueva:</p>
+      <a href="${link}"
+         style="display: inline-block; padding: 12px 24px; background-color: #2563eb;
+                color: #fff; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+        Definir nueva contraseña
+      </a>
+      <p style="color: #6b7280; font-size: 14px;">
+        Este enlace expira en 48 horas. Si no esperabas este email, contactá a tu administrador.
+      </p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb;" />
+      <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>
+    </div>
+  `;
+
+  return enviarEmail({
+    para: email,
+    asunto: 'TourConnect — Restablecé tu contraseña',
+    html,
+  });
+};
+
 const MOTIVOS_LABEL = {
   incumplimiento_pago: 'Incumplimiento de pago',
   incumplimiento_terminos: 'Incumplimiento de términos y condiciones',
@@ -159,6 +196,7 @@ const enviarNotificacionReactivacion = async (email, nombreEntidad) => {
 module.exports = {
   enviarEmail,
   enviarInvitacion,
+  enviarResetClave,
   enviarNotificacionDesactivacion,
   enviarNotificacionReactivacion,
 };
