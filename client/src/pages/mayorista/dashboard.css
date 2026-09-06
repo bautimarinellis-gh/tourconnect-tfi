@@ -82,8 +82,3 @@
   color: var(--color-text-soft);
   font-size: 0.8125rem;
 }
-
-/* ── Asistente Inteligente ── */
-.dashboard-assistant-section {
-  width: 100%;
-}

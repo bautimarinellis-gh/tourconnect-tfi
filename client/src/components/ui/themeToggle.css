@@ -11,10 +11,12 @@
   justify-content: center;
   cursor: pointer;
   background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  /* Borde y glow tenue con el verde de acento: en light el borde glass casi
+     no se veía. En dark lo pisan las reglas [data-theme="dark"] de más abajo. */
+  border: 1px solid rgba(62, 207, 142, 0.45);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 0 12px rgba(62, 207, 142, 0.1), var(--shadow-md);
   color: var(--color-text);
   outline: none;
   transition: 
@@ -27,7 +29,8 @@
 
 .theme-toggle-btn:hover {
   transform: scale(1.12) translateY(-3px);
-  box-shadow: var(--shadow-lg);
+  border-color: rgba(62, 207, 142, 0.65);
+  box-shadow: 0 0 20px rgba(62, 207, 142, 0.2), var(--shadow-lg);
   color: var(--color-primary-hover);
 }
 
@@ -85,7 +88,9 @@
   pointer-events: none;
 }
 
-/* Dark theme specific enhancements for premium glass feel and glowing accent */
+/* Dark theme specific enhancements for premium glass feel and glowing accent.
+   El borde/glow más marcado del modo claro vive en la regla base; acá se
+   restauran los valores originales del modo oscuro. */
 [data-theme="dark"] .theme-toggle-btn {
   background: rgba(19, 22, 16, 0.85);
   border: 1px solid rgba(62, 207, 142, 0.25);

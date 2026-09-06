@@ -31,6 +31,7 @@ import { MayoristaReservas } from './pages/mayorista/Reservas';
 import { MayoristaReservaDetalle } from './pages/mayorista/ReservaDetalle';
 import { MayoristaSeguridad } from './pages/mayorista/Seguridad';
 import { ConPermiso } from './components/shared/SinPermiso';
+import { MayoristaAssistant } from './components/shared/MayoristaAssistant';
 import { PERMISO_POR_SECCION as P } from './config/navegacion';
 
 // Agencia Pages
@@ -111,6 +112,13 @@ function App() {
                     </ConPermiso>
                   } />
                 </Routes>
+
+                {/* Asistente Inteligente: widget flotante, presente en todas
+                    las secciones del mayorista. Montado fuera del <Routes> para
+                    que no se re-monte al navegar. Sin permiso por ahora (lo usan
+                    mayorista y sub-mayoristas); para restringirlo, envolver en
+                    <ConPermiso codigo="..."> sin tocar el componente. */}
+                <MayoristaAssistant />
               </PageWrapper>
             } />
           </Route>
