@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Download } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -8,10 +8,12 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Modal } from '../../components/ui/Modal';
 import { AuditEventDetail } from '../../components/ui/AuditEventDetail';
+import { useToast } from '../../components/ui/Toast';
 import { ACCION_LABELS, ACCIONES_POR_ROL } from '../../utils/auditoriaConstants';
 import { useAuditoria } from '../../hooks/useAuditoria';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateTime } from '../../utils/formatters';
+import auditoriaService from '../../services/auditoriaService';
 import './auditoria.css';
 
 // ── Helpers de presentación ──────────────────────────────────────
@@ -31,79 +33,126 @@ const CategoriaBadge = ({ categoria }) => (
 
 // ── Componente principal ─────────────────────────────────────────
 export const AuditoriaPage = ({ title }) => {
-  const { logs, paginacion, page, setPage, filtros, actualizarFiltro, limpiarFiltros, loading, error } = useAuditoria();
+  const {
+    logs, paginacion, page, setPage, filtros, actualizarFiltro, limpiarFiltros, loading, error,
+    trazabilidad, esTrazabilidadEntidad, verTrazabilidad, salirDeTrazabilidad,
+  } = useAuditoria();
   const { user } = useAuth();
+  const toast = useToast();
   const [selectedLog, setSelectedLog] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const accionesPorCategoria = ACCIONES_POR_ROL[user?.rol] ?? ACCIONES_POR_ROL.agencia;
 
   const tieneFiltrosActivos = Object.values(filtros).some(Boolean);
 
+  const handleExportar = async () => {
+    setExporting(true);
+    try {
+      const params = trazabilidad
+        ? { entidad_afectada: trazabilidad.entidad_afectada, entidad_id: trazabilidad.entidad_id }
+        : filtros;
+      const blob = await auditoriaService.exportarPDF(params);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = trazabilidad
+        ? `trazabilidad_${trazabilidad.entidad_afectada}_${trazabilidad.entidad_id}.pdf`
+        : `auditoria_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      toast.error('No se pudo generar el PDF de auditoría.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       <div className="page-header">
         <h1 className="page-title">{title}</h1>
+        <Button variant="ghost" onClick={handleExportar} isLoading={exporting} disabled={loading || logs.length === 0}>
+          <Download size={16} /> Exportar PDF
+        </Button>
       </div>
+
+      {/* ── Trazabilidad de una entidad puntual ── */}
+      {trazabilidad && (
+        <Alert variant="info" className="audit-trazabilidad-banner">
+          Viendo la {esTrazabilidadEntidad ? 'trazabilidad completa' : 'actividad propia'} de{' '}
+          <strong>{trazabilidad.entidad_afectada} #{truncateId(trazabilidad.entidad_id)}</strong>.
+          {' '}
+          <Button variant="secondary" size="sm" className="audit-btn-volver" onClick={salirDeTrazabilidad}>
+            ← Volver a mi actividad
+          </Button>
+        </Alert>
+      )}
 
       {/* ── Filtros ── */}
-      <div className="audit-filters">
+      {!trazabilidad && (
+        <div className="audit-filters">
 
-        <div className="audit-filter-field audit-filter-field--accion">
-          <label className="audit-filter-label">Acción</label>
-          <select
-            className="input-control"
-            value={filtros.accion}
-            onChange={e => actualizarFiltro('accion', e.target.value)}
-          >
-            <option value="">Todas las acciones</option>
-            <optgroup label="Seguridad">
-              {accionesPorCategoria.seguridad.map(a => (
-                <option key={a} value={a}>{ACCION_LABELS[a]}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Negocio">
-              {accionesPorCategoria.negocio.map(a => (
-                <option key={a} value={a}>{ACCION_LABELS[a]}</option>
-              ))}
-            </optgroup>
-          </select>
-        </div>
-
-        <div className="audit-filter-field">
-          <label className="audit-filter-label">Categoría</label>
-          <select
-            className="input-control"
-            value={filtros.categoria}
-            onChange={e => actualizarFiltro('categoria', e.target.value)}
-          >
-            <option value="">Todas</option>
-            <option value="seguridad">Seguridad</option>
-            <option value="negocio">Negocio</option>
-          </select>
-        </div>
-
-        <div className="audit-filter-field">
-          <label className="audit-filter-label">Resultado</label>
-          <select
-            className="input-control"
-            value={filtros.resultado}
-            onChange={e => actualizarFiltro('resultado', e.target.value)}
-          >
-            <option value="">Todos</option>
-            <option value="exitoso">Exitoso</option>
-            <option value="fallido">Fallido</option>
-          </select>
-        </div>
-
-        {tieneFiltrosActivos && (
-          <div className="audit-filter-field">
-            <label className="audit-filter-label">&nbsp;</label>
-            <Button variant="secondary" size="sm" onClick={limpiarFiltros}>
-              Limpiar filtros
-            </Button>
+          <div className="audit-filter-field audit-filter-field--accion">
+            <label className="audit-filter-label">Acción</label>
+            <select
+              className="input-control"
+              value={filtros.accion}
+              onChange={e => actualizarFiltro('accion', e.target.value)}
+            >
+              <option value="">Todas las acciones</option>
+              <optgroup label="Seguridad">
+                {accionesPorCategoria.seguridad.map(a => (
+                  <option key={a} value={a}>{ACCION_LABELS[a]}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Negocio">
+                {accionesPorCategoria.negocio.map(a => (
+                  <option key={a} value={a}>{ACCION_LABELS[a]}</option>
+                ))}
+              </optgroup>
+            </select>
           </div>
-        )}
-      </div>
+
+          <div className="audit-filter-field">
+            <label className="audit-filter-label">Categoría</label>
+            <select
+              className="input-control"
+              value={filtros.categoria}
+              onChange={e => actualizarFiltro('categoria', e.target.value)}
+            >
+              <option value="">Todas</option>
+              <option value="seguridad">Seguridad</option>
+              <option value="negocio">Negocio</option>
+            </select>
+          </div>
+
+          <div className="audit-filter-field">
+            <label className="audit-filter-label">Resultado</label>
+            <select
+              className="input-control"
+              value={filtros.resultado}
+              onChange={e => actualizarFiltro('resultado', e.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="exitoso">Exitoso</option>
+              <option value="fallido">Fallido</option>
+            </select>
+          </div>
+
+          {tieneFiltrosActivos && (
+            <div className="audit-filter-field">
+              <label className="audit-filter-label">&nbsp;</label>
+              <Button variant="secondary" size="sm" className="audit-btn-limpiar" onClick={limpiarFiltros}>
+                Limpiar filtros
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Error ── */}
       {error && (
@@ -147,12 +196,21 @@ export const AuditoriaPage = ({ title }) => {
                     <ResultadoBadge resultado={log.resultado} />
                   </TableCell>
                   <TableCell>
-                    {log.entidad_afectada ? (
+                    {log.entidad_afectada && log.entidad_id ? (
+                      <div
+                        className="audit-entidad audit-entidad--clickable"
+                        title="Ver trazabilidad completa de esta entidad"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          verTrazabilidad(log.entidad_afectada, log.entidad_id);
+                        }}
+                      >
+                        <div>{log.entidad_afectada}</div>
+                        <div className="audit-entidad-id">#{truncateId(log.entidad_id)}</div>
+                      </div>
+                    ) : log.entidad_afectada ? (
                       <div className="audit-entidad">
                         <div>{log.entidad_afectada}</div>
-                        {log.entidad_id && (
-                          <div className="audit-entidad-id">#{truncateId(log.entidad_id)}</div>
-                        )}
                       </div>
                     ) : (
                       <span style={{ color: 'var(--color-text-muted)' }}>—</span>
@@ -166,33 +224,41 @@ export const AuditoriaPage = ({ title }) => {
             </tbody>
           </Table>
 
-          {/* ── Paginación ── */}
-          <div className="audit-pagination">
-            <span className="audit-pagination-info">
-              {paginacion.total} evento{paginacion.total !== 1 ? 's' : ''} en total
-            </span>
-            <div className="audit-pagination-controls">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage(p => p - 1)}
-              >
-                ← Anterior
-              </Button>
-              <span className="audit-page-indicator">
-                Página {paginacion.pagina} de {paginacion.paginas}
+          {/* ── Paginación (no aplica en modo trazabilidad: viene completa) ── */}
+          {trazabilidad ? (
+            <div className="audit-pagination">
+              <span className="audit-pagination-info">
+                {paginacion.total} evento{paginacion.total !== 1 ? 's' : ''} en la trazabilidad de esta entidad
               </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={page >= paginacion.paginas || loading}
-                onClick={() => setPage(p => p + 1)}
-              >
-                Siguiente →
-              </Button>
             </div>
-          </div>
+          ) : (
+            <div className="audit-pagination">
+              <span className="audit-pagination-info">
+                {paginacion.total} evento{paginacion.total !== 1 ? 's' : ''} en total
+              </span>
+              <div className="audit-pagination-controls">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  ← Anterior
+                </Button>
+                <span className="audit-page-indicator">
+                  Página {paginacion.pagina} de {paginacion.paginas}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={page >= paginacion.paginas || loading}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Siguiente →
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
 

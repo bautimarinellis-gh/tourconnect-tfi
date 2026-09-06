@@ -177,14 +177,6 @@ exports.createRol = async (req, res, next) => {
 
     await rol.save();
 
-    registrarAuditoria({
-      req,
-      accion: 'ROL_CREADO',
-      entidad_afectada: 'Rol',
-      entidad_id: rol._id,
-      detalle: { nombre: rol.nombre, permisos: permisos ?? [] },
-    });
-
     res.status(201).json({ success: true, data: rol });
   } catch (err) {
     if (err.code === 11000) {
@@ -204,11 +196,6 @@ exports.updateRol = async (req, res, next) => {
     const { nombre, permisos } = req.body;
     const rol = await buscarRolEditable(req.params.id, req.mayorista_id);
 
-    const antes = {
-      nombre: rol.nombre,
-      permisos: rol.permisos.map(String),
-    };
-
     if (nombre !== undefined) {
       if (!String(nombre).trim()) {
         throw error('El nombre del rol es obligatorio', 400);
@@ -221,22 +208,6 @@ exports.updateRol = async (req, res, next) => {
     }
 
     await rol.save();
-
-    // Editar el rol afecta a todos los usuarios que lo tengan: el rol es
-    // atómico a nivel usuario y esta es la única vía para cambiar su alcance.
-    const alcanzados = await Usuario.countDocuments({ rol_id: rol._id });
-
-    registrarAuditoria({
-      req,
-      accion: 'ROL_ACTUALIZADO',
-      entidad_afectada: 'Rol',
-      entidad_id: rol._id,
-      detalle: {
-        antes,
-        despues: { nombre: rol.nombre, permisos: permisos ?? antes.permisos },
-        usuarios_alcanzados: alcanzados,
-      },
-    });
 
     res.json({ success: true, data: rol });
   } catch (err) {
@@ -270,14 +241,6 @@ exports.deleteRol = async (req, res, next) => {
     }
 
     await rol.deleteOne();
-
-    registrarAuditoria({
-      req,
-      accion: 'ROL_ELIMINADO',
-      entidad_afectada: 'Rol',
-      entidad_id: rol._id,
-      detalle: { nombre: rol.nombre },
-    });
 
     res.json({ success: true, message: 'Rol eliminado' });
   } catch (err) {
@@ -392,16 +355,6 @@ exports.createUsuario = async (req, res, next) => {
       },
     });
 
-    if (rolAsignado) {
-      registrarAuditoria({
-        req,
-        accion: 'ROL_ASIGNADO',
-        entidad_afectada: 'Usuario',
-        entidad_id: usuario._id,
-        detalle: { rol: rolAsignado.nombre, rol_id: rolAsignado._id },
-      });
-    }
-
     // Después de persistir: si el mail falla, la cuenta ya existe y se puede
     // reenviar la invitación. Al revés no se puede deshacer.
     try {
@@ -436,21 +389,11 @@ exports.asignarRol = async (req, res, next) => {
       req.mayorista_id
     );
 
-    const rolAnterior = usuario.rol_id;
-
     // rol_id: null quita el rol. Los permisos individuales no se tocan: son
     // independientes del rol.
     if (!rol_id) {
       usuario.rol_id = null;
       await usuario.save();
-
-      registrarAuditoria({
-        req,
-        accion: 'ROL_DESASIGNADO',
-        entidad_afectada: 'Usuario',
-        entidad_id: usuario._id,
-        detalle: { rol_anterior: rolAnterior },
-      });
 
       return res.json({ success: true, data: usuario });
     }
@@ -486,14 +429,6 @@ exports.asignarRol = async (req, res, next) => {
     usuario.rol_id = rol._id;
     await usuario.save();
 
-    registrarAuditoria({
-      req,
-      accion: 'ROL_ASIGNADO',
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-      detalle: { rol: rol.nombre, rol_id: rol._id, rol_anterior: rolAnterior },
-    });
-
     res.json({ success: true, data: usuario });
   } catch (err) {
     next(err);
@@ -515,39 +450,8 @@ exports.asignarPermisos = async (req, res, next) => {
 
     const idsPermisos = await resolverPermisosAsignables(permisos ?? []);
 
-    const antes = await Permiso.find({ _id: { $in: usuario.permisos_individuales } })
-      .select('codigo')
-      .lean();
-    const codigosAntes = antes.map((p) => p.codigo);
-    const codigosDespues = permisos ?? [];
-
     usuario.permisos_individuales = idsPermisos;
     await usuario.save();
-
-    // Se auditan los deltas por separado, porque los permisos individuales
-    // son independientes entre sí: agregar uno y quitar otro son dos hechos
-    // distintos, no una edición en bloque.
-    const agregados = codigosDespues.filter((c) => !codigosAntes.includes(c));
-    const revocados = codigosAntes.filter((c) => !codigosDespues.includes(c));
-
-    if (agregados.length > 0) {
-      registrarAuditoria({
-        req,
-        accion: 'PERMISO_INDIVIDUAL_ASIGNADO',
-        entidad_afectada: 'Usuario',
-        entidad_id: usuario._id,
-        detalle: { permisos: agregados },
-      });
-    }
-    if (revocados.length > 0) {
-      registrarAuditoria({
-        req,
-        accion: 'PERMISO_INDIVIDUAL_REVOCADO',
-        entidad_afectada: 'Usuario',
-        entidad_id: usuario._id,
-        detalle: { permisos: revocados },
-      });
-    }
 
     res.json({ success: true, data: usuario });
   } catch (err) {
@@ -564,8 +468,6 @@ exports.updateUsuario = async (req, res, next) => {
   try {
     const { nombre, email } = req.body;
     const usuario = await buscarUsuarioDelTenant(req.params.id, req.mayorista_id);
-
-    const antes = { nombre: usuario.nombre, email: usuario.email };
 
     if (nombre !== undefined) {
       if (!String(nombre).trim()) throw error('El nombre es obligatorio', 400);
@@ -587,14 +489,6 @@ exports.updateUsuario = async (req, res, next) => {
     }
 
     await usuario.save();
-
-    registrarAuditoria({
-      req,
-      accion: 'USUARIO_ACTUALIZADO',
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-      detalle: { antes, despues: { nombre: usuario.nombre, email: usuario.email } },
-    });
 
     res.json({ success: true, data: usuario });
   } catch (err) {
@@ -665,14 +559,6 @@ exports.reactivarUsuario = async (req, res, next) => {
     usuario.activo = true;
     await usuario.save();
 
-    registrarAuditoria({
-      req,
-      accion: 'USUARIO_REACTIVADO',
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-      detalle: { email: usuario.email },
-    });
-
     res.json({ success: true, message: 'Usuario reactivado' });
   } catch (err) {
     next(err);
@@ -704,14 +590,6 @@ exports.resetearClave = async (req, res, next) => {
     usuario.reset_code_expires = undefined;
     usuario.reset_code_attempts = 0;
     await usuario.save();
-
-    registrarAuditoria({
-      req,
-      accion: 'RESET_PASSWORD_SOLICITADO',
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-      detalle: { email: usuario.email, solicitado_por: 'administrador' },
-    });
 
     try {
       await enviarResetClave(usuario.email, usuario.nombre, resetToken);

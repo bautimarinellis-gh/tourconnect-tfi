@@ -244,3 +244,17 @@ select.input-control {
 [data-theme="dark"] .btn-primary:hover:not(:disabled) {
   color: #12140F;
 }
+
+/* btn-secondary usa --color-surface para el fondo, que en dark mode
+   (#131610) es casi idéntico a --color-bg (#0D0F0A): sin una caja de fondo
+   propia, el botón queda "flotando" como texto suelto en cualquier lugar
+   que no sea dentro de una card clara. Se le da un fondo y borde con más
+   contraste específicamente para dark mode. */
+[data-theme="dark"] .btn-secondary {
+  background-color: var(--color-surface-subtle);
+  border-color: var(--color-border-strong);
+}
+[data-theme="dark"] .btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-border);
+  border-color: var(--color-primary);
+}

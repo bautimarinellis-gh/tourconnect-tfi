@@ -142,13 +142,6 @@ exports.createAgencia = async (req, res, next) => {
 
     registrarAuditoria({
       req,
-      accion: 'AGENCIA_CREADA',
-      entidad_afectada: 'Agencia',
-      entidad_id: nuevaAgencia._id,
-      detalle: { nombre, email },
-    });
-    registrarAuditoria({
-      req,
       accion: 'USUARIO_CREADO',
       entidad_afectada: 'Usuario',
       entidad_id: nuevoUsuario._id,
@@ -244,14 +237,6 @@ exports.updateAgencia = async (req, res, next) => {
         message: 'Agencia no encontrada.',
       });
     }
-
-    registrarAuditoria({
-      req,
-      accion: 'AGENCIA_ACTUALIZADA',
-      entidad_afectada: 'Agencia',
-      entidad_id: agencia._id,
-      detalle: { cambios: updateFields },
-    });
 
     res.status(200).json({
       success: true,
@@ -375,22 +360,7 @@ exports.reactivarAgencia = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    registrarAuditoria({
-      req,
-      accion: 'AGENCIA_REACTIVADA',
-      entidad_afectada: 'Agencia',
-      entidad_id: agencia._id,
-      detalle: { nombre: agencia.nombre },
-    });
     if (usuario) {
-      registrarAuditoria({
-        req,
-        accion: 'USUARIO_REACTIVADO',
-        entidad_afectada: 'Usuario',
-        entidad_id: usuario._id,
-        detalle: { email: usuario.email, rol: 'agencia' },
-      });
-
       try {
         await enviarNotificacionReactivacion(usuario.email, agencia.nombre);
       } catch (mailError) {
@@ -486,13 +456,6 @@ exports.deleteAgencia = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    registrarAuditoria({
-      req,
-      accion: 'AGENCIA_DESACTIVADA',
-      entidad_afectada: 'Agencia',
-      entidad_id: agencia._id,
-      detalle: { nombre: agencia.nombre, motivo, mensaje: mensajeTrim || undefined },
-    });
     if (usuario) {
       registrarAuditoria({
         req,

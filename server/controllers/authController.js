@@ -276,15 +276,6 @@ const setPassword = async (req, res, next) => {
     usuario.invite_token_expires = undefined;
     await usuario.save();
 
-    registrarAuditoria({
-      req,
-      accion: 'SET_PASSWORD',
-      usuario_id: usuario._id,
-      mayorista_id: null,
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-    });
-
     res.json({
       success: true,
       data: {
@@ -333,16 +324,6 @@ const forgotPassword = async (req, res, next) => {
     usuario.reset_token = undefined;
     usuario.reset_token_expires = undefined;
     await usuario.save();
-
-    registrarAuditoria({
-      req,
-      accion: 'RESET_PASSWORD_SOLICITADO',
-      usuario_id: usuario._id,
-      mayorista_id: null,
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-      detalle: { email: usuario.email },
-    });
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -421,32 +402,12 @@ const verifyResetCode = async (req, res, next) => {
 
     // Con 6 dígitos el código es fuerza-brutable: cortar tras N intentos
     if (usuario.reset_code_attempts >= MAX_INTENTOS_CODIGO) {
-      await registrarAuditoria({
-        req,
-        accion: 'RESET_CODE_FALLIDO',
-        usuario_id: usuario._id,
-        mayorista_id: null,
-        resultado: 'fallido',
-        detalle: { email: usuario.email, motivo: 'max_intentos_superado' },
-      });
       return respuestaInvalida();
     }
 
     if (hashCodigo(codigo) !== usuario.reset_code_hash) {
       usuario.reset_code_attempts += 1;
       await usuario.save();
-      await registrarAuditoria({
-        req,
-        accion: 'RESET_CODE_FALLIDO',
-        usuario_id: usuario._id,
-        mayorista_id: null,
-        resultado: 'fallido',
-        detalle: {
-          email: usuario.email,
-          motivo: 'codigo_incorrecto',
-          intento: usuario.reset_code_attempts,
-        },
-      });
       return respuestaInvalida();
     }
 

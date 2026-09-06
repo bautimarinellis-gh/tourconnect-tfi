@@ -1,51 +1,26 @@
 const mongoose = require('mongoose');
 
+// Set deliberadamente chico: solo lo que hace falta para auditar seguridad
+// (login/logout, altas y bajas de acceso, intentos denegados) y la
+// trazabilidad completa del elemento "core" del sistema (el ciclo de vida de
+// una reserva). Cada acción nueva acá es una decisión, no un default.
 const ACCIONES = [
   // Seguridad
   'LOGIN_EXITOSO',
   'LOGIN_FALLIDO',
   'LOGOUT',
-  'SET_PASSWORD',
-  'RESET_PASSWORD',
-  'RESET_PASSWORD_SOLICITADO',
-  'RESET_CODE_FALLIDO',
-  'USUARIO_CREADO',
-  'USUARIO_ACTUALIZADO',
-  'USUARIO_DESACTIVADO',
-  'MAYORISTA_CREADO',
-  'MAYORISTA_DESACTIVADO',
-  'MAYORISTA_ACTUALIZADO',
-  'AGENCIA_CREADA',
-  'AGENCIA_DESACTIVADA',
-  'AGENCIA_REACTIVADA',
-  'AGENCIA_ACTUALIZADA',
-  'USUARIO_REACTIVADO',
-  'ACTIVACION_MANUAL_USUARIO',
-  'MAYORISTA_REACTIVADO',
   'CAMBIO_PASSWORD',
-  // Seguridad — roles y permisos
-  'ROL_CREADO',
-  'ROL_ACTUALIZADO',
-  'ROL_ELIMINADO',
-  'ROL_ASIGNADO',
-  'ROL_DESASIGNADO',
-  'PERMISO_INDIVIDUAL_ASIGNADO',
-  'PERMISO_INDIVIDUAL_REVOCADO',
+  'RESET_PASSWORD',
+  'USUARIO_CREADO',
+  'USUARIO_DESACTIVADO',
   'ACCESO_DENEGADO',
-  // Negocio
-  'COTIZACION_CREADA',
-  'COTIZACION_APROBADA',
-  'COTIZACION_RECHAZADA',
-  'COTIZACION_CANCELADA',
+  // Negocio — ciclo de vida completo de la reserva (trazabilidad, anexo 14.3)
   'RESERVA_CREADA',
   'PAGO_INFORMADO',
   'PAGO_CONFIRMADO',
   'PAGO_RECHAZADO',
   'RESERVA_CERRADA',
   'RESERVA_CANCELADA',
-  'MARKUP_ACTUALIZADO',
-  'PRODUCTOS_AGENCIA_SYNC',
-  'REPORTE_EXPORTADO',
 ];
 
 const auditLogSchema = new mongoose.Schema(

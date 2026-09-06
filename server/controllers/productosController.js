@@ -3,6 +3,7 @@ const AgenciaProducto = require('../models/AgenciaProducto');
 const Cotizacion = require('../models/Cotizacion');
 const Reserva = require('../models/Reserva');
 const { calcularPrecioFinal } = require('../utils/precioCalculator');
+const { hoyDateString, toDateString } = require('../utils/dateHelpers');
 
 /**
  * Obtener todos los productos (con filtrado y comportamiento por rol)
@@ -77,19 +78,6 @@ exports.getProductos = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-};
-
-/**
- * Fecha de hoy (local del servidor) en formato YYYY-MM-DD, para comparar
- * contra los inputs de fecha que llegan del frontend en ese mismo formato.
- */
-const hoyDateString = () => new Date().toLocaleDateString('en-CA');
-
-/** Convierte un valor de fecha (string YYYY-MM-DD o Date) a YYYY-MM-DD. */
-const toDateString = (v) => {
-  if (!v) return null;
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  return String(v).slice(0, 10);
 };
 
 /**

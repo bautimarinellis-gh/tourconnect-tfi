@@ -30,6 +30,21 @@
   min-width: 210px;
 }
 
+/* El botón "Limpiar filtros" comparte fila con selects de 2.5rem de alto
+   (.input-control); btn-sm por defecto mide 2rem y quedaba más chico y más
+   bajo que el resto de la fila. Se lo iguala en altura explícitamente. */
+.audit-filter-field .btn {
+  min-height: 2.5rem;
+}
+
+.audit-btn-limpiar {
+  margin-left: 0.5rem;
+}
+
+.audit-btn-volver {
+  margin-left: 0.75rem;
+}
+
 /* ── Tabla: columna de acción con code ────────────────────────────── */
 .audit-accion-cell {
   display: flex;
@@ -59,6 +74,27 @@
   font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
   font-size: 0.6875rem;
   color: var(--color-text-muted);
+}
+
+.audit-entidad--clickable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.audit-entidad--clickable:hover {
+  color: var(--color-primary);
+}
+
+.audit-trazabilidad-banner {
+  margin-bottom: 1.25rem;
+}
+
+.audit-trazabilidad-banner .alert-message {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .audit-email {

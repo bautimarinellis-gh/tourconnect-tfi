@@ -129,13 +129,6 @@ exports.crearMayorista = async (req, res, next) => {
 
     registrarAuditoria({
       req,
-      accion: 'MAYORISTA_CREADO',
-      entidad_afectada: 'Mayorista',
-      entidad_id: nuevoMayorista._id,
-      detalle: { nombre, email, plan_suscripcion: planSuscripcion },
-    });
-    registrarAuditoria({
-      req,
       accion: 'USUARIO_CREADO',
       entidad_afectada: 'Usuario',
       entidad_id: nuevoUsuario._id,
@@ -229,14 +222,6 @@ exports.updateMayorista = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
     }
 
-    registrarAuditoria({
-      req,
-      accion: 'MAYORISTA_ACTUALIZADO',
-      entidad_afectada: 'Mayorista',
-      entidad_id: mayorista._id,
-      detalle: { cambios: updateFields },
-    });
-
     const updated = await Mayorista.findById(id).populate('usuario_id', 'email activo');
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -268,14 +253,6 @@ exports.activarUsuarioMayorista = async (req, res, next) => {
     usuario.invite_token = undefined;
     usuario.invite_token_expires = undefined;
     await usuario.save();
-
-    registrarAuditoria({
-      req,
-      accion: 'ACTIVACION_MANUAL_USUARIO',
-      entidad_afectada: 'Usuario',
-      entidad_id: usuario._id,
-      detalle: { email: usuario.email, mayorista_id: mayorista._id },
-    });
 
     res.json({ success: true, data: { message: 'Usuario activado. Puede iniciar sesión.' } });
   } catch (error) {
@@ -408,13 +385,18 @@ exports.deleteMayorista = async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    registrarAuditoria({
-      req,
-      accion: 'MAYORISTA_DESACTIVADO',
-      entidad_afectada: 'Mayorista',
-      entidad_id: mayorista._id,
-      detalle: { nombre: mayorista.nombre, motivo, mensaje: mensajeTrim || undefined },
-    });
+    // Se audita como USUARIO_DESACTIVADO (no un accion propia de Mayorista):
+    // lo que importa desde seguridad es que se revocó el acceso de esa
+    // cuenta, igual que al desactivar cualquier otro usuario.
+    if (usuario) {
+      registrarAuditoria({
+        req,
+        accion: 'USUARIO_DESACTIVADO',
+        entidad_afectada: 'Usuario',
+        entidad_id: usuario._id,
+        detalle: { email: usuario.email, motivo, mensaje: mensajeTrim || undefined },
+      });
+    }
 
     if (usuario) {
       try {
@@ -484,14 +466,6 @@ exports.reactivarMayorista = async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
-
-    registrarAuditoria({
-      req,
-      accion: 'MAYORISTA_REACTIVADO',
-      entidad_afectada: 'Mayorista',
-      entidad_id: mayorista._id,
-      detalle: { nombre: mayorista.nombre },
-    });
 
     if (usuario) {
       try {

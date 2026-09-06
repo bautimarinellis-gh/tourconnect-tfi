@@ -2,45 +2,17 @@ export const ACCION_LABELS = {
   LOGIN_EXITOSO:              'Inicio de sesión',
   LOGIN_FALLIDO:              'Intento de acceso fallido',
   LOGOUT:                     'Cierre de sesión',
-  SET_PASSWORD:               'Contraseña configurada',
   RESET_PASSWORD:             'Contraseña restablecida',
-  RESET_PASSWORD_SOLICITADO:  'Solicitud de reset de contraseña',
-  RESET_CODE_FALLIDO:         'Código de verificación incorrecto',
-  USUARIO_CREADO:             'Usuario creado',
-  USUARIO_ACTUALIZADO:        'Usuario actualizado',
-  USUARIO_DESACTIVADO:        'Usuario desactivado',
-  USUARIO_REACTIVADO:         'Usuario reactivado',
-  ACTIVACION_MANUAL_USUARIO:  'Activación manual de usuario',
   CAMBIO_PASSWORD:            'Contraseña cambiada',
-  ROL_CREADO:                 'Rol creado',
-  ROL_ACTUALIZADO:            'Rol actualizado',
-  ROL_ELIMINADO:              'Rol eliminado',
-  ROL_ASIGNADO:                'Rol asignado a usuario',
-  ROL_DESASIGNADO:            'Rol desasignado de usuario',
-  PERMISO_INDIVIDUAL_ASIGNADO: 'Permiso individual asignado',
-  PERMISO_INDIVIDUAL_REVOCADO: 'Permiso individual revocado',
+  USUARIO_CREADO:             'Usuario creado',
+  USUARIO_DESACTIVADO:        'Usuario desactivado',
   ACCESO_DENEGADO:            'Acceso denegado por falta de permisos',
-  MAYORISTA_CREADO:           'Mayorista creado',
-  MAYORISTA_DESACTIVADO:      'Mayorista desactivado',
-  MAYORISTA_REACTIVADO:       'Mayorista reactivado',
-  MAYORISTA_ACTUALIZADO:      'Mayorista actualizado',
-  AGENCIA_CREADA:             'Agencia creada',
-  AGENCIA_DESACTIVADA:        'Agencia desactivada',
-  AGENCIA_REACTIVADA:         'Agencia reactivada',
-  AGENCIA_ACTUALIZADA:        'Agencia actualizada',
-  REPORTE_EXPORTADO:          'Reporte exportado',
-  COTIZACION_CREADA:          'Cotización creada',
-  COTIZACION_APROBADA:        'Cotización aprobada',
-  COTIZACION_RECHAZADA:       'Cotización rechazada',
-  COTIZACION_CANCELADA:       'Cotización cancelada',
   RESERVA_CREADA:             'Reserva creada',
   PAGO_INFORMADO:             'Pago informado',
   PAGO_CONFIRMADO:            'Pago confirmado',
   PAGO_RECHAZADO:             'Pago rechazado',
   RESERVA_CERRADA:            'Reserva cerrada',
   RESERVA_CANCELADA:          'Reserva cancelada',
-  MARKUP_ACTUALIZADO:         'Markup actualizado',
-  PRODUCTOS_AGENCIA_SYNC:     'Sincronización de productos',
 };
 
 // Scoping "mi actividad": cada rol ve solo sus propias acciones, así que
@@ -48,41 +20,33 @@ export const ACCION_LABELS = {
 // (Verificado contra los role() de las rutas y los registrarAuditoria de
 // cada controller.)
 
-// Admin: gestiona mayoristas; su cuenta nace del seed (nunca SET_PASSWORD).
+// Admin: gestiona mayoristas. Desactivar un mayorista se audita como
+// USUARIO_DESACTIVADO sobre su usuario asociado, no como una acción propia
+// de Mayorista (ver adminController.deactivarMayorista).
 const SEGURIDAD_ADMIN = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
-  'RESET_PASSWORD', 'RESET_PASSWORD_SOLICITADO', 'RESET_CODE_FALLIDO', 'CAMBIO_PASSWORD',
-  'USUARIO_CREADO', 'ACTIVACION_MANUAL_USUARIO',
-  'MAYORISTA_CREADO', 'MAYORISTA_DESACTIVADO', 'MAYORISTA_REACTIVADO',
+  'RESET_PASSWORD', 'CAMBIO_PASSWORD',
+  'USUARIO_CREADO', 'USUARIO_DESACTIVADO',
 ];
-const NEGOCIO_ADMIN = [
-  'MAYORISTA_ACTUALIZADO',
-];
+const NEGOCIO_ADMIN = [];
 
 // Mayorista: gestiona agencias y aprueba/cobra operaciones.
 const SEGURIDAD_MAYORISTA = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
-  'SET_PASSWORD', 'RESET_PASSWORD', 'RESET_PASSWORD_SOLICITADO', 'RESET_CODE_FALLIDO', 'CAMBIO_PASSWORD',
-  'USUARIO_CREADO', 'USUARIO_ACTUALIZADO', 'USUARIO_DESACTIVADO', 'USUARIO_REACTIVADO',
-  'AGENCIA_CREADA', 'AGENCIA_DESACTIVADA', 'AGENCIA_REACTIVADA',
-  'ROL_CREADO', 'ROL_ACTUALIZADO', 'ROL_ELIMINADO', 'ROL_ASIGNADO', 'ROL_DESASIGNADO',
-  'PERMISO_INDIVIDUAL_ASIGNADO', 'PERMISO_INDIVIDUAL_REVOCADO', 'ACCESO_DENEGADO',
+  'RESET_PASSWORD', 'CAMBIO_PASSWORD',
+  'USUARIO_CREADO', 'USUARIO_DESACTIVADO', 'ACCESO_DENEGADO',
 ];
 const NEGOCIO_MAYORISTA = [
-  'MAYORISTA_ACTUALIZADO', 'AGENCIA_ACTUALIZADA', 'REPORTE_EXPORTADO',
-  'COTIZACION_APROBADA', 'COTIZACION_RECHAZADA',
   'PAGO_CONFIRMADO', 'PAGO_RECHAZADO',
   'RESERVA_CERRADA', 'RESERVA_CANCELADA',
-  'MARKUP_ACTUALIZADO', 'PRODUCTOS_AGENCIA_SYNC',
 ];
 
 // Agencia: cotiza, reserva e informa pagos.
 const SEGURIDAD_AGENCIA = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
-  'SET_PASSWORD', 'RESET_PASSWORD', 'RESET_PASSWORD_SOLICITADO', 'RESET_CODE_FALLIDO', 'CAMBIO_PASSWORD',
+  'RESET_PASSWORD', 'CAMBIO_PASSWORD',
 ];
 const NEGOCIO_AGENCIA = [
-  'COTIZACION_CREADA', 'COTIZACION_CANCELADA',
   'RESERVA_CREADA', 'PAGO_INFORMADO', 'RESERVA_CANCELADA',
 ];
 

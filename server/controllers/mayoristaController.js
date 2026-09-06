@@ -1,5 +1,4 @@
 const Mayorista = require('../models/Mayorista');
-const { registrarAuditoria } = require('../utils/auditService');
 
 /**
  * @desc    Obtener mi perfil de mayorista
@@ -58,14 +57,6 @@ exports.updatePerfil = async (req, res, next) => {
     if (!mayorista) {
       return res.status(404).json({ success: false, message: 'Perfil de mayorista no encontrado' });
     }
-
-    registrarAuditoria({
-      req,
-      accion: 'MAYORISTA_ACTUALIZADO',
-      entidad_afectada: 'Mayorista',
-      entidad_id: mayorista._id,
-      detalle: { cambios: updateFields },
-    });
 
     res.json({
       success: true,

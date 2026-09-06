@@ -13,6 +13,7 @@ const {
   obtenerPrecioFinal,
   extraerUltimoRechazo,
 } = require('../utils/reservaHelpers');
+const { hoyDateString, toDateString } = require('../utils/dateHelpers');
 
 // =============================================
 // RESERVAS
@@ -101,9 +102,7 @@ exports.createReserva = async (req, res, next) => {
     // Igual que en la aprobación: pueden pasar días entre que se aprueba la
     // cotización y que la agencia genera la reserva. Si para entonces el
     // viaje ya empezó, no tiene sentido reservarlo.
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    if (new Date(cotizacion.fecha_inicio) < hoy) {
+    if (toDateString(cotizacion.fecha_inicio) < hoyDateString()) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({

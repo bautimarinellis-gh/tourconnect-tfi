@@ -7,6 +7,7 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed:admin": "node seeds/adminSeed.js",
+    "seed:demo": "node seeds/demoSeed.js",
     "migrate:roles": "node seeds/migracionRoles.js"
   },
   "license": "ISC",

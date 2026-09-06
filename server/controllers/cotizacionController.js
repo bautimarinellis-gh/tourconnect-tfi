@@ -3,8 +3,8 @@ const Cotizacion = require('../models/Cotizacion');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Producto = require('../models/Producto');
 const { calcularPrecioTotal } = require('../utils/precioCalculator');
-const { registrarAuditoria } = require('../utils/auditService');
 const { verificarCupoDisponible } = require('../utils/cupoValidator');
+const { hoyDateString, toDateString } = require('../utils/dateHelpers');
 
 // Error de negocio (no de DB) usada para abortar la transacción de aprobación
 // sin disparar el retry automático de session.withTransaction (solo reintenta
@@ -104,10 +104,7 @@ exports.createCotizacion = async (req, res, next) => {
       });
     }
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    if (fechaInicio < hoy) {
+    if (toDateString(fecha_inicio) < hoyDateString()) {
       return res.status(400).json({
         success: false,
         message: 'La fecha de inicio no puede ser anterior al día de hoy.',
@@ -152,14 +149,6 @@ exports.createCotizacion = async (req, res, next) => {
       fecha_fin,
       precio_total,
       estado: 'pendiente',
-    });
-
-    registrarAuditoria({
-      req,
-      accion: 'COTIZACION_CREADA',
-      entidad_afectada: 'Cotizacion',
-      entidad_id: cotizacion._id,
-      detalle: { producto_id, pasajeros, precio_total, fecha_inicio, fecha_fin },
     });
 
     res.status(201).json({
@@ -276,9 +265,7 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
     // que vence a las 72hs). Si para entonces el viaje ya empezó, no debe
     // poder aprobarse.
     if (estado === 'aprobada') {
-      const hoy = new Date();
-      hoy.setHours(0, 0, 0, 0);
-      if (new Date(cotizacion.fecha_inicio) < hoy) {
+      if (toDateString(cotizacion.fecha_inicio) < hoyDateString()) {
         return res.status(400).json({
           success: false,
           message: 'No se puede aprobar: la fecha de inicio del viaje ya pasó.',
@@ -346,14 +333,6 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
       }
     }
 
-    registrarAuditoria({
-      req,
-      accion: estado === 'aprobada' ? 'COTIZACION_APROBADA' : 'COTIZACION_RECHAZADA',
-      entidad_afectada: 'Cotizacion',
-      entidad_id: actualizada._id,
-      detalle: estado === 'rechazada' ? { motivo_rechazo: motivoRechazoTrim, agencia_id: actualizada.agencia_id } : { agencia_id: actualizada.agencia_id },
-    });
-
     res.status(200).json({
       success: true,
       data: actualizada,
@@ -417,14 +396,6 @@ exports.cancelarCotizacion = async (req, res, next) => {
         message: 'La cotización ya no está pendiente (fue modificada por otra acción).',
       });
     }
-
-    registrarAuditoria({
-      req,
-      accion: 'COTIZACION_CANCELADA',
-      entidad_afectada: 'Cotizacion',
-      entidad_id: actualizada._id,
-      detalle: motivoTrim ? { motivo_cancelacion: motivoTrim } : null,
-    });
 
     res.status(200).json({
       success: true,
