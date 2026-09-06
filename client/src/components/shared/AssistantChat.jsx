@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, ChevronRight, X } from 'lucide-react';
+import { Send, Sparkles, ChevronRight, Eraser, X } from 'lucide-react';
 import assistantService from '../../services/assistantService';
 import { formatCurrency } from '../../utils/formatters';
 import './assistant.css';
@@ -149,7 +149,7 @@ function MessageBubble({ msg, onSuggestionClick, onRetry }) {
 
 // ─── Componente principal ──────────────────────────────────────────
 
-export function AssistantChat() {
+export function AssistantChat({ floating = false, onCollapse }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -166,6 +166,15 @@ export function AssistantChat() {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading]);
+
+  // El textarea crece con el contenido (hasta el max-height del CSS); así una
+  // pregunta de dos líneas no dispara una scrollbar interna.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [input]);
 
   const sendQuery = useCallback(async (queryText) => {
     const trimmed = queryText.trim();
@@ -238,7 +247,7 @@ export function AssistantChat() {
   };
 
   return (
-    <div className="assistant-section">
+    <div className={`assistant-section${floating ? ' assistant-section--floating' : ''}`}>
       {/* ── Header ── */}
       <div className="assistant-header">
         <div className="assistant-header-icon">
@@ -251,11 +260,23 @@ export function AssistantChat() {
         {messages.length > 0 && (
           <button
             type="button"
-            className="clear-chat-btn"
+            className="assistant-header-btn"
             onClick={() => setMessages([])}
             title="Limpiar conversación"
+            aria-label="Limpiar conversación"
           >
-            <X size={14} />
+            <Eraser size={15} />
+          </button>
+        )}
+        {floating && (
+          <button
+            type="button"
+            className="assistant-header-btn"
+            onClick={onCollapse}
+            title="Cerrar"
+            aria-label="Cerrar asistente"
+          >
+            <X size={16} />
           </button>
         )}
       </div>
@@ -322,7 +343,7 @@ export function AssistantChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ej: ¿Cuáles son mis top 5 agencias del último mes?"
+          placeholder="Escribí tu pregunta…"
           rows={1}
           disabled={isLoading}
           maxLength={300}
