@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Calendar, Users, DollarSign, Package, FileText, ArrowRight, CheckCircle } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
-import { AssistantChat } from '../../components/shared/AssistantChat';
 import reporteService from '../../services/reporteService';
 import { usePermiso } from '../../hooks/usePermiso';
 import { formatCurrency } from '../../utils/formatters';
@@ -95,11 +94,6 @@ export const MayoristaDashboard = () => {
             )}
           </CardBody>
         </Card>
-      </div>
-
-      {/* ── Asistente Inteligente ── */}
-      <div className="dashboard-assistant-section">
-        <AssistantChat />
       </div>
 
     </div>

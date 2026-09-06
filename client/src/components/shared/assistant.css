@@ -389,25 +389,25 @@
   cursor: not-allowed;
 }
 
-/* ── Clear chat button (en el header) ── */
-.clear-chat-btn {
-  width: 24px;
-  height: 24px;
+/* ── Botones del header (limpiar / cerrar) ── */
+.assistant-header-btn {
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.8);
+  background: transparent;
+  color: var(--color-text-muted);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.clear-chat-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
-  color: white;
+.assistant-header-btn:hover {
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
 }
 
 /* ── Retry button (dentro de burbuja de error) ── */
@@ -500,5 +500,280 @@
 
 [data-theme="dark"] .assistant-stat-card {
   background: linear-gradient(135deg, var(--color-primary-soft) 0%, #131610 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Widget flotante (ámbito mayorista)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Se ocultan con `hidden` sin desmontar (ver MayoristaAssistant): las
+   reglas de display de abajo ganarían al [hidden] de la UA, hay que
+   restablecerlo de forma explícita. */
+.assistant-launcher[hidden],
+.assistant-panel[hidden] {
+  display: none;
+}
+
+/* Paleta de acento del asistente (ámbar, propia — distinta del verde del
+   sistema). Se define en el launcher y en la sección porque no comparten
+   un ancestro común (ver MayoristaAssistant). */
+.assistant-launcher,
+.assistant-section {
+  --assistant-accent: #c1741a;
+  --assistant-accent-strong: #a5620f;
+  --assistant-accent-soft: rgba(193, 116, 26, 0.12);
+  --assistant-on-accent: #ffffff;
+}
+
+[data-theme="dark"] .assistant-launcher,
+[data-theme="dark"] .assistant-section {
+  --assistant-accent: #e9a23c;
+  --assistant-accent-strong: #f2b256;
+  --assistant-accent-soft: rgba(233, 162, 60, 0.15);
+  --assistant-on-accent: #241606;
+}
+
+/* ── Launcher: círculo que en hover se despliega a pastilla ──
+   Apilado encima del ThemeToggle. z-index 10000: un punto por encima del
+   ThemeToggle (9999). En desktop no se pisan (el launcher va en su propia
+   ranura), pero en mobile el panel full-screen tiene que tapar el toggle. */
+.assistant-launcher {
+  position: fixed;
+  right: 2rem;
+  bottom: calc(2rem + 50px + 12px); /* 50px = alto del ThemeToggle · 12px = gap */
+  z-index: 10000;
+  height: 50px;
+  max-width: 50px; /* colapsado = círculo; en hover se expande */
+  border-radius: 25px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--glass-bg);
+  /* Borde y glow tenue con el ámbar de acento: en light el borde glass casi
+     no se veía. En dark lo pisan las reglas [data-theme="dark"] de más abajo. */
+  border: 1px solid rgba(193, 116, 26, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 0 12px rgba(193, 116, 26, 0.1), var(--shadow-md);
+  color: var(--color-text);
+  outline: none;
+  transition:
+    max-width 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.15s ease;
+}
+
+.assistant-launcher-icon {
+  width: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--assistant-accent);
+}
+
+.assistant-launcher-label {
+  padding-right: 18px;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.assistant-launcher:hover,
+.assistant-launcher:focus-visible {
+  max-width: 240px;
+  box-shadow: 0 0 20px rgba(193, 116, 26, 0.2), var(--shadow-lg);
+  border-color: var(--assistant-accent);
+}
+
+.assistant-launcher:hover .assistant-launcher-label,
+.assistant-launcher:focus-visible .assistant-launcher-label {
+  opacity: 1;
+  transition: opacity 0.25s ease 0.1s;
+}
+
+.assistant-launcher:active {
+  transform: scale(0.96);
+}
+
+/* ── Panel: chat chico anclado abajo-derecha ──
+   Se ancla en la misma ranura que el launcher (encima del ThemeToggle),
+   así el toggle de tema queda visible y clickeable con el panel abierto
+   en desktop y no hay colisión de coordenadas entre ambos FABs. */
+.assistant-panel {
+  position: fixed;
+  right: 2rem;
+  bottom: calc(2rem + 50px + 12px);
+  z-index: 10000;
+  width: 392px;
+  height: 564px;
+  max-height: 80vh;
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  display: flex;
+  transform-origin: bottom right;
+  animation: assistant-panel-in 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes assistant-panel-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Variante floating de AssistantChat: llena el panel ── */
+.assistant-section--floating {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.assistant-section--floating .assistant-messages {
+  min-height: 0;
+  max-height: none;
+  flex: 1;
+}
+
+/* El panel es acotado: el estado vacío y los chips van algo compactos para
+   que la lista de mensajes no arranque ya con scroll. */
+.assistant-section--floating .assistant-welcome {
+  gap: 6px;
+  padding: 14px 12px;
+}
+
+.assistant-section--floating .assistant-welcome-icon {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 0;
+  background: var(--assistant-accent-soft);
+  color: var(--assistant-accent);
+}
+
+.assistant-section--floating .assistant-welcome p {
+  max-width: 240px;
+}
+
+.assistant-section--floating .assistant-suggestions {
+  gap: 5px;
+  padding: 8px 12px;
+  /* Si el panel queda muy bajo, los chips ceden espacio (scrollean) antes
+     que la caja de escribir, que nunca se recorta. */
+  flex-shrink: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.assistant-section--floating .assistant-suggestion-label {
+  margin-bottom: 0;
+}
+
+.assistant-section--floating .suggestion-chip {
+  padding: 4px 10px;
+}
+
+.assistant-section--floating .suggestion-chip:hover {
+  background: var(--assistant-accent-soft);
+  border-color: var(--assistant-accent);
+  color: var(--assistant-accent);
+}
+
+/* ── Header estilo Owlight: superficie plana + acento en la marca ── */
+.assistant-section--floating .assistant-header {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  padding: 13px 12px 13px 16px;
+  flex-shrink: 0;
+}
+
+.assistant-section--floating .assistant-header-icon {
+  background: var(--assistant-accent-soft);
+  color: var(--assistant-accent);
+}
+
+.assistant-section--floating .assistant-header-title {
+  color: var(--assistant-accent);
+}
+
+.assistant-section--floating .assistant-header-subtitle {
+  color: var(--color-text-muted);
+}
+
+/* ── Caja de escribir: más amplia y siempre visible (no se recorta con la
+   esquina redondeada del panel ni cuando el panel queda bajo) ── */
+.assistant-section--floating .assistant-input-area {
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 12px 14px 16px;
+}
+
+.assistant-section--floating .assistant-input {
+  min-height: 46px;
+  padding: 13px 14px;
+  border-radius: var(--radius);
+}
+
+/* ── Botón enviar en color de acento ── */
+.assistant-section--floating .assistant-send-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius);
+  background: var(--assistant-accent);
+  color: var(--assistant-on-accent);
+}
+
+.assistant-section--floating .assistant-send-btn:hover:not(:disabled) {
+  background: var(--assistant-accent-strong);
+}
+
+/* ── Dark mode: glow ámbar en el launcher (en línea con el acento) ── */
+[data-theme="dark"] .assistant-launcher {
+  background: rgba(19, 22, 16, 0.85);
+  border-color: rgba(233, 162, 60, 0.25);
+  box-shadow: 0 0 16px rgba(233, 162, 60, 0.12), var(--shadow-md);
+}
+
+[data-theme="dark"] .assistant-launcher:hover,
+[data-theme="dark"] .assistant-launcher:focus-visible {
+  border-color: rgba(233, 162, 60, 0.5);
+  box-shadow: 0 0 22px rgba(233, 162, 60, 0.28), var(--shadow-lg);
+}
+
+/* ── Responsive: hoja full-screen en pantallas chicas ── */
+@media (max-width: 920px) {
+  /* En mobile no hay hover: el launcher queda siempre como círculo. */
+  .assistant-launcher {
+    right: 1.5rem;
+    bottom: calc(1.5rem + 44px + 10px); /* 44px = ThemeToggle en mobile */
+    max-width: 44px;
+    height: 44px;
+    border-radius: 22px;
+  }
+
+  .assistant-launcher-icon {
+    width: 42px;
+  }
+
+  .assistant-panel {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    animation: none;
+  }
 }
 
