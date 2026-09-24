@@ -12,6 +12,7 @@ const ACCIONES = [
   'CAMBIO_PASSWORD',
   'RESET_PASSWORD',
   'USUARIO_CREADO',
+  'USUARIO_ACTIVADO',
   'USUARIO_DESACTIVADO',
   'ACCESO_DENEGADO',
   // Negocio — ciclo de vida completo de la reserva (trazabilidad, anexo 14.3)

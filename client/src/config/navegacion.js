@@ -96,6 +96,18 @@ export const PERMISO_POR_SECCION = Object.fromEntries(
   ])
 );
 
+/**
+ * Permisos que habilitan alguna consulta del Asistente Inteligente. Espejo del
+ * campo `permiso` de server/utils/intentCatalog.js: es solo UX (ocultar el
+ * widget si no puede consultar nada), el backend valida igual.
+ */
+export const PERMISOS_ASISTENTE = [
+  PERMISO_POR_SECCION.agencias,
+  PERMISO_POR_SECCION.cotizaciones,
+  PERMISO_POR_SECCION.reservas,
+  PERMISO_POR_SECCION.reportes,
+];
+
 /** ¿El usuario tiene acceso a este ítem de navegación? */
 export const tieneAcceso = (permiso, permisosUsuario = []) => {
   if (!permiso) return true;

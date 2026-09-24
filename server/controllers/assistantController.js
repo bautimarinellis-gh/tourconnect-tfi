@@ -1,6 +1,11 @@
 const { classify } = require('../utils/intentClassifier');
 const { execute } = require('../utils/queryExecutor');
 const intentCatalog = require('../utils/intentCatalog');
+const { registrarAuditoria } = require('../utils/auditService');
+
+/** ¿El usuario tiene el permiso que pide la intención? */
+const puedeConsultar = (req, intentDef) =>
+  req.permisos instanceof Set && req.permisos.has(intentDef.permiso);
 
 /**
  * @desc    Procesar una consulta del Asistente Inteligente
@@ -42,7 +47,9 @@ exports.query = async (req, res, next) => {
         intent: 'unknown',
         confidence: classification.confidence,
         message: 'No pude entender tu consulta. Podés preguntarme sobre:',
-        suggestions: classification.suggestions || [],
+        // Solo se sugiere lo que el usuario puede consultar
+        suggestions: (classification.suggestions || [])
+          .filter((s) => puedeConsultar(req, intentCatalog[s.intent])),
         metadata: {
           executed_at: new Date().toISOString(),
           query_time_ms: Date.now() - startTime,
@@ -50,12 +57,35 @@ exports.query = async (req, res, next) => {
       });
     }
 
-    // ── 4. Verificar permisos del intent ──────────────────────────────────
+    // ── 4. Verificar rol y permiso del intent ─────────────────────────────
     const intentDef = intentCatalog[classification.intent];
     if (!intentDef || !intentDef.roles.includes(req.usuario?.rol)) {
       return res.status(403).json({
         success: false,
         message: 'No tenés permisos para ejecutar esta consulta.',
+      });
+    }
+
+    // Mismo permiso que protege la sección equivalente del sistema: el
+    // asistente no puede ser una puerta trasera a datos que el rol no ve.
+    if (!puedeConsultar(req, intentDef)) {
+      registrarAuditoria({
+        req,
+        accion: 'ACCESO_DENEGADO',
+        resultado: 'fallido',
+        detalle: {
+          permisos_requeridos: [intentDef.permiso],
+          metodo: req.method,
+          ruta: req.originalUrl,
+          intent: classification.intent,
+        },
+      });
+
+      return res.status(403).json({
+        success: false,
+        code: 'ASSISTANT_INTENT_FORBIDDEN',
+        message: `Tu rol no incluye acceso a esta consulta (${intentDef.description.toLowerCase()}). `
+          + 'Si la necesitás, pedíselo al administrador de tu empresa.',
       });
     }
 

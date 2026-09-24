@@ -14,6 +14,7 @@ const {
   extraerUltimoRechazo,
 } = require('../utils/reservaHelpers');
 const { hoyDateString, toDateString } = require('../utils/dateHelpers');
+const { estaVigente } = require('../utils/vigenciaCotizacion');
 
 // =============================================
 // RESERVAS
@@ -96,6 +97,18 @@ exports.createReserva = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para crear una reserva con esta cotización',
+      });
+    }
+
+    // CU-06, escenario alternativo 2: la aprobación tiene un plazo para
+    // confirmarse (ver utils/vigenciaCotizacion.js). Se chequea acá además del
+    // cron, que corre cada hora.
+    if (!estaVigente(cotizacion)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'La cotización venció: superó el plazo para confirmar la reserva.',
       });
     }
 

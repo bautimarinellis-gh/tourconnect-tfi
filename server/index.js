@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const helmet = require('helmet');
 const connectDB = require('./config/db');
+const { sanitizeInput } = require('./middlewares/sanitizeInput');
 
 // Cargar variables de entorno
 dotenv.config({ path: '../.env' });
@@ -29,6 +30,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+// Después de parsear body y query: rechaza claves que Mongo leería como
+// operadores ($ne, $gt, ...) antes de que lleguen a cualquier controller.
+app.use(sanitizeInput);
 
 // Logger HTTP solo en desarrollo
 if (process.env.NODE_ENV !== 'production') {

@@ -115,9 +115,8 @@ function App() {
 
                 {/* Asistente Inteligente: widget flotante, presente en todas
                     las secciones del mayorista. Montado fuera del <Routes> para
-                    que no se re-monte al navegar. Sin permiso por ahora (lo usan
-                    mayorista y sub-mayoristas); para restringirlo, envolver en
-                    <ConPermiso codigo="..."> sin tocar el componente. */}
+                    que no se re-monte al navegar. Se oculta solo si el usuario
+                    no tiene ningún permiso que habilite una consulta. */}
                 <MayoristaAssistant />
               </PageWrapper>
             } />

@@ -11,7 +11,7 @@ import { Alert } from '../../components/ui/Alert';
 import { useToast } from '../../components/ui/Toast';
 import { ReservaTimeline } from '../../components/shared/ReservaTimeline';
 import { EstadoCuentaCard } from '../../components/shared/EstadoCuentaCard';
-import { formatCurrency, formatDateTime, formatDate, formatEstadoReserva } from '../../utils/formatters';
+import { formatCurrency, formatDateTime, formatDate, formatRangoFechas, formatEstadoReserva } from '../../utils/formatters';
 import { toFloat } from '../../utils/money';
 import reservaService from '../../services/reservaService';
 
@@ -225,7 +225,7 @@ export const MayoristaReservaDetalle = () => {
                 </div>
                 <div>
                   <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Fechas</p>
-                  <p style={{ fontWeight: 500 }}>{formatDate(reserva.fecha_inicio)} al {formatDate(reserva.fecha_fin)}</p>
+                  <p style={{ fontWeight: 500 }}>{formatRangoFechas(reserva.fecha_inicio, reserva.fecha_fin, ' al ')}</p>
                 </div>
                 <div>
                   <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Pasajeros</p>

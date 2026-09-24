@@ -13,6 +13,16 @@ export const formatDate = (dateString) => {
   return dateFormatter.format(new Date(dateString));
 };
 
+/**
+ * Rango de fechas de una cotización o reserva. Una actividad dura un solo día
+ * (inicio = fin): en ese caso se muestra una sola fecha.
+ */
+export const formatRangoFechas = (inicio, fin, separador = ' — ') => {
+  const desde = formatDate(inicio);
+  const hasta = formatDate(fin);
+  return !hasta || desde === hasta ? desde : `${desde}${separador}${hasta}`;
+};
+
 export const formatDateTime = (dateString) => {
   if (!dateString) return '';
   return dateTimeFormatter.format(new Date(dateString));

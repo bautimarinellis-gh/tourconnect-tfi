@@ -6,6 +6,8 @@
  *  - keywords: mapa de keyword (normalizada) → peso para el scoring
  *  - defaultParams: valores usados si el clasificador no extrae el param
  *  - roles: roles que pueden ejecutar este intent
+ *  - permiso: permiso (de permisosCatalogo) que el usuario necesita para
+ *    consultarlo; el mismo que protege la sección equivalente del sistema
  *  - visualization: tipo de renderizado sugerido para el frontend
  */
 const intentCatalog = {
@@ -20,6 +22,7 @@ const intentCatalog = {
     },
     defaultParams: { limit: 5, time_range: 'last_30_days', orderBy: 'reservas' },
     roles: ['mayorista'],
+    permiso: 'GestionarAgencias',
     visualization: 'table',
   },
 
@@ -32,8 +35,11 @@ const intentCatalog = {
       esperando: 2, revisar: 2, responder: 2, sin: 1, respuesta: 2,
       nueva: 1, nuevas: 1, reciente: 1, recientes: 1,
     },
-    defaultParams: { limit: 10, time_range: 'last_30_days' },
+    // Las pendientes son un estado actual, no un período: por defecto se
+    // cuentan todas (vencen solas a las 72 hs, así que no se acumulan).
+    defaultParams: { limit: 10, time_range: 'all_time' },
     roles: ['mayorista'],
+    permiso: 'GestionarCotizaciones',
     visualization: 'table',
   },
 
@@ -49,6 +55,7 @@ const intentCatalog = {
     },
     defaultParams: { dias_inactivos: 30 },
     roles: ['mayorista'],
+    permiso: 'GestionarAgencias',
     visualization: 'list',
   },
 
@@ -65,6 +72,7 @@ const intentCatalog = {
     },
     defaultParams: { time_range: 'last_30_days' },
     roles: ['mayorista'],
+    permiso: 'VerReportes',
     visualization: 'stat',
   },
 
@@ -81,6 +89,7 @@ const intentCatalog = {
     },
     defaultParams: { time_range: 'last_30_days' },
     roles: ['mayorista'],
+    permiso: 'GestionarReservas',
     visualization: 'table',
   },
 
@@ -96,6 +105,7 @@ const intentCatalog = {
     },
     defaultParams: { limit: 5, time_range: 'last_30_days' },
     roles: ['mayorista'],
+    permiso: 'VerReportes',
     visualization: 'table',
   },
 };

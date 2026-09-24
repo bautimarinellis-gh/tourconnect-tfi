@@ -5,7 +5,7 @@ import { Table, TableRow, TableCell } from '../ui/Table';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { formatCurrency, formatDate, formatEstadoReserva } from '../../utils/formatters';
+import { formatCurrency, formatDate, formatRangoFechas, formatEstadoReserva } from '../../utils/formatters';
 
 /**
  * Tabla de listado de reservas, compartida entre mayorista y agencia.
@@ -45,7 +45,7 @@ export const ReservasTable = ({ reservas, basePath, showAgenciaColumn = false })
             {showAgenciaColumn && <TableCell>{r.agencia_id?.nombre || 'N/A'}</TableCell>}
             <TableCell>
               <div style={{ fontSize: '0.875rem' }}>
-                {formatDate(r.fecha_inicio)} — {formatDate(r.fecha_fin)}
+                {formatRangoFechas(r.fecha_inicio, r.fecha_fin)}
               </div>
             </TableCell>
             <TableCell>{r.pasajeros}</TableCell>

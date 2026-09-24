@@ -2,9 +2,10 @@ const mongoose = require('mongoose');
 const Cotizacion = require('../models/Cotizacion');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const Producto = require('../models/Producto');
-const { calcularPrecioTotal } = require('../utils/precioCalculator');
+const { calcularPrecioCotizacion } = require('../utils/precioCalculator');
 const { verificarCupoDisponible } = require('../utils/cupoValidator');
 const { hoyDateString, toDateString } = require('../utils/dateHelpers');
+const { estaVigente } = require('../utils/vigenciaCotizacion');
 
 // Error de negocio (no de DB) usada para abortar la transacción de aprobación
 // sin disparar el retry automático de session.withTransaction (solo reintenta
@@ -57,20 +58,22 @@ exports.getCotizaciones = async (req, res, next) => {
 exports.createCotizacion = async (req, res, next) => {
   try {
     const { agencia_id } = req.usuario;
-    const { producto_id, pasajeros, fecha_inicio, fecha_fin } = req.body;
+    const { producto_id, fecha_inicio } = req.body;
+    const pasajeros = Number(req.body.pasajeros);
 
-    // Validar datos básicos
-    if (!producto_id || !pasajeros || !fecha_inicio || !fecha_fin) {
+    // Validar datos básicos. fecha_fin se valida después, según el tipo de
+    // producto: una actividad se cotiza para un solo día.
+    if (!producto_id || !req.body.pasajeros || !fecha_inicio) {
       return res.status(400).json({
         success: false,
         message: 'Faltan campos obligatorios'
       });
     }
 
-    if (pasajeros < 1 || pasajeros > MAX_PASAJEROS) {
+    if (!Number.isInteger(pasajeros) || pasajeros < 1 || pasajeros > MAX_PASAJEROS) {
       return res.status(400).json({
         success: false,
-        message: `La cantidad de pasajeros debe ser entre 1 y ${MAX_PASAJEROS}`
+        message: `La cantidad de pasajeros debe ser un número entero entre 1 y ${MAX_PASAJEROS}`
       });
     }
 
@@ -90,17 +93,34 @@ exports.createCotizacion = async (req, res, next) => {
 
     const producto = agenciaProducto.producto_id;
     const mayorista_id = producto.mayorista_id;
-    const precio_base = producto.precio_base;
-    const markup_porcentaje = agenciaProducto.markup_porcentaje;
+    const esActividad = producto.tipo === 'actividad';
 
-    // Validar que las fechas sean coherentes entre sí
+    // Actividad: un solo día, fecha_fin = fecha_inicio (lo que venga en el
+    // body se ignora). Hotel y paquete: rango con fin posterior al inicio.
+    const fecha_fin = esActividad ? fecha_inicio : req.body.fecha_fin;
+    if (!fecha_fin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Faltan campos obligatorios'
+      });
+    }
+
     const fechaInicio = new Date(fecha_inicio);
     const fechaFin    = new Date(fecha_fin);
 
-    if (fechaInicio >= fechaFin) {
+    if (Number.isNaN(fechaInicio.getTime()) || Number.isNaN(fechaFin.getTime())) {
       return res.status(400).json({
         success: false,
-        message: 'La fecha de inicio debe ser anterior a la fecha de fin.',
+        message: 'Las fechas no tienen un formato válido.',
+      });
+    }
+
+    if (!esActividad && fechaInicio >= fechaFin) {
+      return res.status(400).json({
+        success: false,
+        message: producto.tipo === 'hotel'
+          ? 'La estadía debe ser de al menos 1 noche: la fecha de fin tiene que ser posterior a la de inicio.'
+          : 'La fecha de inicio debe ser anterior a la fecha de fin.',
       });
     }
 
@@ -108,15 +128,6 @@ exports.createCotizacion = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'La fecha de inicio no puede ser anterior al día de hoy.',
-      });
-    }
-
-    const cantidad_noches = Math.round((fechaFin - fechaInicio) / 86400000);
-
-    if (cantidad_noches < 1) {
-      return res.status(400).json({
-        success: false,
-        message: 'La estadía debe ser de al menos 1 noche.',
       });
     }
 
@@ -133,12 +144,17 @@ exports.createCotizacion = async (req, res, next) => {
       });
     }
 
-    // Convertir Decimal128 a number para el cálculo
-    const precio_unitario_num = parseFloat(precio_base.toString());
-    const markup_num = parseFloat(markup_porcentaje.toString());
+    const markup_porcentaje = parseFloat(agenciaProducto.markup_porcentaje.toString());
 
-    // Calcular precio total: precio_unitario_con_markup × noches × pasajeros
-    const precio_total = calcularPrecioTotal(precio_unitario_num, markup_num, cantidad_noches, pasajeros);
+    // La fórmula depende del tipo de producto (ver utils/precioCalculator.js)
+    const { precio_unitario, unidades, precio_total } = calcularPrecioCotizacion({
+      tipo: producto.tipo,
+      precio_base: parseFloat(producto.precio_base.toString()),
+      markup_porcentaje,
+      fecha_inicio: fechaInicio,
+      fecha_fin: fechaFin,
+      pasajeros,
+    });
 
     const cotizacion = await Cotizacion.create({
       agencia_id,
@@ -148,6 +164,10 @@ exports.createCotizacion = async (req, res, next) => {
       fecha_inicio,
       fecha_fin,
       precio_total,
+      tipo_producto: producto.tipo,
+      precio_unitario,
+      markup_porcentaje,
+      unidades,
       estado: 'pendiente',
     });
 
@@ -260,6 +280,15 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
       });
     }
 
+    // El cron de vencimiento corre cada hora: entre corrida y corrida una
+    // pendiente puede haber superado su plazo sin estar marcada todavía.
+    if (!estaVigente(cotizacion)) {
+      return res.status(400).json({
+        success: false,
+        message: 'La cotización venció: superó el plazo para ser respondida.',
+      });
+    }
+
     // Revalidar vigencia: la fecha de inicio se valida contra "hoy" al crear
     // la cotización, pero el mayorista puede tardar días en aprobarla (hasta
     // que vence a las 72hs). Si para entonces el viaje ya empezó, no debe
@@ -304,7 +333,7 @@ exports.actualizarEstadoCotizacion = async (req, res, next) => {
 
           actualizada = await Cotizacion.findOneAndUpdate(
             { _id: id, estado: 'pendiente' },
-            { $set: { estado: 'aprobada' } },
+            { $set: { estado: 'aprobada', aprobada_at: new Date() } },
             { new: true, session }
           );
         });

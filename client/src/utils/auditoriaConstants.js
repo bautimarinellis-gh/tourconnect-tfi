@@ -5,6 +5,7 @@ export const ACCION_LABELS = {
   RESET_PASSWORD:             'Contraseña restablecida',
   CAMBIO_PASSWORD:            'Contraseña cambiada',
   USUARIO_CREADO:             'Usuario creado',
+  USUARIO_ACTIVADO:           'Cuenta activada (invitación aceptada)',
   USUARIO_DESACTIVADO:        'Usuario desactivado',
   ACCESO_DENEGADO:            'Acceso denegado por falta de permisos',
   RESERVA_CREADA:             'Reserva creada',
@@ -25,7 +26,7 @@ export const ACCION_LABELS = {
 // de Mayorista (ver adminController.deactivarMayorista).
 const SEGURIDAD_ADMIN = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
-  'RESET_PASSWORD', 'CAMBIO_PASSWORD',
+  'RESET_PASSWORD', 'CAMBIO_PASSWORD', 'USUARIO_ACTIVADO',
   'USUARIO_CREADO', 'USUARIO_DESACTIVADO',
 ];
 const NEGOCIO_ADMIN = [];
@@ -33,7 +34,7 @@ const NEGOCIO_ADMIN = [];
 // Mayorista: gestiona agencias y aprueba/cobra operaciones.
 const SEGURIDAD_MAYORISTA = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
-  'RESET_PASSWORD', 'CAMBIO_PASSWORD',
+  'RESET_PASSWORD', 'CAMBIO_PASSWORD', 'USUARIO_ACTIVADO',
   'USUARIO_CREADO', 'USUARIO_DESACTIVADO', 'ACCESO_DENEGADO',
 ];
 const NEGOCIO_MAYORISTA = [
@@ -44,7 +45,7 @@ const NEGOCIO_MAYORISTA = [
 // Agencia: cotiza, reserva e informa pagos.
 const SEGURIDAD_AGENCIA = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
-  'RESET_PASSWORD', 'CAMBIO_PASSWORD',
+  'RESET_PASSWORD', 'CAMBIO_PASSWORD', 'USUARIO_ACTIVADO',
 ];
 const NEGOCIO_AGENCIA = [
   'RESERVA_CREADA', 'PAGO_INFORMADO', 'RESERVA_CANCELADA',

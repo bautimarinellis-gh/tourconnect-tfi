@@ -12,6 +12,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { NumberStepper } from '../../components/ui/NumberStepper';
 import { Alert } from '../../components/ui/Alert';
 import { formatCurrency } from '../../utils/formatters';
+import { etiquetaPrecio } from '../../utils/precio';
 import { applyRangePreset, daysBetween, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
 import productoService from '../../services/productoService';
 import './productos.css';
@@ -382,7 +383,7 @@ export const MayoristaProductos = () => {
                 </p>
                 <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Precio Base</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', textTransform: 'uppercase', letterSpacing: '0.5px' }} title={etiquetaPrecio(p.tipo)}>Precio Base</span>
                     <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text)' }}>{formatCurrency(p.precio_base)}</div>
                   </div>
                   <Badge variant="info" style={{ textTransform: 'capitalize' }}>{p.tipo}</Badge>
@@ -418,7 +419,7 @@ export const MayoristaProductos = () => {
         />
         <Input label="Nombre *" value={formData.nombre} onChange={e => set('nombre', e.target.value)} />
         <Textarea label="Descripción *" rows={3} value={formData.descripcion} onChange={e => set('descripcion', e.target.value)} />
-        <Input label="Precio Base (USD) *" type="number" min="0.01" step="0.01" value={formData.precio_base} onChange={e => set('precio_base', e.target.value)} />
+        <Input label={`${etiquetaPrecio(tipoProducto)} (USD) *`} type="number" min="0.01" step="0.01" value={formData.precio_base} onChange={e => set('precio_base', e.target.value)} />
         {renderAvailabilityFields(formData, set, 'create')}
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
@@ -523,7 +524,7 @@ export const MayoristaProductos = () => {
         <Input label="Nombre *" value={editForm.nombre} onChange={e => setEdit('nombre', e.target.value)} />
         <Textarea label="Descripción *" rows={3} value={editForm.descripcion} onChange={e => setEdit('descripcion', e.target.value)} />
 
-        <Input label="Precio Base (USD) *" type="number" min="0.01" step="0.01" value={editForm.precio_base} onChange={e => setEdit('precio_base', e.target.value)} />
+        <Input label={`${etiquetaPrecio(editTipo)} (USD) *`} type="number" min="0.01" step="0.01" value={editForm.precio_base} onChange={e => setEdit('precio_base', e.target.value)} />
         <Alert variant="info" style={{ marginTop: '-0.5rem', marginBottom: '1rem' }}>
           Las cotizaciones ya realizadas no se verán afectadas por este cambio.
         </Alert>

@@ -9,7 +9,8 @@ import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { formatCurrency, formatDate } from '../../utils/formatters';
-import { addDays, applyRangePreset, daysBetween, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
+import { addDays, applyRangePreset, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
+import { esDeUnSoloDia, estimarPrecio, etiquetaPrecio } from '../../utils/precio';
 import productoService from '../../services/productoService';
 import cotizacionService from '../../services/cotizacionService';
 import { useToast } from '../../components/ui/Toast';
@@ -64,11 +65,17 @@ export const AgenciaCatalogo = () => {
   }, [fetchCatalogo]);
 
   const handleCotizar = async () => {
-    if (!formData.fecha_inicio || !formData.fecha_fin || formData.cantidad_pasajeros < 1) {
-      toast.error('Debe completar las fechas y la cantidad de pasajeros.');
+    // Una actividad se cotiza para un solo día: la fecha de fin es la de inicio.
+    const unSoloDia = esDeUnSoloDia(selectedProduct.tipo);
+    const fechaFin = unSoloDia ? formData.fecha_inicio : formData.fecha_fin;
+
+    if (!formData.fecha_inicio || !fechaFin || formData.cantidad_pasajeros < 1) {
+      toast.error(unSoloDia
+        ? 'Debe completar la fecha y la cantidad de pasajeros.'
+        : 'Debe completar las fechas y la cantidad de pasajeros.');
       return;
     }
-    if (!isValidDateRange(formData.fecha_inicio, formData.fecha_fin, { allowSameDay: false })) {
+    if (!unSoloDia && !isValidDateRange(formData.fecha_inicio, fechaFin, { allowSameDay: false })) {
       toast.error('La fecha de inicio debe ser anterior a la fecha de fin.');
       return;
     }
@@ -77,7 +84,7 @@ export const AgenciaCatalogo = () => {
       await cotizacionService.create({
         producto_id:  selectedProduct._id,
         fecha_inicio: formData.fecha_inicio,
-        fecha_fin:    formData.fecha_fin,
+        fecha_fin:    fechaFin,
         pasajeros:    formData.cantidad_pasajeros,
       });
       toast.success('Cotización generada exitosamente. El mayorista la revisará pronto.');
@@ -107,15 +114,16 @@ export const AgenciaCatalogo = () => {
     .sort()
     .pop();
   const maxDisponible = toDateInputValue(selectedProduct?.disponibilidad_hasta);
-  const cantidadNoches =
-    formData.fecha_inicio && formData.fecha_fin
-      ? daysBetween(formData.fecha_inicio, formData.fecha_fin)
-      : 0;
-
-  const precioFinalEstimado =
-    selectedProduct && cantidadNoches > 0
-      ? selectedProduct.precio_final * cantidadNoches * formData.cantidad_pasajeros
-      : 0;
+  const unSoloDia = esDeUnSoloDia(selectedProduct?.tipo);
+  const estimado = selectedProduct
+    ? estimarPrecio({
+      tipo: selectedProduct.tipo,
+      precioUnitario: selectedProduct.precio_final,
+      fechaInicio: formData.fecha_inicio,
+      fechaFin: formData.fecha_fin,
+      pasajeros: formData.cantidad_pasajeros,
+    })
+    : null;
 
   const canApplyDurationPreset = (days) => {
     if (!selectedProduct || !maxDisponible) return false;
@@ -222,46 +230,61 @@ export const AgenciaCatalogo = () => {
                 <>
                   <p className="quote-description">{selectedProduct.descripcion}</p>
                   <div className="quote-info-row">
-                    <span>Precio por pasajero</span>
+                    <span>{etiquetaPrecio(selectedProduct.tipo)}</span>
                     <strong>{formatCurrency(selectedProduct.precio_final)}</strong>
                   </div>
                   <Alert variant="info">
                     Disponible del <strong>{formatDate(selectedProduct.disponibilidad_desde)}</strong> al <strong>{formatDate(selectedProduct.disponibilidad_hasta)}</strong>.
                   </Alert>
-                  <div className="quote-form-grid">
-                    <Input
-                      type="date"
-                      label="Inicio"
-                      min={minDisponible}
-                      max={maxDisponible}
-                      value={formData.fecha_inicio}
-                      onChange={e => setFormData({ ...formData, fecha_inicio: e.target.value })}
-                    />
-                    <Input
-                      type="date"
-                      label="Fin"
-                      min={formData.fecha_inicio || minDisponible}
-                      max={maxDisponible}
-                      value={formData.fecha_fin}
-                      onChange={e => setFormData({ ...formData, fecha_fin: e.target.value })}
-                    />
-                  </div>
-                  <div className="quote-duration-presets" aria-label="Duración de la cotización">
-                    {QUOTE_DURATION_PRESETS.map(preset => {
-                      const disabled = !canApplyDurationPreset(preset.days);
-                      return (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => applyDurationPreset(preset.days)}
-                          title={disabled ? 'Fuera de la disponibilidad del producto' : preset.label}
-                        >
-                          {preset.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {unSoloDia ? (
+                    <div className="quote-form-grid">
+                      <Input
+                        type="date"
+                        label="Fecha de la actividad"
+                        min={minDisponible}
+                        max={maxDisponible}
+                        value={formData.fecha_inicio}
+                        onChange={e => setFormData({ ...formData, fecha_inicio: e.target.value, fecha_fin: e.target.value })}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="quote-form-grid">
+                        <Input
+                          type="date"
+                          label="Inicio"
+                          min={minDisponible}
+                          max={maxDisponible}
+                          value={formData.fecha_inicio}
+                          onChange={e => setFormData({ ...formData, fecha_inicio: e.target.value })}
+                        />
+                        <Input
+                          type="date"
+                          label="Fin"
+                          min={formData.fecha_inicio || minDisponible}
+                          max={maxDisponible}
+                          value={formData.fecha_fin}
+                          onChange={e => setFormData({ ...formData, fecha_fin: e.target.value })}
+                        />
+                      </div>
+                      <div className="quote-duration-presets" aria-label="Duración de la cotización">
+                        {QUOTE_DURATION_PRESETS.map(preset => {
+                          const disabled = !canApplyDurationPreset(preset.days);
+                          return (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              disabled={disabled}
+                              onClick={() => applyDurationPreset(preset.days)}
+                              title={disabled ? 'Fuera de la disponibilidad del producto' : preset.label}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                   <div className="quote-stepper-row">
                     <span>Pasajeros</span>
                     <div className="quote-stepper">
@@ -282,11 +305,13 @@ export const AgenciaCatalogo = () => {
                   </div>
                   <div className="quote-total-row">
                     <span>Total estimado</span>
-                    <strong>{formatCurrency(precioFinalEstimado)}</strong>
+                    <strong>{formatCurrency(estimado?.total ?? 0)}</strong>
                   </div>
-                  {cantidadNoches > 0 && (
+                  {estimado && (
                     <p className="quote-breakdown">
-                      {formatCurrency(selectedProduct?.precio_final)} x {cantidadNoches} noche{cantidadNoches !== 1 ? 's' : ''} x {formData.cantidad_pasajeros} pax
+                      {formatCurrency(selectedProduct?.precio_final)}
+                      {estimado.noches !== null && ` x ${estimado.noches} noche${estimado.noches !== 1 ? 's' : ''}`}
+                      {` x ${formData.cantidad_pasajeros} pax`}
                     </p>
                   )}
                   <Button className="w-full" size="lg" onClick={handleCotizar} isLoading={actionLoading}>

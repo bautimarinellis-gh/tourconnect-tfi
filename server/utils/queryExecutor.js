@@ -16,68 +16,97 @@ const {
   productoCollection,
   agenciaCollection,
 } = require('./reporteHelpers');
+const { MESES, hoyAR, inicioDiaAR } = require('./fechasAR');
 
 // ─────────────────────────────────────────────
 // Helpers de rango de fechas
 // ─────────────────────────────────────────────
 
-function getFechaDesde(time_range) {
-  const now = new Date();
-  const y = now.getUTCFullYear();
-  const mo = now.getUTCMonth();
-  const d = now.getUTCDate();
+/**
+ * Rango de fechas del período pedido, en hora argentina.
+ *
+ * Devuelve { fechaDesde, fechaHasta } con fechaHasta EXCLUSIVO. Los períodos
+ * que ya terminaron ("ayer", "el mes pasado", "diciembre 2025") son cerrados;
+ * los que siguen en curso ("hoy", "este mes", "últimos 30 días") tienen
+ * fechaHasta null, es decir, hasta ahora.
+ */
+function getDateRange(params, now = new Date()) {
+  const { time_range, days, months, month, year } = params;
+  const { y, m, d, dow } = hoyAR(now);
+  const abierto = (fechaDesde) => ({ fechaDesde, fechaHasta: null });
+  const cerrado = (fechaDesde, fechaHasta) => ({ fechaDesde, fechaHasta });
 
   switch (time_range) {
-    case 'today':         return new Date(Date.UTC(y, mo, d));
-    case 'yesterday':     return new Date(Date.UTC(y, mo, d - 1));
-    case 'last_7_days':   return new Date(Date.UTC(y, mo, d - 7));
-    case 'last_week':     return new Date(Date.UTC(y, mo, d - 7));
-    case 'current_month': return new Date(Date.UTC(y, mo, 1));
-    case 'last_month':    return new Date(Date.UTC(y, mo - 1, 1));
-    case 'last_90_days':  return new Date(Date.UTC(y, mo, d - 90));
-    case 'last_6_months': return new Date(Date.UTC(y, mo - 6, d));
-    case 'current_year':  return new Date(Date.UTC(y, 0, 1));
-    case 'all_time':      return new Date('2000-01-01T00:00:00.000Z');
-    default:              return new Date(Date.UTC(y, mo, d - 30)); // last_30_days
+    case 'today':
+      return abierto(inicioDiaAR(y, m, d));
+    case 'yesterday':
+      return cerrado(inicioDiaAR(y, m, d - 1), inicioDiaAR(y, m, d));
+    case 'last_n_days':
+      // Los últimos N días incluyen hoy: hoy y los N-1 anteriores.
+      return abierto(inicioDiaAR(y, m, d - (days - 1)));
+    case 'last_week': {
+      // Semana calendario anterior, de lunes a domingo.
+      const lunes = d - ((dow + 6) % 7);
+      return cerrado(inicioDiaAR(y, m, lunes - 7), inicioDiaAR(y, m, lunes));
+    }
+    case 'current_month':
+      return abierto(inicioDiaAR(y, m, 1));
+    case 'last_month':
+      return cerrado(inicioDiaAR(y, m - 1, 1), inicioDiaAR(y, m, 1));
+    case 'last_n_months':
+      return abierto(inicioDiaAR(y, m - months, d + 1));
+    case 'current_quarter':
+      return abierto(inicioDiaAR(y, m - (m % 3), 1));
+    case 'last_quarter': {
+      const inicioTrimestre = m - (m % 3);
+      return cerrado(inicioDiaAR(y, inicioTrimestre - 3, 1), inicioDiaAR(y, inicioTrimestre, 1));
+    }
+    case 'current_year':
+      return abierto(inicioDiaAR(y, 0, 1));
+    case 'last_year':
+      return cerrado(inicioDiaAR(y - 1, 0, 1), inicioDiaAR(y, 0, 1));
+    case 'specific_month':
+      return cerrado(inicioDiaAR(year, month - 1, 1), inicioDiaAR(year, month, 1));
+    case 'all_time':
+      return abierto(new Date(0));
+    default: // last_30_days
+      return abierto(inicioDiaAR(y, m, d - 29));
   }
 }
 
-function timeRangeLabel(params) {
-  const { time_range, month, year } = typeof params === 'string' ? { time_range: params } : params;
-  if (time_range === 'specific_month' && month && year) {
-    const MONTH_NAMES = ['enero','febrero','marzo','abril','mayo','junio','julio',
-      'agosto','septiembre','octubre','noviembre','diciembre'];
-    return `${MONTH_NAMES[month - 1]} ${year}`;
-  }
-  const labels = {
-    today:         'hoy',
-    yesterday:     'desde ayer',
-    last_7_days:   'los últimos 7 días',
-    last_week:     'la semana pasada',
-    current_month: 'el mes actual',
-    last_month:    'desde el mes pasado',
-    last_30_days:  'los últimos 30 días',
-    last_90_days:  'los últimos 90 días',
-    last_6_months: 'los últimos 6 meses',
-    current_year:  'el año actual',
-    all_time:      'todo el historial',
-  };
-  return labels[time_range] || 'los últimos 30 días';
+/** Filtro de MongoDB para un campo fecha según el período. */
+function filtroFecha(params) {
+  const { fechaDesde, fechaHasta } = getDateRange(params);
+  return fechaHasta ? { $gte: fechaDesde, $lt: fechaHasta } : { $gte: fechaDesde };
 }
 
 /**
- * Retorna { fechaDesde, fechaHasta } según los params.
- * Para specific_month: fechaHasta es el último instante del mes.
- * Para el resto: fechaHasta es null (sin límite superior).
+ * Frase que describe el período, lista para ir después del sujeto:
+ * "Ingresos hoy", "Top 5 agencias en agosto 2026", "12 reservas la semana pasada".
  */
-function getDateRange(params) {
-  const { time_range, month, year } = params;
-  if (time_range === 'specific_month' && month && year) {
-    const fechaDesde = new Date(Date.UTC(year, month - 1, 1));
-    const fechaHasta = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
-    return { fechaDesde, fechaHasta };
+function describirPeriodo(params, now = new Date()) {
+  const { time_range, days, months, month, year } = params;
+  const { y, m } = hoyAR(now);
+
+  switch (time_range) {
+    case 'today':           return 'hoy';
+    case 'yesterday':       return 'ayer';
+    case 'last_n_days':     return days === 1 ? 'hoy' : `en los últimos ${days} días`;
+    case 'last_week':       return 'la semana pasada';
+    case 'current_month':   return 'en lo que va del mes';
+    case 'last_month': {
+      const mesPasado = new Date(Date.UTC(y, m - 1, 1));
+      return `en ${MESES[mesPasado.getUTCMonth()]} ${mesPasado.getUTCFullYear()}`;
+    }
+    case 'last_n_months':   return months === 1 ? 'en el último mes' : `en los últimos ${months} meses`;
+    case 'current_quarter': return 'en lo que va del trimestre';
+    case 'last_quarter':    return 'el trimestre pasado';
+    case 'current_year':    return `en lo que va de ${y}`;
+    case 'last_year':       return `en ${y - 1}`;
+    case 'specific_month':  return `en ${MESES[month - 1]} ${year}`;
+    case 'all_time':        return 'en todo el historial';
+    default:                return 'en los últimos 30 días';
   }
-  return { fechaDesde: getFechaDesde(time_range), fechaHasta: null };
 }
 
 function formatMonto(val) {
@@ -98,8 +127,7 @@ function formatMonto(val) {
  */
 async function handleTopAgencias(params, mayoristaId) {
   const { limit = 5, orderBy = 'reservas' } = params;
-  const { fechaDesde, fechaHasta } = getDateRange(params);
-  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
+  const dateFilter = filtroFecha(params);
   const sortField = orderBy === 'facturacion' ? 'monto_total' : 'cantidad_reservas';
 
   const pipeline = [
@@ -151,7 +179,7 @@ async function handleTopAgencias(params, mayoristaId) {
 
   return {
     data,
-    summary: `Top ${data.length} agencias en ${timeRangeLabel(params)}. `
+    summary: `Top ${data.length} agencias ${describirPeriodo(params)}: `
       + `${totalReservas} reservas, $${totalFacturado.toLocaleString('en-US')} facturados.`,
     columns: ['agencia', 'reservas', 'facturacion'],
     columnLabels: { agencia: 'Agencia', reservas: 'Reservas', facturacion: 'Facturación ($)' },
@@ -164,59 +192,80 @@ async function handleTopAgencias(params, mayoristaId) {
  */
 async function handleCotizacionesPendientes(params, mayoristaId) {
   const { limit = 10 } = params;
-  const { fechaDesde, fechaHasta } = getDateRange(params);
 
-  const rows = await Cotizacion.aggregate([
+  // $facet cuenta el total antes del $limit: el resumen tiene que decir
+  // cuántas pendientes hay, no cuántas filas se muestran.
+  const [resultado] = await Cotizacion.aggregate([
     {
       $match: {
         mayorista_id: mayoristaId,
         estado: 'pendiente',
-        created_at: { $gte: fechaDesde, ...(fechaHasta && { $lte: fechaHasta }) },
+        created_at: filtroFecha(params),
       },
     },
-    { $sort: { created_at: -1 } },
-    { $limit: Math.min(limit, 20) },
     {
-      $lookup: {
-        from: agenciaCollection(),
-        localField: 'agencia_id',
-        foreignField: '_id',
-        as: 'agencia_info',
-      },
-    },
-    { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
-    {
-      $lookup: {
-        from: productoCollection(),
-        localField: 'producto_id',
-        foreignField: '_id',
-        as: 'producto_info',
-      },
-    },
-    { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        _id: 0,
-        agencia: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
-        producto: { $ifNull: ['$producto_info.nombre', 'Producto desconocido'] },
-        pasajeros: 1,
-        monto: '$precio_total',
-        fecha: '$created_at',
+      $facet: {
+        total: [{ $count: 'n' }],
+        filas: [
+          { $sort: { created_at: -1 } },
+          { $limit: Math.min(limit, 20) },
+          {
+            $lookup: {
+              from: agenciaCollection(),
+              localField: 'agencia_id',
+              foreignField: '_id',
+              as: 'agencia_info',
+            },
+          },
+          { $unwind: { path: '$agencia_info', preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: productoCollection(),
+              localField: 'producto_id',
+              foreignField: '_id',
+              as: 'producto_info',
+            },
+          },
+          { $unwind: { path: '$producto_info', preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              _id: 0,
+              agencia: { $ifNull: ['$agencia_info.nombre', 'Agencia desconocida'] },
+              producto: { $ifNull: ['$producto_info.nombre', 'Producto desconocido'] },
+              pasajeros: 1,
+              monto: '$precio_total',
+              fecha: '$created_at',
+            },
+          },
+        ],
       },
     },
   ]);
+
+  const total = resultado?.total[0]?.n ?? 0;
+  const rows = resultado?.filas ?? [];
 
   const data = rows.map((c) => ({
     agencia: c.agencia,
     producto: c.producto,
     pasajeros: c.pasajeros,
     monto: formatMonto(c.monto),
-    fecha: c.fecha ? new Date(c.fecha).toLocaleDateString('es-AR') : '-',
+    fecha: c.fecha
+      ? new Date(c.fecha).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })
+      : '-',
   }));
+
+  const periodo = params.time_range === 'all_time' ? '' : ` ${describirPeriodo(params)}`;
+  let summary = total === 1
+    ? `Tenés 1 cotización pendiente${periodo}.`
+    : `Tenés ${total} cotizaciones pendientes${periodo}.`;
+  if (total > data.length) {
+    summary += ` Se muestran las ${data.length} más recientes.`;
+  }
 
   return {
     data,
-    summary: `${data.length} cotizaciones pendientes en ${timeRangeLabel(params)}.`,
+    summary,
     columns: ['agencia', 'producto', 'pasajeros', 'monto', 'fecha'],
     columnLabels: {
       agencia: 'Agencia', producto: 'Producto',
@@ -231,8 +280,7 @@ async function handleCotizacionesPendientes(params, mayoristaId) {
  */
 async function handleAgenciasInactivas(params, mayoristaId) {
   const { dias_inactivos = 30 } = params;
-  const fechaCorte = new Date();
-  fechaCorte.setDate(fechaCorte.getDate() - dias_inactivos);
+  const { fechaDesde: fechaCorte } = getDateRange({ time_range: 'last_n_days', days: dias_inactivos });
 
   // Agencias activas del mayorista
   const todasAgencias = await Agencia.find({ mayorista_id: mayoristaId, activo: true })
@@ -277,8 +325,7 @@ async function handleAgenciasInactivas(params, mayoristaId) {
  * Total de ingresos (reservas no canceladas) en el período.
  */
 async function handleIngresosPeriodo(params, mayoristaId) {
-  const { fechaDesde, fechaHasta } = getDateRange(params);
-  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
+  const dateFilter = filtroFecha(params);
 
   const resultado = await Reserva.aggregate([
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
@@ -302,10 +349,10 @@ async function handleIngresosPeriodo(params, mayoristaId) {
 
   return {
     data: [{ label: 'Total ingresos', valor: totalIngresos, reservas: totalReservas }],
-    summary: `$${totalIngresos.toLocaleString('en-US')} en ingresos durante ${timeRangeLabel(params)} (${totalReservas} reservas confirmadas).`,
+    summary: `$${totalIngresos.toLocaleString('en-US')} en ingresos ${describirPeriodo(params)} (${totalReservas} reservas confirmadas).`,
     stat: {
       value: `$${totalIngresos.toLocaleString('en-US')}`,
-      label: `Ingresos en ${timeRangeLabel(params)}`,
+      label: `Ingresos ${describirPeriodo(params)}`,
       sub: `${totalReservas} reservas confirmadas`,
     },
     columns: [],
@@ -318,8 +365,7 @@ async function handleIngresosPeriodo(params, mayoristaId) {
  * Resumen de reservas agrupadas por estado.
  */
 async function handleReservasPorEstado(params, mayoristaId) {
-  const { fechaDesde, fechaHasta } = getDateRange(params);
-  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
+  const dateFilter = filtroFecha(params);
 
   const estadoLabels = {
     pendiente_pago: 'Pendiente de pago',
@@ -345,7 +391,7 @@ async function handleReservasPorEstado(params, mayoristaId) {
 
   return {
     data,
-    summary: `${total} reservas en total en ${timeRangeLabel(params)}, distribuidas en ${data.length} estados.`,
+    summary: `${total} reservas ${describirPeriodo(params)}, distribuidas en ${data.length} estados.`,
     columns: ['estado', 'cantidad'],
     columnLabels: { estado: 'Estado', cantidad: 'Cantidad' },
   };
@@ -357,8 +403,7 @@ async function handleReservasPorEstado(params, mayoristaId) {
  */
 async function handleProductoTop(params, mayoristaId) {
   const { limit = 5 } = params;
-  const { fechaDesde, fechaHasta } = getDateRange(params);
-  const dateFilter = fechaHasta ? { $gte: fechaDesde, $lte: fechaHasta } : { $gte: fechaDesde };
+  const dateFilter = filtroFecha(params);
 
   const pipeline = [
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
@@ -408,7 +453,7 @@ async function handleProductoTop(params, mayoristaId) {
 
   return {
     data,
-    summary: `Top ${data.length} productos por reservas en ${timeRangeLabel(params)}.`,
+    summary: `Top ${data.length} productos por reservas ${describirPeriodo(params)}.`,
     columns: ['producto', 'tipo', 'reservas', 'facturacion'],
     columnLabels: {
       producto: 'Producto', tipo: 'Tipo',

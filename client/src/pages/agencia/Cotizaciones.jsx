@@ -11,19 +11,18 @@ import { Select } from '../../components/ui/Select';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
 import { CotizacionDetailModal } from '../../components/shared/CotizacionDetailModal';
-import { formatCurrency, formatDate, formatEstadoCotizacion } from '../../utils/formatters';
+import { formatCurrency, formatRangoFechas, formatDateTime, formatEstadoCotizacion } from '../../utils/formatters';
 import cotizacionService from '../../services/cotizacionService';
 import reservaService from '../../services/reservaService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../components/ui/Toast';
 
-// Debe coincidir con HORAS_VENCIMIENTO_COTIZACION en
-// server/utils/cotizacionVencimiento.js (no hay endpoint que lo exponga).
-const HORAS_VENCIMIENTO = 72;
-
+// El servidor calcula cuándo vence cada cotización (vence_at): una pendiente
+// si el mayorista no la responde, una aprobada si la agencia no confirma la
+// reserva a tiempo. Acá solo se muestra el tiempo que queda.
 const getVencimientoInfo = (cotizacion) => {
-  if (cotizacion.estado !== 'pendiente' || !cotizacion.created_at) return null;
-  const expira = new Date(new Date(cotizacion.created_at).getTime() + HORAS_VENCIMIENTO * 3600 * 1000);
+  if (!cotizacion.vence_at) return null;
+  const expira = new Date(cotizacion.vence_at);
   const diffMs = expira - Date.now();
   const diffHs = Math.floor(diffMs / 3600000);
   return { expira, diffHs, vencido: diffMs <= 0 };
@@ -158,7 +157,7 @@ export const AgenciaCotizaciones = () => {
                   </TableCell>
                   <TableCell>{c.pasajeros}</TableCell>
                   <TableCell>
-                    {formatDate(c.fecha_inicio)} - {formatDate(c.fecha_fin)}
+                    {formatRangoFechas(c.fecha_inicio, c.fecha_fin, ' - ')}
                   </TableCell>
                   <TableCell style={{ fontWeight: 600 }}>{formatCurrency(c.precio_total)}</TableCell>
                   <TableCell>
@@ -234,6 +233,12 @@ export const AgenciaCotizaciones = () => {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {bookingError && <Alert variant="error">{bookingError}</Alert>}
+          {selectedCotizacion?.vence_at && (
+            <Alert variant="info">
+              Tenés hasta el {formatDateTime(selectedCotizacion.vence_at)} para confirmar la reserva. Pasado ese
+              plazo la cotización vence y los lugares se liberan.
+            </Alert>
+          )}
           <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
             <h4 style={{ margin: '0 0 0.5rem 0' }}>Estás a punto de confirmar:</h4>
             <p style={{ margin: 0, fontSize: '0.875rem' }}>{selectedCotizacion?.producto_id?.nombre}</p>

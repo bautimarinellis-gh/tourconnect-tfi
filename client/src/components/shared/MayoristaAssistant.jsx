@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { AssistantChat } from './AssistantChat';
+import { usePermiso } from '../../hooks/usePermiso';
+import { PERMISOS_ASISTENTE } from '../../config/navegacion';
 import './assistant.css';
 
 /**
@@ -13,16 +15,18 @@ import './assistant.css';
  * El launcher y el panel se renderizan siempre (se ocultan con `hidden`,
  * no se desmontan): minimizar no debe borrar la conversación en curso.
  *
- * Sin gate por permiso por ahora: lo usan el mayorista y los sub-mayoristas
- * (cualquier usuario del tenant), igual que cuando vivía en el Dashboard.
- * Para restringirlo a futuro alcanza con envolver <MayoristaAssistant /> en
- * <ConPermiso codigo="..."> desde App.jsx, sin tocar este componente.
+ * Cada intención del asistente exige el mismo permiso que la sección
+ * equivalente del sistema (ver `permiso` en server/utils/intentCatalog.js).
+ * Si el usuario no tiene ninguno, el botón no se muestra.
  *
  * El aislamiento por tenant es 100% server-side (assistantRoute + middleware
  * tenant): el front solo manda el texto de la consulta.
  */
 export function MayoristaAssistant() {
   const [open, setOpen] = useState(false);
+  const habilitado = usePermiso(PERMISOS_ASISTENTE);
+
+  if (!habilitado) return null;
 
   return (
     <>

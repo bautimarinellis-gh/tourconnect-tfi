@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { calcularVencimiento } = require('../utils/vigenciaCotizacion');
 
 const cotizacionSchema = new mongoose.Schema(
   {
@@ -27,12 +28,16 @@ const cotizacionSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    // En una actividad (un solo día) fecha_fin es igual a fecha_inicio; en
+    // hoteles y paquetes tiene que ser posterior.
     fecha_fin: {
       type: Date,
       required: true,
       validate: {
         validator: function (value) {
-          return value > this.fecha_inicio;
+          return this.tipo_producto === 'actividad'
+            ? value >= this.fecha_inicio
+            : value > this.fecha_inicio;
         },
         message: 'fecha_fin debe ser posterior a fecha_inicio',
       },
@@ -41,10 +46,39 @@ const cotizacionSchema = new mongoose.Schema(
       type: mongoose.Types.Decimal128,
       required: true,
     },
+    // Registro de cómo se calculó el total al momento de cotizar (CU-03,
+    // paso 10): si después cambian el precio base o el markup, la cotización
+    // conserva los valores con los que se ofreció. Las cotizaciones previas a
+    // estos campos los tienen en null.
+    tipo_producto: {
+      type: String,
+      enum: ['hotel', 'actividad', 'paquete', null],
+      default: null,
+    },
+    // Precio por unidad con el markup ya aplicado (lo que la agencia ve en su catálogo).
+    precio_unitario: {
+      type: mongoose.Types.Decimal128,
+      default: null,
+    },
+    markup_porcentaje: {
+      type: Number,
+      default: null,
+    },
+    // Noches en un hotel; 1 en actividades y paquetes (ver precioCalculator).
+    unidades: {
+      type: Number,
+      default: null,
+    },
     estado: {
       type: String,
       enum: ['pendiente', 'aprobada', 'rechazada', 'vencida', 'cancelada', 'reserva_generada'],
       default: 'pendiente',
+    },
+    // Desde acá corre el plazo que tiene la agencia para confirmar la reserva
+    // (ver utils/vigenciaCotizacion.js).
+    aprobada_at: {
+      type: Date,
+      default: null,
     },
     motivo_rechazo: {
       type: String,
@@ -73,7 +107,15 @@ const cotizacionSchema = new mongoose.Schema(
 
 cotizacionSchema.virtual('cantidad_noches').get(function () {
   if (!this.fecha_inicio || !this.fecha_fin) return null;
+  // Las noches solo tienen sentido en un hotel.
+  if (this.tipo_producto && this.tipo_producto !== 'hotel') return null;
   return Math.round((this.fecha_fin - this.fecha_inicio) / 86400000);
+});
+
+// Cuándo vence si nadie actúa (null si su estado no vence). Viaja en el JSON
+// para que el frontend muestre la cuenta regresiva sin duplicar la regla.
+cotizacionSchema.virtual('vence_at').get(function () {
+  return calcularVencimiento(this);
 });
 
 // Índices compuestos para queries del Asistente Inteligente y reportes

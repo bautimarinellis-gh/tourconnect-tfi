@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { Alert } from '../ui/Alert';
-import { formatCurrency, formatDate, formatEstadoCotizacion } from '../../utils/formatters';
+import { formatCurrency, formatRangoFechas, formatEstadoCotizacion } from '../../utils/formatters';
 
 const Row = ({ label, children }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -40,7 +40,7 @@ export const CotizacionDetailModal = ({ isOpen, onClose, cotizacion, showAgencia
           <span>{cotizacion.producto_id?.nombre || 'N/A'}</span>
         </Row>
         <Row label="Fechas">
-          <span>{formatDate(cotizacion.fecha_inicio)} — {formatDate(cotizacion.fecha_fin)}</span>
+          <span>{formatRangoFechas(cotizacion.fecha_inicio, cotizacion.fecha_fin)}</span>
         </Row>
         <Row label="Pasajeros">
           <span>{cotizacion.pasajeros}</span>

@@ -41,6 +41,24 @@ const MAX_INTENTOS_CODIGO = 5;
 const hashCodigo = (codigo) =>
   crypto.createHash('sha256').update(String(codigo)).digest('hex');
 
+/**
+ * Estos valores van directo a filtros de búsqueda (`findOne({ invite_token })`).
+ * Exigir que sean texto impide que un objeto como `{ "$ne": null }` se
+ * interprete como operador de Mongo. Es la segunda capa: el middleware
+ * sanitizeInput ya los rechaza, pero auth no debe depender solo de eso.
+ */
+const sonTextos = (...valores) =>
+  valores.every((v) => typeof v === 'string' && v.length > 0);
+
+/** Mismo criterio que el schema de Usuario (lowercase + trim). */
+const normalizarEmail = (email) => email.trim().toLowerCase();
+
+const respuestaCamposInvalidos = (res) =>
+  res.status(400).json({
+    success: false,
+    message: 'Los datos enviados no tienen un formato válido.',
+  });
+
 // ---------------------
 // Controllers
 // ---------------------
@@ -51,14 +69,17 @@ const hashCodigo = (codigo) =>
  */
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
 
-    if (!email || !password) {
+    if (!req.body.email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Email y contraseña son obligatorios.',
       });
     }
+
+    if (!sonTextos(req.body.email, password)) return respuestaCamposInvalidos(res);
+    const email = normalizarEmail(req.body.email);
 
     // Buscar usuario con password_hash incluido
     const usuario = await Usuario.findOne({ email }).select('+password_hash');
@@ -242,6 +263,8 @@ const setPassword = async (req, res, next) => {
       });
     }
 
+    if (!sonTextos(invite_token, password)) return respuestaCamposInvalidos(res);
+
     if (password.length < 8) {
       return res.status(400).json({
         success: false,
@@ -276,6 +299,17 @@ const setPassword = async (req, res, next) => {
     usuario.invite_token_expires = undefined;
     await usuario.save();
 
+    // Activar una cuenta es definir su primera contraseña: tiene que quedar
+    // rastro de cuándo y desde dónde se hizo.
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_ACTIVADO',
+      usuario_id: usuario._id,
+      mayorista_id: usuario.mayorista_id ?? null,
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+    });
+
     res.json({
       success: true,
       data: {
@@ -293,14 +327,15 @@ const setPassword = async (req, res, next) => {
  */
 const forgotPassword = async (req, res, next) => {
   try {
-    const { email } = req.body;
-
-    if (!email) {
+    if (!req.body.email) {
       return res.status(400).json({
         success: false,
         message: 'El email es obligatorio.',
       });
     }
+
+    if (!sonTextos(req.body.email)) return respuestaCamposInvalidos(res);
+    const email = normalizarEmail(req.body.email);
 
     const usuario = await Usuario.findOne({ email });
 
@@ -373,14 +408,17 @@ const forgotPassword = async (req, res, next) => {
  */
 const verifyResetCode = async (req, res, next) => {
   try {
-    const { email, codigo } = req.body;
+    const { codigo } = req.body;
 
-    if (!email || !codigo) {
+    if (!req.body.email || !codigo) {
       return res.status(400).json({
         success: false,
         message: 'Email y código son obligatorios.',
       });
     }
+
+    if (!sonTextos(req.body.email, codigo)) return respuestaCamposInvalidos(res);
+    const email = normalizarEmail(req.body.email);
 
     const respuestaInvalida = () =>
       res.status(400).json({
@@ -443,6 +481,8 @@ const resetPassword = async (req, res, next) => {
         message: 'Token y contraseña son obligatorios.',
       });
     }
+
+    if (!sonTextos(token, password)) return respuestaCamposInvalidos(res);
 
     if (password.length < 8) {
       return res.status(400).json({
@@ -538,6 +578,8 @@ const changePassword = async (req, res, next) => {
         message: 'La contraseña actual y la nueva son obligatorias.',
       });
     }
+
+    if (!sonTextos(password_actual, password_nueva)) return respuestaCamposInvalidos(res);
 
     if (String(password_nueva).length < 8) {
       return res.status(400).json({

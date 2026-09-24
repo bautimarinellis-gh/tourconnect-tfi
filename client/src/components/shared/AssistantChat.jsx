@@ -2,15 +2,17 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Sparkles, ChevronRight, Eraser, X } from 'lucide-react';
 import assistantService from '../../services/assistantService';
 import { formatCurrency } from '../../utils/formatters';
+import { usePermisos } from '../../hooks/usePermiso';
+import { PERMISO_POR_SECCION as P } from '../../config/navegacion';
 import './assistant.css';
 
 // ─── Suggestions predefinidas ──────────────────────────────────────
 const INITIAL_SUGGESTIONS = [
-  '¿Cuáles son mis top 5 agencias?',
-  '¿Cuántas cotizaciones tengo pendientes?',
-  '¿Cuánto facturé este mes?',
-  '¿Qué producto tuvo más reservas?',
-  '¿Qué agencias están inactivas?',
+  { texto: '¿Cuáles son mis top 5 agencias?', permiso: P.agencias },
+  { texto: '¿Cuántas cotizaciones tengo pendientes?', permiso: P.cotizaciones },
+  { texto: '¿Cuánto facturé este mes?', permiso: P.reportes },
+  { texto: '¿Qué producto tuvo más reservas?', permiso: P.reportes },
+  { texto: '¿Qué agencias están inactivas?', permiso: P.agencias },
 ];
 
 // ─── Sub-componentes de visualización ─────────────────────────────
@@ -153,6 +155,8 @@ export function AssistantChat({ floating = false, onCollapse }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const permisos = usePermisos();
+  const sugerencias = INITIAL_SUGGESTIONS.filter((s) => permisos.includes(s.permiso));
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastMsg = messages[messages.length - 1];
@@ -219,6 +223,10 @@ export function AssistantChat({ floating = false, onCollapse }) {
 
     } catch (err) {
       const errorMsg = err?.response?.data?.message || err.message || 'Ocurrió un error al procesar tu consulta.';
+      // Reintentar solo tiene sentido si falló la red o el servidor; un 4xx
+      // (por ejemplo, sin permiso para esa consulta) va a fallar igual.
+      const status = err?.response?.status;
+      const reintentable = !status || status >= 500;
       setMessages((prev) => [
         ...prev,
         {
@@ -226,7 +234,7 @@ export function AssistantChat({ floating = false, onCollapse }) {
           content: errorMsg,
           id: Date.now() + 1,
           isError: true,
-          retryQuery: trimmed,
+          retryQuery: reintentable ? trimmed : null,
         },
       ]);
     } finally {
@@ -317,18 +325,18 @@ export function AssistantChat({ floating = false, onCollapse }) {
       </div>
 
       {/* ── Suggestion chips (solo si no hay mensajes) ── */}
-      {showSuggestions && (
+      {showSuggestions && sugerencias.length > 0 && (
         <div className="assistant-suggestions">
           <div className="assistant-suggestion-label">Probá preguntar:</div>
-          {INITIAL_SUGGESTIONS.map((s) => (
+          {sugerencias.map((s) => (
             <button
               type="button"
-              key={s}
+              key={s.texto}
               className="suggestion-chip"
-              onClick={() => handleSuggestionClick(s)}
+              onClick={() => handleSuggestionClick(s.texto)}
               disabled={isLoading}
             >
-              {s}
+              {s.texto}
             </button>
           ))}
         </div>

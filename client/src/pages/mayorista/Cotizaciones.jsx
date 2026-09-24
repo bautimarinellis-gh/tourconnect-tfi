@@ -11,7 +11,7 @@ import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { CotizacionDetailModal } from '../../components/shared/CotizacionDetailModal';
-import { formatCurrency, formatDate, formatEstadoCotizacion } from '../../utils/formatters';
+import { formatCurrency, formatDate, formatRangoFechas, formatEstadoCotizacion } from '../../utils/formatters';
 import cotizacionService from '../../services/cotizacionService';
 
 export const MayoristaCotizaciones = () => {
@@ -131,7 +131,7 @@ export const MayoristaCotizaciones = () => {
                   <TableCell>
                     <div style={{ fontWeight: 500 }}>{c.producto_id?.nombre || 'Producto'}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', textTransform: 'capitalize' }}>
-                      {c.producto_id?.tipo && `${c.producto_id.tipo} · `}{formatDate(c.fecha_inicio)} - {formatDate(c.fecha_fin)}
+                      {c.producto_id?.tipo && `${c.producto_id.tipo} · `}{formatRangoFechas(c.fecha_inicio, c.fecha_fin, ' - ')}
                     </div>
                   </TableCell>
                   <TableCell>{c.pasajeros}</TableCell>
