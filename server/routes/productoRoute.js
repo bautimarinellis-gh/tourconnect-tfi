@@ -6,6 +6,7 @@ const {
   updateProducto,
   deleteProducto,
   checkProductoAgencias,
+  getDisponibilidad,
 } = require('../controllers/productosController');
 const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
@@ -32,6 +33,11 @@ router.post('/', role('mayorista'), checkPermiso('GestionarProductos'), createPr
 // - Mayoristas devuelven info total
 // - Agencias devuelven info modificada si está habilitado
 router.get('/:id', role('mayorista', 'agencia'), checkPermisoMayorista('GestionarProductos'), getProductoById);
+
+// GET /api/v1/productos/:id/disponibilidad?fecha_inicio=&fecha_fin=
+// - Plazas libres para esas fechas. La pertenencia (dueño o agencia
+//   habilitada) se valida en el controlador, como en GET /:id.
+router.get('/:id/disponibilidad', role('mayorista', 'agencia'), checkPermisoMayorista('GestionarProductos'), getDisponibilidad);
 
 // GET /api/v1/productos/:id/agencias
 // - Solo mayoristas: retorna cuántas agencias tienen vinculado el producto

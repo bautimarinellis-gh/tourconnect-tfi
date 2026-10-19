@@ -12,6 +12,7 @@ export const ACCION_LABELS = {
   PAGO_INFORMADO:             'Pago informado',
   PAGO_CONFIRMADO:            'Pago confirmado',
   PAGO_RECHAZADO:             'Pago rechazado',
+  PAGO_DEVUELTO:              'Pago devuelto',
   RESERVA_CERRADA:            'Reserva cerrada',
   RESERVA_CANCELADA:          'Reserva cancelada',
 };
@@ -38,7 +39,7 @@ const SEGURIDAD_MAYORISTA = [
   'USUARIO_CREADO', 'USUARIO_DESACTIVADO', 'ACCESO_DENEGADO',
 ];
 const NEGOCIO_MAYORISTA = [
-  'PAGO_CONFIRMADO', 'PAGO_RECHAZADO',
+  'PAGO_CONFIRMADO', 'PAGO_RECHAZADO', 'PAGO_DEVUELTO',
   'RESERVA_CERRADA', 'RESERVA_CANCELADA',
 ];
 

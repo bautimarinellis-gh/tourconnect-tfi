@@ -30,6 +30,9 @@ app.use(cors({
 app.use(cookieParser());
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+// Antes de sanitizeInput: MP manda `?data.id=...`, una clave con punto que el
+// sanitizador rechazaría. El webhook no arma filtros con lo que recibe.
+app.use('/api/v1/webhooks', require('./routes/webhookRoute'));
 // Después de parsear body y query: rechaza claves que Mongo leería como
 // operadores ($ne, $gt, ...) antes de que lleguen a cualquier controller.
 app.use(sanitizeInput);
@@ -142,7 +145,9 @@ app.use((err, _req, res, _next) => {
 // ---------------------
 const PORT = process.env.PORT || 3000;
 const { checkCotizacionesVencidas } = require('./utils/cotizacionVencimiento');
+const { cancelarReservasVencidas, cerrarReservasFinalizadas } = require('./utils/reservaVencimiento');
 const { bootstrapSeguridad } = require('./utils/bootstrapSeguridad');
+const { completarTenantReservas } = require('./utils/completarTenantReservas');
 
 const startServer = async () => {
   await connectDB();
@@ -162,14 +167,30 @@ const startServer = async () => {
     console.error('❌ Falló el bootstrap de seguridad:', error.message);
   }
 
+  // Reservas creadas antes de que guardaran mayorista_id/agencia_id: se
+  // completan antes de atender requests, porque las consultas por tenant
+  // filtran por esos campos. Idempotente; si falla, se reintenta al próximo
+  // arranque (o con npm run migrate:reservas).
+  try {
+    const completadas = await completarTenantReservas();
+    if (completadas > 0) console.log(`🔧 Reservas completadas con su tenant: ${completadas}`);
+  } catch (error) {
+    console.error('❌ Falló completar el tenant de las reservas:', error.message);
+  }
+
   app.listen(PORT, () => {
     console.log(`🚀 TourConnect corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 
-    // Ejecutar al iniciar
-    checkCotizacionesVencidas();
-
-    // Ejecutar cada 1 hora (3600000 ms)
-    setInterval(checkCotizacionesVencidas, 60 * 60 * 1000);
+    // Tareas periódicas: al iniciar y cada 1 hora. Vencen las cotizaciones
+    // fuera de plazo, cancelan las reservas cuyo viaje pasó sin pago y cierran
+    // las pagadas cuyo viaje ya terminó.
+    const tareasPeriodicas = async () => {
+      await checkCotizacionesVencidas();
+      await cancelarReservasVencidas();
+      await cerrarReservasFinalizadas();
+    };
+    tareasPeriodicas();
+    setInterval(tareasPeriodicas, 60 * 60 * 1000);
   });
 };
 

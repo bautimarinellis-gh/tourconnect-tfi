@@ -4,8 +4,9 @@ const AgenciaProducto = require('../models/AgenciaProducto');
 const Producto = require('../models/Producto');
 const { calcularPrecioCotizacion } = require('../utils/precioCalculator');
 const { verificarCupoDisponible } = require('../utils/cupoValidator');
-const { hoyDateString, toDateString } = require('../utils/dateHelpers');
+const { hoyDateString, toDateString, sumarDias } = require('../utils/dateHelpers');
 const { estaVigente } = require('../utils/vigenciaCotizacion');
+const { leerPaginacion, describirPagina } = require('../utils/paginacion');
 
 // Error de negocio (no de DB) usada para abortar la transacción de aprobación
 // sin disparar el retry automático de session.withTransaction (solo reintenta
@@ -38,14 +39,23 @@ exports.getCotizaciones = async (req, res, next) => {
       query.agencia_id = agencia_id;
     }
 
-    const cotizaciones = await Cotizacion.find(query)
+    const paginacion = leerPaginacion(req.query);
+    let consulta = Cotizacion.find(query)
       .populate('agencia_id', 'nombre')
-      .populate('producto_id', 'nombre tipo precio_base')
+      // Sin precio_base: esta respuesta también la recibe la agencia.
+      .populate('producto_id', 'nombre tipo')
       .sort({ created_at: -1 });
+    if (paginacion) consulta = consulta.skip(paginacion.skip).limit(paginacion.limit);
+
+    const [cotizaciones, total] = await Promise.all([
+      consulta,
+      paginacion ? Cotizacion.countDocuments(query) : null,
+    ]);
 
     res.status(200).json({
       success: true,
-      data: cotizaciones
+      data: cotizaciones,
+      ...(paginacion && { pagination: describirPagina(paginacion, total) }),
     });
   } catch (error) {
     next(error);
@@ -131,17 +141,30 @@ exports.createCotizacion = async (req, res, next) => {
       });
     }
 
-    // Validar que las fechas estén dentro del rango de disponibilidad del producto
-    if (
-      fechaInicio < new Date(producto.disponibilidad_desde) ||
-      fechaFin    > new Date(producto.disponibilidad_hasta)
-    ) {
-      const desde = new Date(producto.disponibilidad_desde).toISOString().split('T')[0];
-      const hasta = new Date(producto.disponibilidad_hasta).toISOString().split('T')[0];
+    // Validar que las fechas estén dentro del rango de disponibilidad del producto.
+    // En un hotel la disponibilidad son noches: la última noche que se vende
+    // es la de disponibilidad_hasta, así que la salida puede ser el día siguiente.
+    const desde = toDateString(producto.disponibilidad_desde);
+    const hasta = toDateString(producto.disponibilidad_hasta);
+    const limiteFin = producto.tipo === 'hotel' ? sumarDias(hasta, 1) : hasta;
+    if (toDateString(fechaInicio) < desde || toDateString(fechaInicio) > hasta || toDateString(fechaFin) > limiteFin) {
       return res.status(400).json({
         success: false,
-        message: `Las fechas deben estar dentro del período de disponibilidad del producto: ${desde} al ${hasta}.`,
+        message: producto.tipo === 'hotel'
+          ? `Las noches deben estar dentro del período de disponibilidad del hotel: ${desde} al ${hasta} (salida hasta el ${limiteFin}).`
+          : `Las fechas deben estar dentro del período de disponibilidad del producto: ${desde} al ${hasta}.`,
       });
+    }
+
+    // Control de cupo al cotizar: evita que la agencia pida algo que el
+    // mayorista no va a poder aprobar. El control definitivo (sin sobreventa
+    // ante aprobaciones simultáneas) se repite al aprobar, en una transacción.
+    const cupo = await verificarCupoDisponible(
+      { producto_id, pasajeros, fecha_inicio: fechaInicio, fecha_fin: fechaFin },
+      { producto }
+    );
+    if (!cupo.ok) {
+      return res.status(400).json({ success: false, message: cupo.message });
     }
 
     const markup_porcentaje = parseFloat(agenciaProducto.markup_porcentaje.toString());
@@ -190,7 +213,8 @@ exports.getCotizacionById = async (req, res, next) => {
 
     const cotizacion = await Cotizacion.findById(id)
       .populate('agencia_id', 'nombre razon_social cuit telefono activo')
-      .populate('producto_id', 'nombre tipo precio_base descripcion disponibilidad_desde disponibilidad_hasta activo')
+      // Sin precio_base: esta respuesta también la recibe la agencia.
+      .populate('producto_id', 'nombre tipo descripcion disponibilidad_desde disponibilidad_hasta activo')
       .populate('mayorista_id', 'nombre razon_social');
 
     if (!cotizacion) {

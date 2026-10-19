@@ -10,7 +10,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Alert } from '../../components/ui/Alert';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import seguridadService from '../../services/seguridadService';
 import './seguridad.css';
 
@@ -353,7 +353,7 @@ const TabUsuarios = ({ roles, catalogo }) => {
       >
         <Alert variant="info">
           <Mail size={14} /> Se le va a enviar una invitación por email para que
-          defina su contraseña. La invitación vence en 48 horas.
+          defina su contraseña. La invitación tiene vencimiento: el plazo figura en el email.
         </Alert>
         <Input
           label="Nombre *"
@@ -425,7 +425,7 @@ const TabUsuarios = ({ roles, catalogo }) => {
         {confirmAccion?.tipo === 'resetear' && (
           <Alert variant="info">
             <Mail size={14} /> Le vamos a enviar a <strong>{confirmAccion.usuario.email}</strong>{' '}
-            un link para definir una nueva contraseña. Expira en 48 horas y nadie, ni vos, llega
+            un link para definir una nueva contraseña. El link vence (el plazo figura en el email) y nadie, ni vos, llega
             a ver la clave.
           </Alert>
         )}

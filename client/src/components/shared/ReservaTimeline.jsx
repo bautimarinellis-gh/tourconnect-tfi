@@ -2,6 +2,19 @@ import React from 'react';
 import { Card, CardBody, CardHeader } from '../ui/Card';
 import { formatDateTime, formatEstadoReserva } from '../../utils/formatters';
 
+const ROL_LABEL = { mayorista: 'Mayorista', agencia: 'Agencia', admin: 'Administrador' };
+
+/**
+ * Quién hizo el cambio (RF-08: usuario responsable, fecha y acción). Sin
+ * usuario, el cambio lo hizo el sistema (por ejemplo, una cancelación
+ * automática por viaje vencido sin pago).
+ */
+const describirActor = (usuario) => {
+  if (!usuario) return 'Sistema';
+  const rol = ROL_LABEL[usuario.rol];
+  return rol ? `${rol} (${usuario.email})` : usuario.email;
+};
+
 /**
  * Timeline de cambios de estado de una reserva.
  * Compartido entre las vistas de detalle de mayorista y agencia.
@@ -19,7 +32,9 @@ export const ReservaTimeline = ({ historial, title = 'Historial de Estados' }) =
             {h.comentario && (
               <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', fontStyle: 'italic', marginTop: '0.1rem' }}>{h.comentario}</div>
             )}
-            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>{formatDateTime(h.created_at)}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)' }}>
+              {formatDateTime(h.created_at)} · {describirActor(h.usuario_id)}
+            </div>
           </div>
         ))}
       </div>

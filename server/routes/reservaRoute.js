@@ -14,6 +14,7 @@ const {
   confirmarPago,
   rechazarPago,
 } = require('../controllers/reservaController');
+const { iniciarCheckout, verificarPago } = require('../controllers/pagoPasarelaController');
 
 const router = express.Router();
 
@@ -72,5 +73,17 @@ router.route('/:id/confirmar-pago').post(role('mayorista'), checkPermiso('Gestio
 
 // POST /api/v1/reservas/:id/rechazar-pago → El mayorista rechaza el pago informado
 router.route('/:id/rechazar-pago').post(role('mayorista'), checkPermiso('GestionarReservas'), rechazarPago);
+
+// ---------------------
+// Pasarela de pagos (Mercado Pago, modo prueba)
+// ---------------------
+
+// POST /api/v1/reservas/:id/mercadopago/checkout → La agencia genera el checkout de MP
+router.route('/:id/mercadopago/checkout').post(role('agencia'), iniciarCheckout);
+
+// POST /api/v1/reservas/:id/mercadopago/verificar → Consulta el pago en MP y lo aplica
+router
+  .route('/:id/mercadopago/verificar')
+  .post(role('mayorista', 'agencia'), checkPermisoMayorista('GestionarReservas'), verificarPago);
 
 module.exports = router;

@@ -5,7 +5,10 @@ import { Select } from '../../components/ui/Select';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ReservasTable } from '../../components/shared/ReservasTable';
+import { Paginador } from '../../components/ui/Paginador';
 import reservaService from '../../services/reservaService';
+
+const TAMANO_PAGINA = 20;
 
 export const MayoristaReservas = () => {
   const [searchParams] = useSearchParams();
@@ -13,13 +16,32 @@ export const MayoristaReservas = () => {
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState(searchParams.get('estado') ?? '');
   const [filtroAgencia, setFiltroAgencia] = useState('');
+  // La búsqueda por agencia la resuelve el servidor (con paginación el
+  // navegador solo tiene la página actual); se espera a que se deje de tipear.
+  const [busquedaAgencia, setBusquedaAgencia] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setBusquedaAgencia(filtroAgencia.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [filtroAgencia]);
 
   useEffect(() => {
     const doFetch = async () => {
       setLoading(true);
       try {
-        const data = await reservaService.getAll(filtroEstado ? { estado: filtroEstado } : {});
-        setReservas(data);
+        const { items, pagination: pag } = await reservaService.getPagina({
+          page,
+          limit: TAMANO_PAGINA,
+          ...(filtroEstado && { estado: filtroEstado }),
+          ...(busquedaAgencia && { buscar_agencia: busquedaAgencia }),
+        });
+        setReservas(items);
+        setPagination(pag);
       } catch (err) {
         console.error(err);
       } finally {
@@ -27,17 +49,11 @@ export const MayoristaReservas = () => {
       }
     };
     doFetch();
-  }, [filtroEstado]);
+  }, [filtroEstado, busquedaAgencia, page]);
 
-  const reservasFiltradas = reservas.filter(r => {
-    if (filtroAgencia.trim()) {
-      const nombre = r.agencia_id?.nombre?.toLowerCase() ?? '';
-      if (!nombre.includes(filtroAgencia.toLowerCase())) return false;
-    }
-    return true;
-  });
-
-  if (loading && reservas.length === 0) return <Spinner center size="lg" />;
+  // Spinner de página solo en la primera carga: después, filtrar o paginar
+  // no debe desmontar los filtros (se perdería el foco del buscador).
+  if (loading && pagination === null) return <Spinner center size="lg" />;
 
   return (
     <div>
@@ -49,7 +65,7 @@ export const MayoristaReservas = () => {
         <div style={{ flex: '0 0 220px' }}>
         <Select
           value={filtroEstado}
-          onChange={e => setFiltroEstado(e.target.value)}
+          onChange={e => { setFiltroEstado(e.target.value); setPage(1); }}
           options={[
             { label: 'Todos los estados', value: '' },
             { label: 'Pendiente de Pago', value: 'pendiente_pago' },
@@ -75,11 +91,16 @@ export const MayoristaReservas = () => {
       </div>
 
       {reservas.length === 0 ? (
-        <EmptyState title="No hay reservas" description="No se encontraron reservas con los filtros actuales." />
-      ) : reservasFiltradas.length === 0 ? (
-        <EmptyState title="Sin resultados" description={`No hay reservas de agencias que contengan "${filtroAgencia}".`} />
+        busquedaAgencia ? (
+          <EmptyState title="Sin resultados" description={`No hay reservas de agencias que contengan "${busquedaAgencia}".`} />
+        ) : (
+          <EmptyState title="No hay reservas" description="No se encontraron reservas con los filtros actuales." />
+        )
       ) : (
-        <ReservasTable reservas={reservasFiltradas} basePath="/mayorista/reservas" showAgenciaColumn />
+        <>
+          <ReservasTable reservas={reservas} basePath="/mayorista/reservas" showAgenciaColumn />
+          <Paginador pagination={pagination} onPageChange={setPage} loading={loading} etiquetas={['reserva', 'reservas']} />
+        </>
       )}
     </div>
   );

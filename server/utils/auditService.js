@@ -14,19 +14,20 @@ const CATEGORIA_POR_ACCION = {
   PAGO_INFORMADO: 'negocio',
   PAGO_CONFIRMADO: 'negocio',
   PAGO_RECHAZADO: 'negocio',
+  PAGO_DEVUELTO: 'negocio',
   RESERVA_CERRADA: 'negocio',
   RESERVA_CANCELADA: 'negocio',
 };
 
 /**
- * Extrae la IP real del cliente, considerando proxies.
- * En producción detrás de Nginx, el IP real llega en X-Forwarded-For.
+ * IP del cliente tal como la resuelve Express.
+ *
+ * No se lee X-Forwarded-For a mano: el cliente puede mandar ese header con
+ * cualquier valor y la IP auditada quedaría falsificada. `req.ip` aplica el
+ * `trust proxy` de index.js, que solo acepta el valor que agregó el proxy
+ * propio (Nginx) y descarta lo que venga antes.
  */
-const getIp = (req) => {
-  const forwarded = req?.headers?.['x-forwarded-for'];
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return req?.ip ?? null;
-};
+const getIp = (req) => req?.ip ?? null;
 
 /**
  * Escribe un registro de auditoría en MongoDB.
@@ -78,4 +79,4 @@ const registrarAuditoria = async ({
   }
 };
 
-module.exports = { registrarAuditoria };
+module.exports = { registrarAuditoria, getIp };

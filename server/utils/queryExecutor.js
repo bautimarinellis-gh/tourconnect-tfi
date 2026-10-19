@@ -22,6 +22,13 @@ const { MESES, hoyAR, inicioDiaAR } = require('./fechasAR');
 // Helpers de rango de fechas
 // ─────────────────────────────────────────────
 
+/** Valores de `time_range` que entiende getDateRange (el default es last_30_days). */
+const PERIODOS_VALIDOS = [
+  'today', 'yesterday', 'last_n_days', 'last_30_days', 'last_week', 'current_month',
+  'last_month', 'last_n_months', 'current_quarter', 'last_quarter', 'current_year',
+  'last_year', 'specific_month', 'all_time',
+];
+
 /**
  * Rango de fechas del período pedido, en hora argentina.
  *
@@ -506,4 +513,4 @@ async function execute(intent, params, mayoristaIdStr) {
   };
 }
 
-module.exports = { execute, intentHandlers };
+module.exports = { execute, intentHandlers, describirPeriodo, getDateRange, PERIODOS_VALIDOS };

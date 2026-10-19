@@ -64,6 +64,13 @@ const usuarioSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Viaja en el JWT (claim `sv`). Al incrementarse, todos los tokens
+    // emitidos antes dejan de valer: así se cierran las sesiones abiertas en
+    // otros dispositivos cuando cambia la contraseña o se desactiva la cuenta.
+    sesion_version: {
+      type: Number,
+      default: 0,
+    },
     invite_token: {
       type: String,
       select: false,
@@ -104,6 +111,22 @@ usuarioSchema.index({ invite_token: 1 });
 usuarioSchema.index({ reset_token: 1 });
 usuarioSchema.index({ mayorista_id: 1 });
 
+/**
+ * Cambiar la contraseña o desactivar la cuenta invalida todas las sesiones
+ * abiertas. Se hace acá y no en cada controller para que ningún camino
+ * (cambio propio, reseteo, activación por admin, desactivación) lo olvide.
+ * Las actualizaciones que no pasan por save() tienen que hacer el $inc a mano.
+ */
+usuarioSchema.pre('save', function (next) {
+  if (this.isNew) return next();
+  const cambioPassword = this.isModified('password_hash');
+  const seDesactivo = this.isModified('activo') && this.activo === false;
+  if (cambioPassword || seDesactivo) {
+    this.sesion_version = (this.sesion_version ?? 0) + 1;
+  }
+  next();
+});
+
 usuarioSchema.methods.compararPassword = async function (password) {
   return bcrypt.compare(password, this.password_hash);
 };
@@ -122,6 +145,7 @@ usuarioSchema.set('toJSON', {
     delete ret.reset_code_hash;
     delete ret.reset_code_expires;
     delete ret.reset_code_attempts;
+    delete ret.sesion_version;
     delete ret.__v;
     return ret;
   },

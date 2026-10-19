@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { CheckCircle, AlertCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { registrarToastHandler } from '../../hooks/useToast';
 import './toast.css';
 
 const icons = {
@@ -14,25 +15,6 @@ const titles = {
   error:   'Error',
   warning: 'Advertencia',
   info:    'Información',
-};
-
-let _addToast = null;
-
-export const useToast = () => {
-  const show = useCallback((message, variant = 'success', title) => {
-    if (_addToast) _addToast({ message, variant, title });
-  }, []);
-
-  // El objeto se memoiza para que su identidad sea estable entre renders.
-  // Sin esto, cualquier useCallback/useEffect que dependa de `toast` se
-  // re-crea en cada render, y si ese efecto hace un fetch que actualiza
-  // estado, queda en un loop infinito de requests.
-  return useMemo(() => ({
-    success: (message, title) => show(message, 'success', title),
-    error:   (message, title) => show(message, 'error', title),
-    warning: (message, title) => show(message, 'warning', title),
-    info:    (message, title) => show(message, 'info', title),
-  }), [show]);
 };
 
 export const ToastContainer = () => {
@@ -52,11 +34,11 @@ export const ToastContainer = () => {
     }, 3500);
   }, []);
 
-  // Publica el handler en la variable a nivel de módulo desde un efecto,
-  // no durante el render: _addToast es un event-bus fuera del árbol de
-  // React (lo usa useToast), no un valor que la UI lea.
+  // Publica el handler desde un efecto, no durante el render: es un
+  // event-bus fuera del árbol de React (lo usa useToast), no un valor que
+  // la UI lea.
   useEffect(() => {
-    _addToast = handleAdd;
+    registrarToastHandler(handleAdd);
   }, [handleAdd]);
 
   const dismiss = (id) => {

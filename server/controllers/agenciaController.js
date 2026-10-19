@@ -6,6 +6,7 @@ const Usuario = require('../models/Usuario');
 const AgenciaProducto = require('../models/AgenciaProducto');
 const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { getSubscriptionPlan } = require('../utils/subscriptionPlans');
+const { vencimientoInvitacion } = require('../utils/invitacion');
 const { registrarAuditoria } = require('../utils/auditService');
 const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
 const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
@@ -55,7 +56,7 @@ exports.createAgencia = async (req, res, next) => {
   session.startTransaction();
 
   try {
-    const { nombre, razon_social, telefono, cuit, email, password } = req.body;
+    const { nombre, razon_social, telefono, cuit, email } = req.body;
     const mayoristaId = req.usuario.mayorista_id;
 
     const mayorista = await Mayorista.findById(mayoristaId).session(session);
@@ -91,36 +92,19 @@ exports.createAgencia = async (req, res, next) => {
       throw new Error('El correo electrónico ya está registrado.');
     }
 
-    // Validar longitud mínima de password si fue proporcionado
-    if (password && String(password).trim().length < 8) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: 'La contraseña debe tener al menos 8 caracteres.',
-      });
-    }
-
-    const tienePassword = password && String(password).trim().length >= 8;
-    let inviteToken = null;
-    let inviteTokenExpires = null;
-
-    if (!tienePassword) {
-      inviteToken = crypto.randomBytes(32).toString('hex');
-      inviteTokenExpires = Date.now() + 48 * 60 * 60 * 1000; // 48 horas
-    }
+    // Solo por invitación: la contraseña la define la agencia, nunca el
+    // mayorista (Ley 25.326: nadie más conoce la credencial).
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteTokenExpires = vencimientoInvitacion();
 
     // 2. Crear el usuario (agencia)
     const nuevoUsuario = new Usuario({
       email,
       rol: 'agencia',
-      activo: tienePassword,
-      invite_token: tienePassword ? undefined : inviteToken,
-      invite_token_expires: tienePassword ? undefined : inviteTokenExpires,
+      activo: false,
+      invite_token: inviteToken,
+      invite_token_expires: inviteTokenExpires,
     });
-    if (tienePassword) {
-      nuevoUsuario.password_hash = await Usuario.hashPassword(password.trim());
-    }
     await nuevoUsuario.save({ session });
 
     // 4. Crear la agencia
@@ -145,18 +129,16 @@ exports.createAgencia = async (req, res, next) => {
       accion: 'USUARIO_CREADO',
       entidad_afectada: 'Usuario',
       entidad_id: nuevoUsuario._id,
-      detalle: { email, rol: 'agencia', con_invitacion: !tienePassword },
+      detalle: { email, rol: 'agencia', con_invitacion: true },
     });
 
-    // Enviar correo de invitación (solo si no se configuró password). Se
-    // envía después del commit: si la transacción abortara más tarde, no
-    // queremos haber invitado a una cuenta que nunca existió.
-    if (!tienePassword && inviteToken) {
-      try {
-        await enviarInvitacion(email, inviteToken, 'Agencia');
-      } catch (mailError) {
-        console.error('Error al enviar email de invitación, pero la agencia fue creada:', mailError.message);
-      }
+    // Enviar correo de invitación. Se envía después del commit: si la
+    // transacción abortara más tarde, no queremos haber invitado a una
+    // cuenta que nunca existió.
+    try {
+      await enviarInvitacion(email, inviteToken, 'Agencia');
+    } catch (mailError) {
+      console.error('Error al enviar email de invitación, pero la agencia fue creada:', mailError.message);
     }
 
     res.status(201).json({

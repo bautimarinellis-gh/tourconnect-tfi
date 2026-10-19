@@ -50,7 +50,7 @@ export function MayoristaAssistant() {
         role="dialog"
         aria-label="Asistente Inteligente"
       >
-        <AssistantChat floating onCollapse={() => setOpen(false)} />
+        <AssistantChat floating abierto={open} onCollapse={() => setOpen(false)} />
       </div>
     </>
   );

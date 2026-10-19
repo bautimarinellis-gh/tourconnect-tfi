@@ -11,11 +11,12 @@ import { Select } from '../../components/ui/Select';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
 import { CotizacionDetailModal } from '../../components/shared/CotizacionDetailModal';
+import { Paginador } from '../../components/ui/Paginador';
 import { formatCurrency, formatRangoFechas, formatDateTime, formatEstadoCotizacion } from '../../utils/formatters';
 import cotizacionService from '../../services/cotizacionService';
 import reservaService from '../../services/reservaService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 
 // El servidor calcula cuándo vence cada cotización (vence_at): una pendiente
 // si el mayorista no la responde, una aprobada si la agencia no confirma la
@@ -28,12 +29,16 @@ const getVencimientoInfo = (cotizacion) => {
   return { expira, diffHs, vencido: diffMs <= 0 };
 };
 
+const TAMANO_PAGINA = 20;
+
 export const AgenciaCotizaciones = () => {
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState(searchParams.get('estado') ?? '');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
   const navigate = useNavigate();
 
   // Modal: Ver detalle
@@ -56,14 +61,24 @@ export const AgenciaCotizaciones = () => {
   const fetchCotizaciones = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await cotizacionService.getAll(filtroEstado ? { estado: filtroEstado } : {});
-      setCotizaciones(data);
+      const { items, pagination: pag } = await cotizacionService.getPagina({
+        page,
+        limit: TAMANO_PAGINA,
+        ...(filtroEstado && { estado: filtroEstado }),
+      });
+      // Si una acción dejó vacía la última página, volver a la anterior.
+      if (items.length === 0 && pag && page > pag.pages) {
+        setPage(pag.pages);
+        return;
+      }
+      setCotizaciones(items);
+      setPagination(pag);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, page]);
 
   useEffect(() => {
     fetchCotizaciones();
@@ -101,7 +116,9 @@ export const AgenciaCotizaciones = () => {
     }
   };
 
-  if (loading && cotizaciones.length === 0) return <Spinner center size="lg" />;
+  // Spinner de página solo en la primera carga: después, filtrar o paginar
+  // no debe desmontar los filtros.
+  if (loading && pagination === null) return <Spinner center size="lg" />;
 
   return (
     <div>
@@ -112,7 +129,7 @@ export const AgenciaCotizaciones = () => {
       <div style={{ marginBottom: '2rem', maxWidth: '300px' }}>
         <Select
           value={filtroEstado}
-          onChange={e => setFiltroEstado(e.target.value)}
+          onChange={e => { setFiltroEstado(e.target.value); setPage(1); }}
           options={[
             { label: 'Todos los estados', value: '' },
             { label: 'Pendiente', value: 'pendiente' },
@@ -213,6 +230,9 @@ export const AgenciaCotizaciones = () => {
             </tbody>
           </Table>
         </Card>
+      )}
+      {cotizaciones.length > 0 && (
+        <Paginador pagination={pagination} onPageChange={setPage} loading={loading} etiquetas={['cotización', 'cotizaciones']} />
       )}
 
       {/* Modal: Convertir en Reserva */}

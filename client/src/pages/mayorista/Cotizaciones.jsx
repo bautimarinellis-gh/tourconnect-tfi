@@ -11,13 +11,20 @@ import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { CotizacionDetailModal } from '../../components/shared/CotizacionDetailModal';
+import { Paginador } from '../../components/ui/Paginador';
 import { formatCurrency, formatDate, formatRangoFechas, formatEstadoCotizacion } from '../../utils/formatters';
+import { toDateInputValue } from '../../utils/dateRanges';
 import cotizacionService from '../../services/cotizacionService';
+import productoService from '../../services/productoService';
+
+const TAMANO_PAGINA = 20;
 
 export const MayoristaCotizaciones = () => {
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtroEstado, setFiltroEstado] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
   
   // Modal: Rechazar
   const selectedCotizacionRef = useRef(null);
@@ -33,6 +40,10 @@ export const MayoristaCotizaciones = () => {
   // Modal: Confirmar aprobación
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [approveTarget, setApproveTarget] = useState(null);
+  const [approveError, setApproveError] = useState('');
+  // Plazas del producto para las fechas de la cotización a aprobar
+  // ({ ilimitado, cupo_maximo, comprometidas, disponibles }), o null.
+  const [approveCupo, setApproveCupo] = useState(null);
 
   // Modal: Éxito al confirmar
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -41,18 +52,68 @@ export const MayoristaCotizaciones = () => {
   const fetchCotizaciones = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await cotizacionService.getAll(filtroEstado ? { estado: filtroEstado } : {});
-      setCotizaciones(data);
+      const { items, pagination: pag } = await cotizacionService.getPagina({
+        page,
+        limit: TAMANO_PAGINA,
+        ...(filtroEstado && { estado: filtroEstado }),
+      });
+      // Si una acción dejó vacía la última página, volver a la anterior.
+      if (items.length === 0 && pag && page > pag.pages) {
+        setPage(pag.pages);
+        return;
+      }
+      setCotizaciones(items);
+      setPagination(pag);
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [filtroEstado]);
+  }, [filtroEstado, page]);
 
   useEffect(() => {
     fetchCotizaciones();
   }, [fetchCotizaciones]);
+
+  useEffect(() => {
+    setApproveCupo(null);
+    const productoId = approveTarget?.producto_id?._id;
+    if (!productoId) return undefined;
+    let cancelado = false;
+    productoService.getDisponibilidad(productoId, {
+      fecha_inicio: toDateInputValue(approveTarget.fecha_inicio),
+      fecha_fin: toDateInputValue(approveTarget.fecha_fin),
+    })
+      .then((data) => { if (!cancelado) setApproveCupo(data); })
+      .catch((err) => console.error(err));
+    return () => { cancelado = true; };
+  }, [approveTarget]);
+
+  const closeApproveModal = () => {
+    setIsApproveModalOpen(false);
+    setApproveTarget(null);
+    setApproveError('');
+  };
+
+  // La aprobación tiene su propio manejo de error: si el servidor la rechaza
+  // (por ejemplo, porque ya no alcanza el cupo), el mensaje se muestra en el
+  // mismo modal en lugar de perderse.
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    setActionLoading(true);
+    setApproveError('');
+    try {
+      await cotizacionService.updateStatus(approveTarget._id, 'aprobada');
+      closeApproveModal();
+      fetchCotizaciones();
+      setSuccessMessage('La cotización fue aprobada exitosamente. La agencia podrá generar la reserva.');
+      setIsSuccessModalOpen(true);
+    } catch (err) {
+      setApproveError(err?.response?.data?.message || 'Ocurrió un error al aprobar la cotización.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleAction = async (id, status, reason = '') => {
     if (status === 'rechazada' && !reason) {
@@ -66,10 +127,6 @@ export const MayoristaCotizaciones = () => {
       setIsRejectModalOpen(false);
       setRejectReason('');
       fetchCotizaciones();
-      if (status === 'aprobada') {
-        setSuccessMessage('La cotización fue aprobada exitosamente. La agencia podrá generar la reserva.');
-        setIsSuccessModalOpen(true);
-      }
     } catch (err) {
       const msg = err?.response?.data?.message || 'Ocurrió un error al actualizar la cotización.';
       setRejectError(msg);
@@ -78,7 +135,9 @@ export const MayoristaCotizaciones = () => {
     }
   };
 
-  if (loading && cotizaciones.length === 0) return <Spinner center size="lg" />;
+  // Spinner de página solo en la primera carga: después, filtrar o paginar
+  // no debe desmontar los filtros.
+  if (loading && pagination === null) return <Spinner center size="lg" />;
 
   return (
     <div>
@@ -89,7 +148,7 @@ export const MayoristaCotizaciones = () => {
       <div style={{ marginBottom: '2rem', maxWidth: '300px' }}>
         <Select 
           value={filtroEstado} 
-          onChange={e => setFiltroEstado(e.target.value)}
+          onChange={e => { setFiltroEstado(e.target.value); setPage(1); }}
           options={[
             { label: 'Todos los estados', value: '' },
             { label: 'Pendiente', value: 'pendiente' },
@@ -166,21 +225,25 @@ export const MayoristaCotizaciones = () => {
           </Table>
         </Card>
       )}
+      {cotizaciones.length > 0 && (
+        <Paginador pagination={pagination} onPageChange={setPage} loading={loading} etiquetas={['cotización', 'cotizaciones']} />
+      )}
 
       {/* Modal: Confirmar aprobación */}
       <Modal
         isOpen={isApproveModalOpen}
-        onClose={() => { setIsApproveModalOpen(false); setApproveTarget(null); }}
+        onClose={closeApproveModal}
         title="Aprobar Cotización"
         footer={
           <>
-            <Button variant="ghost" onClick={() => { setIsApproveModalOpen(false); setApproveTarget(null); }}>
+            <Button variant="ghost" onClick={closeApproveModal}>
               Cancelar
             </Button>
             <Button
               variant="success"
-              onClick={() => { handleAction(approveTarget._id, 'aprobada'); setIsApproveModalOpen(false); setApproveTarget(null); }}
+              onClick={handleApprove}
               isLoading={actionLoading}
+              disabled={Boolean(approveCupo && !approveCupo.ilimitado && approveTarget && approveTarget.pasajeros > approveCupo.disponibles)}
             >
               <Check size={16} /> Confirmar Aprobación
             </Button>
@@ -189,6 +252,7 @@ export const MayoristaCotizaciones = () => {
       >
         {approveTarget && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9375rem' }}>
+            {approveError && <Alert variant="error">{approveError}</Alert>}
             <p style={{ margin: 0 }}>
               ¿Confirmás la aprobación de la cotización{' '}
               <strong>#{approveTarget._id.slice(-6).toUpperCase()}</strong> de{' '}
@@ -197,6 +261,19 @@ export const MayoristaCotizaciones = () => {
             <div style={{ padding: '0.75rem 1rem', background: 'var(--color-success-soft)', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', color: 'var(--color-success)' }}>
               Al aprobar, la agencia podrá generar la reserva. Esta acción no se puede deshacer.
             </div>
+            {approveCupo && (approveCupo.ilimitado ? (
+              <Alert variant="info">Este producto no tiene cupo definido: se vende sin límite de plazas.</Alert>
+            ) : approveTarget.pasajeros > approveCupo.disponibles ? (
+              <Alert variant="warning">
+                No alcanza el cupo: la cotización pide <strong>{approveTarget.pasajeros}</strong> plazas y quedan{' '}
+                <strong>{approveCupo.disponibles}</strong> de {approveCupo.cupo_maximo} para esas fechas. Podés rechazarla indicando el motivo.
+              </Alert>
+            ) : (
+              <Alert variant="info">
+                Plazas disponibles para esas fechas: <strong>{approveCupo.disponibles}</strong> de {approveCupo.cupo_maximo}.
+                Al aprobar quedan {approveCupo.disponibles - approveTarget.pasajeros}.
+              </Alert>
+            ))}
           </div>
         )}
       </Modal>

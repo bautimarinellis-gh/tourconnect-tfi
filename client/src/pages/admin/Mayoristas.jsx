@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, RefreshCw, KeyRound, Search, History, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, RefreshCw, Mail, Search, History, AlertTriangle } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -8,10 +8,9 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Textarea } from '../../components/ui/Textarea';
-import { PasswordInput } from '../../components/ui/PasswordInput';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import mayoristaService from '../../services/mayoristaService';
 import { formatCuit, isValidCuit } from '../../utils/cuit';
 import { formatTelefono } from '../../utils/telefono';
@@ -71,8 +70,8 @@ export const AdminMayoristas = () => {
   const [historialMayorista, setHistorialMayorista] = useState(null);
   const [historialData, setHistorialData] = useState([]);
   const [historialLoading, setHistorialLoading] = useState(false);
-  const [activarUsuarioMayorista, setActivarUsuarioMayorista] = useState(null);
-  const [activarPassword, setActivarPassword] = useState('');
+  // Mayorista con la invitación pendiente al que se le reenvía el email.
+  const [invitacionMayorista, setInvitacionMayorista] = useState(null);
   const [formData, setFormData] = useState({
     nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', telefono: '', admin_email: ''
   });
@@ -233,22 +232,16 @@ export const AdminMayoristas = () => {
     }
   };
 
-  const handleConfirmarActivarUsuario = async () => {
-    if (!activarUsuarioMayorista) return;
-    if (!activarPassword || activarPassword.trim().length < 8) {
-      showFormError('La contraseña debe tener al menos 8 caracteres.');
-      return;
-    }
+  const handleReenviarInvitacion = async () => {
+    if (!invitacionMayorista) return;
     setFormError('');
     setSaving(true);
     try {
-      await mayoristaService.activarUsuario(activarUsuarioMayorista._id, activarPassword);
-      setActivarUsuarioMayorista(null);
-      setActivarPassword('');
-      fetchMayoristas();
-      toast.success('Usuario activado. Ya puede iniciar sesión.');
+      await mayoristaService.reenviarInvitacion(invitacionMayorista._id);
+      setInvitacionMayorista(null);
+      toast.success(`Invitación reenviada a ${invitacionMayorista.usuario_id?.email}.`);
     } catch (err) {
-      showFormError(getErrorMessage(err, 'Error al activar usuario'));
+      showFormError(getErrorMessage(err, 'Error al reenviar la invitación'));
     } finally {
       setSaving(false);
     }
@@ -355,8 +348,9 @@ export const AdminMayoristas = () => {
                       <TableCell>
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(m)} title="Editar"><Edit2 size={16} /></Button>
                         <Button variant="ghost" size="sm" onClick={() => handleVerHistorial(m)} title="Ver historial"><History size={16} /></Button>
-                        {sinAcceso && m.usuario_id && (
-                          <Button variant="ghost" size="sm" onClick={() => { setActivarUsuarioMayorista(m); setActivarPassword(''); setFormError(''); }} title="Configurar contraseña"><KeyRound size={16} /></Button>
+                        {/* Solo para mayoristas activos: uno desactivado se reactiva por su propio flujo. */}
+                        {m.activo && sinAcceso && m.usuario_id && (
+                          <Button variant="ghost" size="sm" onClick={() => { setInvitacionMayorista(m); setFormError(''); }} title="Reenviar invitación"><Mail size={16} /></Button>
                         )}
                         {m.activo ? (
                           <Button variant="ghost" size="sm" className="text-danger" onClick={() => handleDelete(m)} title="Desactivar"><Trash2 size={16} /></Button>
@@ -424,24 +418,22 @@ export const AdminMayoristas = () => {
       </Modal>
 
       <Modal
-        isOpen={!!activarUsuarioMayorista}
-        onClose={() => { setActivarUsuarioMayorista(null); setActivarPassword(''); setFormError(''); }}
-        title="Configurar contraseña"
+        isOpen={!!invitacionMayorista}
+        onClose={() => { setInvitacionMayorista(null); setFormError(''); }}
+        title="Reenviar invitación"
         footer={
           <>
-            <Button variant="ghost" onClick={() => { setActivarUsuarioMayorista(null); setActivarPassword(''); setFormError(''); }}>Cancelar</Button>
-            <Button onClick={handleConfirmarActivarUsuario} isLoading={saving}>Guardar contraseña</Button>
+            <Button variant="ghost" onClick={() => { setInvitacionMayorista(null); setFormError(''); }}>Cancelar</Button>
+            <Button onClick={handleReenviarInvitacion} isLoading={saving}>Reenviar invitación</Button>
           </>
         }
       >
         {formError && <Alert variant="error">{formError}</Alert>}
-        {activarUsuarioMayorista && (
-          <>
-            <p style={{ marginBottom: '1rem' }}>
-              El usuario <strong>{activarUsuarioMayorista.usuario_id?.email}</strong> no puede iniciar sesión. Configurá una contraseña para activar la cuenta.
-            </p>
-            <PasswordInput label="Nueva contraseña (mín. 8 caracteres)" value={activarPassword} onChange={e => setActivarPassword(e.target.value)} />
-          </>
+        {invitacionMayorista && (
+          <p>
+            El usuario <strong>{invitacionMayorista.usuario_id?.email}</strong> todavía no definió su contraseña.
+            Le vamos a enviar una invitación nueva para que la defina desde su email; el link anterior deja de valer.
+          </p>
         )}
       </Modal>
 

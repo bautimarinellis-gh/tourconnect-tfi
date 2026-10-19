@@ -1,37 +1,14 @@
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const Usuario = require('../models/Usuario');
 const { enviarEmail } = require('../utils/mailer');
 const { resolverContextoPersona, enriquecerUsuario } = require('../utils/personaContext');
 const { resolverPermisosEfectivos } = require('../utils/permisos');
 const { registrarAuditoria } = require('../utils/auditService');
+const { COOKIE, iniciarSesion, cerrarCookie, revocarToken } = require('../utils/sesion');
 
 // ---------------------
 // Helpers
 // ---------------------
-
-/**
- * Genera un JWT con los datos del usuario y contexto de negocio.
- */
-const generarToken = (usuario, contexto) => {
-  return jwt.sign(
-    {
-      id: usuario._id,
-      email: usuario.email,
-      rol: usuario.rol,
-      mayorista_id: contexto.mayorista_id || null,
-      agencia_id: contexto.agencia_id || null,
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-  );
-};
-
-/**
- * Set en memoria para tokens invalidados (logout).
- * En producción debería reemplazarse por Redis.
- */
-const tokenBlacklist = new Set();
 
 // Recuperación de contraseña por código de verificación
 const RESET_CODE_TTL_MS = 15 * 60 * 1000; // 15 minutos
@@ -211,8 +188,6 @@ const login = async (req, res, next) => {
       }
     }
 
-    const token = generarToken(usuario, contexto);
-
     registrarAuditoria({
       req,
       accion: 'LOGIN_EXITOSO',
@@ -222,12 +197,7 @@ const login = async (req, res, next) => {
       detalle: { rol: usuario.rol },
     });
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    iniciarSesion(res, usuario, contexto);
 
     // Los permisos se resuelven acá solo para la respuesta: no viajan en el
     // JWT, así que revocarlos surte efecto en la request siguiente.
@@ -605,7 +575,14 @@ const changePassword = async (req, res, next) => {
     }
 
     usuario.password_hash = await Usuario.hashPassword(password_nueva);
+    // Al guardar sube sesion_version: se cierran las sesiones de los demás
+    // dispositivos. La actual se renueva para no desloguear a quien cambió
+    // la contraseña.
     await usuario.save();
+    iniciarSesion(res, usuario, {
+      mayorista_id: req.usuario.mayorista_id,
+      agencia_id: req.usuario.agencia_id,
+    });
 
     registrarAuditoria({
       req,
@@ -630,20 +607,19 @@ const changePassword = async (req, res, next) => {
  * POST /api/v1/auth/logout
  * Invalida el token actual.
  */
-const logout = (req, res) => {
-  const token = req.cookies?.token;
-
-  if (token) {
-    tokenBlacklist.add(token);
+const logout = async (req, res, next) => {
+  try {
+    const token = req.cookies?.[COOKIE];
+    if (token) {
+      await revocarToken(token);
+    }
+  } catch (error) {
+    return next(error);
   }
 
   registrarAuditoria({ req, accion: 'LOGOUT' });
 
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-  });
+  cerrarCookie(res);
 
   res.json({
     success: true,
@@ -662,5 +638,4 @@ module.exports = {
   me,
   changePassword,
   logout,
-  tokenBlacklist,
 };

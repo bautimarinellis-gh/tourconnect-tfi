@@ -44,6 +44,13 @@ const productoSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    // Plazas (pasajeros) por día: por noche en un hotel, por día en una
+    // actividad y por día de viaje en un paquete (ver utils/cupoValidator).
+    // Obligatorio en las altas; un producto anterior sin cupo no tiene límite.
+    cupo_maximo: {
+      type: Number,
+      min: [1, 'El cupo máximo debe ser al menos 1'],
+    },
     // Campos específicos: hotel
     direccion: {
       type: String,
@@ -55,10 +62,6 @@ const productoSchema = new mongoose.Schema(
       max: [5, 'La cantidad de estrellas no puede ser mayor a 5'],
     },
     // Campos específicos: actividad
-    cupo_maximo: {
-      type: Number,
-      min: [1, 'El cupo máximo debe ser al menos 1'],
-    },
     duracion_horas: {
       type: Number,
       min: [0, 'La duración en horas no puede ser negativa'],

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Users, DollarSign, Package, FileText, ArrowRight, CheckCircle } from 'lucide-react';
+import { Alert } from '../../components/ui/Alert';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
 import reporteService from '../../services/reporteService';
@@ -52,6 +53,16 @@ export const MayoristaDashboard = () => {
           </Link>
         )}
       </div>
+
+      {data?.pagos_viaje_iniciado > 0 && (
+        <div style={{ marginBottom: '1.5rem' }}>
+        <Alert variant="warning">
+          Tenés <strong>{data.pagos_viaje_iniciado}</strong> pago{data.pagos_viaje_iniciado !== 1 ? 's' : ''} informado{data.pagos_viaje_iniciado !== 1 ? 's' : ''} de
+          viajes que ya empezaron y todavía no {data.pagos_viaje_iniciado !== 1 ? 'fueron revisados' : 'fue revisado'}.{' '}
+          <Link to="/mayorista/reservas?estado=pago_informado">Revisar pagos</Link>
+        </Alert>
+        </div>
+      )}
 
       <div className="dashboard-kpi-grid">
         {kpis.map((kpi) => (

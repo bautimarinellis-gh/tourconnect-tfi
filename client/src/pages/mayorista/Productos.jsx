@@ -11,7 +11,7 @@ import { Textarea } from '../../components/ui/Textarea';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { NumberStepper } from '../../components/ui/NumberStepper';
 import { Alert } from '../../components/ui/Alert';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatFecha } from '../../utils/formatters';
 import { etiquetaPrecio } from '../../utils/precio';
 import { applyRangePreset, daysBetween, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
 import productoService from '../../services/productoService';
@@ -23,12 +23,12 @@ const INITIAL_FORM = {
   precio_base: '',
   disponibilidad_desde: '',
   disponibilidad_hasta: '',
+  cupo_maximo: 10,
   // Hotel
   hotel_direccion: '',
   hotel_estrellas: 3,
   // Actividad
   actividad_duracion: 1,
-  actividad_cupo: 10,
   // Paquete
   paquete_itinerario: '',
 };
@@ -40,6 +40,40 @@ const PRODUCT_DATE_PRESETS = [
   { label: '6 meses', months: 6 },
   { label: '1 año', months: 12 },
 ];
+
+/**
+ * Unidad del cupo según el tipo y una ayuda para quien carga el producto
+ * (ver utils/cupoValidator en el server).
+ */
+const CUPO_POR_TIPO = {
+  hotel: {
+    unidad: 'pasajeros por noche',
+    ayuda: 'Cuántos pasajeros podés vender como máximo para una misma noche.',
+  },
+  actividad: {
+    unidad: 'pasajeros por día',
+    ayuda: 'Cuántos pasajeros podés vender como máximo para un mismo día.',
+  },
+  paquete: {
+    unidad: 'pasajeros por día de viaje',
+    ayuda: 'Cuántos pasajeros pueden estar viajando como máximo en un mismo día.',
+  },
+};
+
+const DIAS_POR_VENCER = 15;
+
+/**
+ * Vigencia del producto según su disponibilidad: 'vencido' cuando ya no le
+ * quedan días por vender (las agencias dejan de verlo), 'por_vencer' cuando
+ * le quedan pocos, y 'vigente' en otro caso.
+ */
+const estadoVigencia = (p) => {
+  const hasta = toDateInputValue(p.disponibilidad_hasta);
+  const hoy = todayDateInput();
+  if (!hasta) return 'vigente';
+  if (hasta < hoy) return 'vencido';
+  return daysBetween(hoy, hasta) <= DIAS_POR_VENCER ? 'por_vencer' : 'vigente';
+};
 
 const getAvailabilitySummary = (form) => {
   if (!form.disponibilidad_desde || !form.disponibilidad_hasta) {
@@ -59,13 +93,13 @@ const buildPayload = (tipo, form) => {
     precio_base: Number(form.precio_base),
     disponibilidad_desde: form.disponibilidad_desde,
     disponibilidad_hasta: form.disponibilidad_hasta,
+    cupo_maximo: Number(form.cupo_maximo),
   };
   if (tipo === 'hotel') {
     payload.direccion = form.hotel_direccion;
     payload.estrellas = Number(form.hotel_estrellas);
   } else if (tipo === 'actividad') {
     payload.duracion_horas = Number(form.actividad_duracion);
-    payload.cupo_maximo = Number(form.actividad_cupo);
   } else if (tipo === 'paquete') {
     payload.itinerario = form.paquete_itinerario;
   }
@@ -84,6 +118,7 @@ export const MayoristaProductos = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [filtroTipo, setFiltroTipo] = useState('');
+  const [filtroVigencia, setFiltroVigencia] = useState('vigentes');
 
   // --- Crear ---
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -184,7 +219,7 @@ export const MayoristaProductos = () => {
       hotel_direccion: p.direccion || '',
       hotel_estrellas: p.estrellas ?? 3,
       actividad_duracion: p.duracion_horas ?? 1,
-      actividad_cupo: p.cupo_maximo ?? 10,
+      cupo_maximo: p.cupo_maximo ?? 10,
       paquete_itinerario: p.itinerario || '',
     });
     setEditError('');
@@ -266,6 +301,34 @@ export const MayoristaProductos = () => {
 
   const tipoLabel = { hotel: 'Hotel', actividad: 'Actividad', paquete: 'Paquete' };
 
+  const productosVisibles = productos.filter((p) => {
+    if (filtroVigencia === 'todos') return true;
+    const vencido = estadoVigencia(p) === 'vencido';
+    return filtroVigencia === 'vencidos' ? vencido : !vencido;
+  });
+
+  const renderCupoField = (form, onSet, tipo, productoOriginal) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+      <NumberStepper
+        label={`Cupo máximo (${CUPO_POR_TIPO[tipo]?.unidad ?? 'pasajeros'}) *`}
+        value={form.cupo_maximo}
+        min={1}
+        max={500}
+        onChange={v => onSet('cupo_maximo', v)}
+      />
+      {CUPO_POR_TIPO[tipo] && (
+        <p style={{ margin: '-0.25rem 0 0', fontSize: '0.8125rem', color: 'var(--color-text-soft)' }}>
+          {CUPO_POR_TIPO[tipo].ayuda}
+        </p>
+      )}
+      {productoOriginal && productoOriginal.cupo_maximo == null && (
+        <Alert variant="info" style={{ margin: 0 }}>
+          Este producto no tenía cupo definido (se vendía sin límite). Al guardar se aplicará este cupo.
+        </Alert>
+      )}
+    </div>
+  );
+
   const applyProductPreset = (preset, mode = 'create') => {
     const currentForm = mode === 'edit' ? editForm : formData;
     const update = mode === 'edit' ? setEditForm : setFormData;
@@ -337,7 +400,8 @@ export const MayoristaProductos = () => {
         </Button>
       </div>
 
-      <div style={{ marginBottom: '2rem', maxWidth: '300px' }}>
+      <div style={{ marginBottom: '2rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ flex: '1 1 220px', maxWidth: '300px' }}>
         <Select
           value={filtroTipo}
           placeholder={false}
@@ -349,13 +413,26 @@ export const MayoristaProductos = () => {
             { label: 'Paquete', value: 'paquete' }
           ]}
         />
+        </div>
+        <div style={{ flex: '1 1 220px', maxWidth: '300px' }}>
+          <Select
+            value={filtroVigencia}
+            placeholder={false}
+            onChange={e => setFiltroVigencia(e.target.value)}
+            options={[
+              { label: 'Vigentes', value: 'vigentes' },
+              { label: 'Vencidos', value: 'vencidos' },
+              { label: 'Todos', value: 'todos' },
+            ]}
+          />
+        </div>
       </div>
 
-      {productos.length === 0 ? (
+      {productosVisibles.length === 0 ? (
         <EmptyState title="No se encontraron productos" description="Ajuste sus filtros o cree un nuevo producto." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-          {productos.map(p => (
+          {productosVisibles.map(p => (
             <Card key={p._id}>
               <CardBody style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -378,9 +455,22 @@ export const MayoristaProductos = () => {
                   </div>
                 </div>
                 <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.25rem' }}>{p.nombre}</h3>
-                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '1.5rem', flexGrow: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '1rem', flexGrow: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {p.descripcion}
                 </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8125rem', color: 'var(--color-text-soft)', marginBottom: '1rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <CalendarIcon size={13} />
+                    {formatFecha(p.disponibilidad_desde)} al {formatFecha(p.disponibilidad_hasta)}
+                    {estadoVigencia(p) === 'vencido' && <Badge variant="error">Vencido</Badge>}
+                    {estadoVigencia(p) === 'por_vencer' && <Badge variant="warning">Por vencer</Badge>}
+                  </span>
+                  <span>
+                    {p.cupo_maximo != null
+                      ? `Cupo máximo: ${p.cupo_maximo} ${CUPO_POR_TIPO[p.tipo]?.unidad ?? 'pasajeros'}`
+                      : 'Cupo sin definir (sin límite)'}
+                  </span>
+                </div>
                 <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', textTransform: 'uppercase', letterSpacing: '0.5px' }} title={etiquetaPrecio(p.tipo)}>Precio Base</span>
@@ -421,6 +511,7 @@ export const MayoristaProductos = () => {
         <Textarea label="Descripción *" rows={3} value={formData.descripcion} onChange={e => set('descripcion', e.target.value)} />
         <Input label={`${etiquetaPrecio(tipoProducto)} (USD) *`} type="number" min="0.01" step="0.01" value={formData.precio_base} onChange={e => set('precio_base', e.target.value)} />
         {renderAvailabilityFields(formData, set, 'create')}
+        {renderCupoField(formData, set, tipoProducto)}
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
           {tipoProducto === 'hotel' && (
@@ -430,10 +521,7 @@ export const MayoristaProductos = () => {
             </div>
           )}
           {tipoProducto === 'actividad' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <NumberStepper label="Duración (horas) *" value={formData.actividad_duracion} min={1} max={72} onChange={v => set('actividad_duracion', v)} />
-              <NumberStepper label="Cupo máximo *" value={formData.actividad_cupo} min={1} max={500} onChange={v => set('actividad_cupo', v)} />
-            </div>
+            <NumberStepper label="Duración (horas) *" value={formData.actividad_duracion} min={1} max={72} onChange={v => set('actividad_duracion', v)} />
           )}
           {tipoProducto === 'paquete' && (
             <Textarea label="Itinerario *" rows={4} value={formData.paquete_itinerario} onChange={e => set('paquete_itinerario', e.target.value)} placeholder="Ej: Día 1: Llegada a Bariloche. Día 2: Circuito Chico..." />
@@ -530,6 +618,7 @@ export const MayoristaProductos = () => {
         </Alert>
 
         {renderAvailabilityFields(editForm, setEdit, 'edit')}
+        {renderCupoField(editForm, setEdit, editTipo, editProductoRef.current)}
 
         <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--color-bg)', borderRadius: 'var(--radius-sm)' }}>
           <h4 style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>Detalles Específicos</h4>
@@ -540,10 +629,7 @@ export const MayoristaProductos = () => {
             </div>
           )}
           {editTipo === 'actividad' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <NumberStepper label="Duración (horas) *" value={editForm.actividad_duracion} min={1} max={72} onChange={v => setEdit('actividad_duracion', v)} />
-              <NumberStepper label="Cupo máximo *" value={editForm.actividad_cupo} min={1} max={500} onChange={v => setEdit('actividad_cupo', v)} />
-            </div>
+            <NumberStepper label="Duración (horas) *" value={editForm.actividad_duracion} min={1} max={72} onChange={v => setEdit('actividad_duracion', v)} />
           )}
           {editTipo === 'paquete' && (
             <Textarea label="Itinerario *" rows={4} value={editForm.paquete_itinerario} onChange={e => setEdit('paquete_itinerario', e.target.value)} placeholder="Ej: Día 1: Llegada a Bariloche. Día 2: Circuito Chico..." />

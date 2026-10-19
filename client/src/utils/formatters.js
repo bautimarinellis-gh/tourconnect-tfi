@@ -1,5 +1,9 @@
 const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const dateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
+// Fechas de calendario (viaje, disponibilidad, pago): se guardan como
+// medianoche UTC del día elegido, así que se leen en UTC. En hora local
+// argentina (UTC-3) esa medianoche cae el día anterior.
+const calendarDateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
 const dateTimeFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 
 export const formatCurrency = (amount) => {
@@ -8,9 +12,16 @@ export const formatCurrency = (amount) => {
   return currencyFormatter.format(value);
 };
 
+/** Día de un momento puntual (created_at, timestamps): en hora local. */
 export const formatDate = (dateString) => {
   if (!dateString) return '';
   return dateFormatter.format(new Date(dateString));
+};
+
+/** Fecha de calendario (fecha de viaje, disponibilidad, fecha de pago). */
+export const formatFecha = (dateString) => {
+  if (!dateString) return '';
+  return calendarDateFormatter.format(new Date(dateString));
 };
 
 /**
@@ -18,8 +29,8 @@ export const formatDate = (dateString) => {
  * (inicio = fin): en ese caso se muestra una sola fecha.
  */
 export const formatRangoFechas = (inicio, fin, separador = ' — ') => {
-  const desde = formatDate(inicio);
-  const hasta = formatDate(fin);
+  const desde = formatFecha(inicio);
+  const hasta = formatFecha(fin);
   return !hasta || desde === hasta ? desde : `${desde}${separador}${hasta}`;
 };
 

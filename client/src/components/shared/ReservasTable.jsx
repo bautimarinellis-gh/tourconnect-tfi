@@ -6,6 +6,15 @@ import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { formatCurrency, formatDate, formatRangoFechas, formatEstadoReserva } from '../../utils/formatters';
+import { toDateInputValue, todayDateInput } from '../../utils/dateRanges';
+
+/**
+ * Pago informado de un viaje que ya empezó: el sistema no cambia su estado
+ * (confirmarlo o rechazarlo es decisión del mayorista), pero se destaca para
+ * que no quede olvidado.
+ */
+const esPagoDeViajeIniciado = (r) =>
+  r.estado === 'pago_informado' && toDateInputValue(r.fecha_inicio) < todayDateInput();
 
 /**
  * Tabla de listado de reservas, compartida entre mayorista y agencia.
@@ -53,7 +62,10 @@ export const ReservasTable = ({ reservas, basePath, showAgenciaColumn = false })
               <div style={{ fontWeight: 600 }}>{formatCurrency(r.precio_final)}</div>
             </TableCell>
             <TableCell>
-              <Badge variant={r.estado}>{formatEstadoReserva(r.estado)}</Badge>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.25rem' }}>
+                <Badge variant={r.estado}>{formatEstadoReserva(r.estado)}</Badge>
+                {esPagoDeViajeIniciado(r) && <Badge variant="warning">Viaje ya iniciado</Badge>}
+              </div>
             </TableCell>
             <TableCell>
               <Link to={`${basePath}/${r._id}`}>

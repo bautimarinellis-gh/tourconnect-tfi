@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { horasInvitacion } = require('./invitacion');
 
 /**
  * Crea el transporter de nodemailer con la configuración SMTP
@@ -78,7 +79,7 @@ const enviarInvitacion = async (email, token, rol) => {
         Configurar contraseña
       </a>
       <p style="color: #6b7280; font-size: 14px;">
-        Este enlace expira en 48 horas.
+        Este enlace expira en ${horasInvitacion()} horas.
       </p>
       <hr style="border: none; border-top: 1px solid #e5e7eb;" />
       <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>
@@ -115,7 +116,7 @@ const enviarResetClave = async (email, nombre, token) => {
         Definir nueva contraseña
       </a>
       <p style="color: #6b7280; font-size: 14px;">
-        Este enlace expira en 48 horas. Si no esperabas este email, contactá a tu administrador.
+        Este enlace expira en ${horasInvitacion()} horas. Si no esperabas este email, contactá a tu administrador.
       </p>
       <hr style="border: none; border-top: 1px solid #e5e7eb;" />
       <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>

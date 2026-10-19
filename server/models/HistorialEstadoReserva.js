@@ -8,10 +8,12 @@ const historialEstadoReservaSchema = new mongoose.Schema(
       required: [true, 'La reserva es obligatoria'],
       index: true,
     },
+    // Quién hizo el cambio. null = lo hizo el sistema (por ejemplo, la
+    // cancelación automática de una reserva cuyo viaje pasó sin pago).
     usuario_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Usuario',
-      required: [true, 'El usuario es obligatorio'],
+      default: null,
     },
     estado_anterior: {
       type: String,

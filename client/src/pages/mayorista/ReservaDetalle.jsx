@@ -8,14 +8,17 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import { ReservaTimeline } from '../../components/shared/ReservaTimeline';
 import { EstadoCuentaCard } from '../../components/shared/EstadoCuentaCard';
-import { formatCurrency, formatDateTime, formatDate, formatRangoFechas, formatEstadoReserva } from '../../utils/formatters';
+import { formatCurrency, formatDateTime, formatFecha, formatRangoFechas, formatEstadoReserva } from '../../utils/formatters';
 import { toFloat } from '../../utils/money';
 import reservaService from '../../services/reservaService';
 
-const MOTIVOS_RAPIDOS = ['Monto incorrecto', 'No recibí el pago', 'Datos incorrectos', 'Comprobante inválido'];
+const formatPesos = (monto) =>
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(monto ?? 0);
+
+const MOTIVOS_RAPIDOS =['Monto incorrecto', 'No recibí el pago', 'Datos incorrectos', 'Comprobante inválido'];
 
 export const MayoristaReservaDetalle = () => {
   const { id } = useParams();
@@ -27,6 +30,7 @@ export const MayoristaReservaDetalle = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelError, setCancelError] = useState('');
+  const [devolucion, setDevolucion] = useState({ metodo: '', comprobante: '' });
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -54,12 +58,19 @@ export const MayoristaReservaDetalle = () => {
       setCancelError('El motivo de cancelación es obligatorio.');
       return;
     }
+    const manuales = (reserva.pagos ?? []).filter(p => !p.rechazado && !p.devuelto && p.origen !== 'pasarela');
+    const pideDevolucionManual = reserva.estado === 'pagada' && manuales.length > 0;
+    if (pideDevolucionManual && !devolucion.metodo) {
+      setCancelError('Indicá cómo devolviste el dinero a la agencia.');
+      return;
+    }
     setActionLoading(true);
     setCancelError('');
     try {
-      await reservaService.cancelar(id, cancelReason);
+      await reservaService.cancelar(id, cancelReason, pideDevolucionManual ? devolucion : undefined);
       setIsCancelModalOpen(false);
       setCancelReason('');
+      setDevolucion({ metodo: '', comprobante: '' });
       fetchReserva();
     } catch (err) {
       setCancelError(err.response?.data?.message || 'Error al cancelar la reserva.');
@@ -115,10 +126,27 @@ export const MayoristaReservaDetalle = () => {
   if (loading || !reserva) return <Spinner center size="lg" />;
 
   const precioFinal = toFloat(reserva.precio_final);
-  const pagos = reserva.pagos ?? [];
-  const totalPagado = pagos.filter(p => !p.rechazado).reduce((acc, p) => acc + toFloat(p.monto), 0);
-  const saldo = ['pagada', 'cerrada'].includes(reserva.estado) ? 0 : precioFinal - totalPagado;
   const pid = reserva.pago_informado_datos;
+  const pagos = reserva.pagos ?? [];
+  // El pago en verificación (manual o pendiente de acreditación en MP) todavía no cuenta como pagado.
+  const totalPagado = pagos
+    .filter(p => !p.rechazado && !p.devuelto && p._id !== pid?._id)
+    .reduce((acc, p) => acc + toFloat(p.monto), 0);
+  const saldo = ['pagada', 'cerrada'].includes(reserva.estado) ? 0 : precioFinal - totalPagado;
+  // Los pagos de Mercado Pago se acreditan o rechazan solos: no hay nada que confirmar a mano.
+  const esPasarela = pid?.origen === 'pasarela';
+
+  // Qué pasa con la plata si se cancela (ver devolucionPagos en el servidor).
+  const pagosVigentes = pagos.filter(p => !p.rechazado && !p.devuelto);
+  const aDevolverPorMP = reserva.estado === 'pagada' ? pagosVigentes.filter(p => p.origen === 'pasarela') : [];
+  const aDevolverManual = reserva.estado === 'pagada' ? pagosVigentes.filter(p => p.origen !== 'pasarela') : [];
+  const pagoInformadoSinRevisar = reserva.estado === 'pago_informado' && pid && !esPasarela;
+  const cerrarModalCancelar = () => {
+    setIsCancelModalOpen(false);
+    setCancelReason('');
+    setCancelError('');
+    setDevolucion({ metodo: '', comprobante: '' });
+  };
 
   return (
     <div>
@@ -155,9 +183,13 @@ export const MayoristaReservaDetalle = () => {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1.25rem' }}>
               <AlertTriangle size={22} style={{ color: '#D97706', flexShrink: 0 }} />
               <div>
-                <h3 style={{ margin: '0 0 0.25rem', color: '#92400E' }}>Pago informado por la agencia</h3>
+                <h3 style={{ margin: '0 0 0.25rem', color: '#92400E' }}>
+                  {esPasarela ? 'Pago pendiente en Mercado Pago' : 'Pago informado por la agencia'}
+                </h3>
                 <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
-                  Verificá en tu cuenta bancaria antes de confirmar.
+                  {esPasarela
+                    ? 'La agencia pagó con Mercado Pago y el pago todavía no se acreditó. La reserva pasa a pagada sola cuando se acredite.'
+                    : 'Verificá en tu cuenta bancaria antes de confirmar.'}
                 </p>
               </div>
             </div>
@@ -176,7 +208,7 @@ export const MayoristaReservaDetalle = () => {
               </div>
               <div>
                 <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Fecha del pago</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.fecha_pago ? formatDate(pid.fecha_pago) : '—'}</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.fecha_pago ? formatFecha(pid.fecha_pago) : '—'}</p>
               </div>
               <div>
                 <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Monto informado</p>
@@ -184,7 +216,7 @@ export const MayoristaReservaDetalle = () => {
               </div>
               <div>
                 <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Informado el</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.informado_at ? formatDateTime(pid.informado_at) : '—'}</p>
+                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.created_at ? formatDateTime(pid.created_at) : '—'}</p>
               </div>
               {pid.notas && (
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -193,14 +225,14 @@ export const MayoristaReservaDetalle = () => {
                 </div>
               )}
             </div>
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+            {!esPasarela && <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
               <Button variant="danger" onClick={() => { setModalError(''); setIsRejectModalOpen(true); }}>
                 <X size={16} /> Rechazar Pago
               </Button>
               <Button onClick={() => setIsConfirmModalOpen(true)}>
                 <Check size={16} /> Confirmar Pago
               </Button>
-            </div>
+            </div>}
           </CardBody>
         </Card>
       )}
@@ -246,10 +278,22 @@ export const MayoristaReservaDetalle = () => {
                         <p style={{ fontWeight: 600, margin: '0 0 0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ textDecoration: p.rechazado ? 'line-through' : 'none' }}>{formatCurrency(toFloat(p.monto))}</span>
                           {p.rechazado && <Badge variant="error">Rechazado</Badge>}
+                          {p.devuelto && <Badge variant="warning">Devuelto</Badge>}
+                          {p.devolucion?.simulada && <Badge variant="info">Simulada</Badge>}
                         </p>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0, textTransform: 'capitalize' }}>
-                          {p.metodo || 'N/A'} — Comp: {p.comprobante || 'N/A'}
+                        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: 0 }}>
+                          {p.origen === 'pasarela' ? 'Mercado Pago' : <span style={{ textTransform: 'capitalize' }}>{p.metodo || 'N/A'}</span>} — Comp: {p.comprobante || 'N/A'}
                         </p>
+                        {p.devuelto && (
+                          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-soft)', margin: '0.25rem 0 0' }}>
+                            {p.devolucion?.origen === 'pasarela'
+                              ? (p.devolucion.simulada
+                                ? 'Devolución simulada: el sandbox de Mercado Pago no permite reembolsos por API'
+                                : `Devuelto por Mercado Pago — reembolso N° ${p.devolucion.refund_id}`)
+                              : `Devuelto por ${p.devolucion?.metodo || '—'}${p.devolucion?.comprobante ? ` — comp. ${p.devolucion.comprobante}` : ''}`}
+                            {p.devolucion?.fecha ? ` — ${formatDateTime(p.devolucion.fecha)}` : ''}
+                          </p>
+                        )}
                         {p.rechazado && p.motivo_rechazo && (
                           <p style={{ fontSize: '0.75rem', color: 'var(--color-error, #DC2626)', margin: '0.25rem 0 0' }}>
                             Motivo: {p.motivo_rechazo}
@@ -257,7 +301,7 @@ export const MayoristaReservaDetalle = () => {
                         )}
                       </div>
                       <div style={{ fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>
-                        {formatDateTime(p.fecha_pago)}
+                        {formatFecha(p.fecha_pago)}
                       </div>
                     </div>
                   ))}
@@ -279,17 +323,77 @@ export const MayoristaReservaDetalle = () => {
       {/* Modal Cancelar */}
       <Modal
         isOpen={isCancelModalOpen}
-        onClose={() => { setIsCancelModalOpen(false); setCancelReason(''); setCancelError(''); }}
+        onClose={cerrarModalCancelar}
         title="Cancelar Reserva"
         footer={
           <>
-            <Button variant="ghost" onClick={() => { setIsCancelModalOpen(false); setCancelReason(''); setCancelError(''); }}>Atrás</Button>
-            <Button variant="danger" onClick={handleCancelar} isLoading={actionLoading}>Confirmar Cancelación</Button>
+            <Button variant="ghost" onClick={cerrarModalCancelar}>Atrás</Button>
+            <Button variant="danger" onClick={handleCancelar} isLoading={actionLoading} disabled={pagoInformadoSinRevisar}>
+              {aDevolverPorMP.length + aDevolverManual.length > 0 ? 'Cancelar y Devolver' : 'Confirmar Cancelación'}
+            </Button>
           </>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {cancelError && <Alert variant="error">{cancelError}</Alert>}
+
+          {pagoInformadoSinRevisar && (
+            <Alert variant="warning" title="Pago informado sin revisar">
+              Antes de cancelar, confirmá o rechazá el pago que informó la agencia, así se sabe si hay dinero para devolver.
+            </Alert>
+          )}
+
+          {reserva.estado === 'pago_informado' && esPasarela && (
+            <Alert variant="info" title="Pago pendiente en Mercado Pago">
+              El pago pendiente de la agencia se anula en Mercado Pago. Si justo se acreditó, se devuelve.
+            </Alert>
+          )}
+
+          {aDevolverPorMP.length > 0 && (
+            <Alert variant="info" title="Devolución automática">
+              {aDevolverPorMP.map(p => (
+                <div key={p._id}>
+                  Se devuelven {formatCurrency(toFloat(p.monto))}
+                  {p.pasarela?.monto_ars ? ` (${formatPesos(p.pasarela.monto_ars)})` : ''} por Mercado Pago — operación N° {p.comprobante}.
+                </div>
+              ))}
+              <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                Entorno de prueba: si el sandbox de Mercado Pago no permite el reembolso, queda registrado como devolución simulada.
+              </div>
+            </Alert>
+          )}
+
+          {aDevolverManual.length > 0 && (
+            <>
+              <Alert variant="warning" title="Devolución manual">
+                Hay {aDevolverManual.length === 1 ? 'un pago manual' : `${aDevolverManual.length} pagos manuales`} por{' '}
+                {formatCurrency(aDevolverManual.reduce((acc, p) => acc + toFloat(p.monto), 0))}.
+                Devolvé el dinero a la agencia y registrá cómo lo hiciste.
+              </Alert>
+              <div>
+                <label className="input-label" htmlFor="devolucion-metodo">Medio de devolución *</label>
+                <select
+                  id="devolucion-metodo"
+                  className="input-control"
+                  value={devolucion.metodo}
+                  onChange={e => { setDevolucion({ ...devolucion, metodo: e.target.value }); setCancelError(''); }}
+                >
+                  <option value="">Seleccioná…</option>
+                  <option value="transferencia">Transferencia Bancaria</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <Input
+                label="Comprobante de la devolución"
+                value={devolucion.comprobante}
+                onChange={e => setDevolucion({ ...devolucion, comprobante: e.target.value })}
+                placeholder="Ej: número de transferencia"
+              />
+            </>
+          )}
+
           <Input
             label="Motivo de la cancelación *"
             value={cancelReason}

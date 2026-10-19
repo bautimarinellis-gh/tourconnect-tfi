@@ -8,12 +8,12 @@ import { Select } from '../../components/ui/Select';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { formatCurrency, formatFecha } from '../../utils/formatters';
 import { addDays, applyRangePreset, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
-import { esDeUnSoloDia, estimarPrecio, etiquetaPrecio } from '../../utils/precio';
+import { cobraPorNoche, esDeUnSoloDia, estimarPrecio, etiquetaPrecio } from '../../utils/precio';
 import productoService from '../../services/productoService';
 import cotizacionService from '../../services/cotizacionService';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import './catalogo.css';
 
 const QUOTE_DURATION_PRESETS = [
@@ -22,6 +22,9 @@ const QUOTE_DURATION_PRESETS = [
   { label: '7 días', days: 7 },
   { label: '14 días', days: 14 },
 ];
+
+// Espera antes de consultar las plazas libres mientras la agencia elige fechas.
+const DEBOUNCE_DISPONIBILIDAD_MS = 300;
 
 const getIconForType = (tipo) => {
   if (tipo === 'hotel') return <Hotel />;
@@ -45,6 +48,10 @@ export const AgenciaCatalogo = () => {
     fecha_fin: '',
     cantidad_pasajeros: 1,
   });
+  // Plazas libres para las fechas elegidas: { ilimitado, disponibles } o null
+  // mientras no hay fechas válidas (o si la consulta falló: el servidor igual
+  // controla el cupo al crear la cotización).
+  const [disponibilidad, setDisponibilidad] = useState(null);
 
   const fetchCatalogo = useCallback(async () => {
     setLoading(true);
@@ -63,6 +70,30 @@ export const AgenciaCatalogo = () => {
   useEffect(() => {
     fetchCatalogo();
   }, [fetchCatalogo]);
+
+  useEffect(() => {
+    setDisponibilidad(null);
+    if (!selectedProduct || !formData.fecha_inicio) return undefined;
+
+    const unSoloDia = esDeUnSoloDia(selectedProduct.tipo);
+    const fechaFin = unSoloDia ? formData.fecha_inicio : formData.fecha_fin;
+    if (!unSoloDia && !isValidDateRange(formData.fecha_inicio, fechaFin, { allowSameDay: false })) return undefined;
+
+    let cancelado = false;
+    const timer = setTimeout(async () => {
+      try {
+        const data = await productoService.getDisponibilidad(selectedProduct._id, {
+          fecha_inicio: formData.fecha_inicio,
+          fecha_fin: fechaFin,
+        });
+        if (!cancelado) setDisponibilidad(data);
+      } catch (err) {
+        console.error(err);
+      }
+    }, DEBOUNCE_DISPONIBILIDAD_MS);
+
+    return () => { cancelado = true; clearTimeout(timer); };
+  }, [selectedProduct, formData.fecha_inicio, formData.fecha_fin]);
 
   const handleCotizar = async () => {
     // Una actividad se cotiza para un solo día: la fecha de fin es la de inicio.
@@ -114,7 +145,12 @@ export const AgenciaCatalogo = () => {
     .sort()
     .pop();
   const maxDisponible = toDateInputValue(selectedProduct?.disponibilidad_hasta);
+  // En un hotel la disponibilidad son noches: la última es la del "hasta",
+  // así que la salida puede ser el día siguiente.
+  const maxFin = cobraPorNoche(selectedProduct?.tipo) && maxDisponible ? addDays(maxDisponible, 1) : maxDisponible;
   const unSoloDia = esDeUnSoloDia(selectedProduct?.tipo);
+  const plazasLibres = disponibilidad && !disponibilidad.ilimitado ? disponibilidad.disponibles : null;
+  const sinCupoSuficiente = plazasLibres !== null && formData.cantidad_pasajeros > plazasLibres;
   const estimado = selectedProduct
     ? estimarPrecio({
       tipo: selectedProduct.tipo,
@@ -129,7 +165,7 @@ export const AgenciaCatalogo = () => {
     if (!selectedProduct || !maxDisponible) return false;
     const start = formData.fecha_inicio || minDisponible;
     const end = addDays(start, days);
-    return Boolean(start && end && end <= maxDisponible);
+    return Boolean(start && end && end <= maxFin);
   };
 
   const applyDurationPreset = (days) => {
@@ -138,7 +174,7 @@ export const AgenciaCatalogo = () => {
       startInput: formData.fecha_inicio,
       days,
       fallbackStart: minDisponible,
-      maxEnd: maxDisponible,
+      maxEnd: maxFin,
     });
     setFormData(prev => ({
       ...prev,
@@ -206,7 +242,7 @@ export const AgenciaCatalogo = () => {
                       <span className="catalog-item-title">{p.nombre}</span>
                       <span className="catalog-item-meta">
                         <Badge variant="info" style={{ textTransform: 'capitalize' }}>{p.tipo}</Badge>
-                        <span><Calendar size={12} /> {formatDate(p.disponibilidad_desde)}</span>
+                        <span><Calendar size={12} /> {formatFecha(p.disponibilidad_desde)}</span>
                       </span>
                     </span>
                     <span className="catalog-item-price">{formatCurrency(p.precio_final)}</span>
@@ -234,7 +270,7 @@ export const AgenciaCatalogo = () => {
                     <strong>{formatCurrency(selectedProduct.precio_final)}</strong>
                   </div>
                   <Alert variant="info">
-                    Disponible del <strong>{formatDate(selectedProduct.disponibilidad_desde)}</strong> al <strong>{formatDate(selectedProduct.disponibilidad_hasta)}</strong>.
+                    Disponible del <strong>{formatFecha(selectedProduct.disponibilidad_desde)}</strong> al <strong>{formatFecha(selectedProduct.disponibilidad_hasta)}</strong>.
                   </Alert>
                   {unSoloDia ? (
                     <div className="quote-form-grid">
@@ -260,9 +296,9 @@ export const AgenciaCatalogo = () => {
                         />
                         <Input
                           type="date"
-                          label="Fin"
+                          label={cobraPorNoche(selectedProduct.tipo) ? 'Salida' : 'Fin'}
                           min={formData.fecha_inicio || minDisponible}
-                          max={maxDisponible}
+                          max={maxFin}
                           value={formData.fecha_fin}
                           onChange={e => setFormData({ ...formData, fecha_fin: e.target.value })}
                         />
@@ -298,11 +334,22 @@ export const AgenciaCatalogo = () => {
                       <button
                         type="button"
                         onClick={() => setFormData({ ...formData, cantidad_pasajeros: formData.cantidad_pasajeros + 1 })}
+                        disabled={plazasLibres !== null && formData.cantidad_pasajeros >= plazasLibres}
+                        title={plazasLibres !== null && formData.cantidad_pasajeros >= plazasLibres ? 'No quedan más plazas para esas fechas' : undefined}
                       >
                         <Plus size={14} />
                       </button>
                     </div>
                   </div>
+                  {plazasLibres !== null && (
+                    <Alert variant={plazasLibres === 0 || sinCupoSuficiente ? 'warning' : 'success'}>
+                      {plazasLibres === 0
+                        ? 'No quedan plazas para esas fechas. Probá con otras fechas.'
+                        : sinCupoSuficiente
+                          ? <>Solo quedan <strong>{plazasLibres}</strong> plaza{plazasLibres !== 1 ? 's' : ''} para esas fechas: reducí la cantidad de pasajeros.</>
+                          : <>Quedan <strong>{plazasLibres}</strong> plaza{plazasLibres !== 1 ? 's' : ''} para esas fechas.</>}
+                    </Alert>
+                  )}
                   <div className="quote-total-row">
                     <span>Total estimado</span>
                     <strong>{formatCurrency(estimado?.total ?? 0)}</strong>
@@ -314,7 +361,7 @@ export const AgenciaCatalogo = () => {
                       {` x ${formData.cantidad_pasajeros} pax`}
                     </p>
                   )}
-                  <Button className="w-full" size="lg" onClick={handleCotizar} isLoading={actionLoading}>
+                  <Button className="w-full" size="lg" onClick={handleCotizar} isLoading={actionLoading} disabled={sinCupoSuficiente}>
                     <ShoppingCart size={16} /> Confirmar cotización
                   </Button>
                 </>

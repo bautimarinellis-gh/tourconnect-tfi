@@ -9,13 +9,16 @@
     "test": "node --test \"tests/**/*.test.js\"",
     "seed:admin": "node seeds/adminSeed.js",
     "seed:demo": "node seeds/demoSeed.js",
-    "migrate:roles": "node seeds/migracionRoles.js"
+    "seed:demo-asistente": "node seeds/demoAsistenteSeed.js",
+    "migrate:roles": "node seeds/migracionRoles.js",
+    "migrate:reservas": "node seeds/migracionReservasTenant.js"
   },
   "license": "ISC",
   "devDependencies": {
     "nodemon": "^3.1.14"
   },
   "dependencies": {
+    "@google/genai": "^2.24.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
