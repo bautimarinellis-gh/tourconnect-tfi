@@ -95,7 +95,11 @@ async function responderConIA(req, query, historial) {
   }
   // "No se puede" o consulta inválida: se le da la chance al clasificador
   // local, que puede reconocer algo o dar un aviso de permisos claro.
-  if (!consulta || consulta.ninguna) return null;
+  if (!consulta) {
+    console.warn('[asistente] La consulta que armó Gemini no pasó la validación, se usa el modo básico.');
+    return null;
+  }
+  if (consulta.ninguna) return null;
 
   // mayorista_id desde el middleware, NUNCA de la IA ni del body
   const resultado = await ejecutarConsulta(consulta, req.mayorista_id);
