@@ -1,10 +1,13 @@
 const mongoose = require('mongoose');
 const Cotizacion = require('../models/Cotizacion');
 
+// Lo usan tanto el mayorista como la agencia: no incluye precio_base, que es
+// el costo del mayorista y la agencia nunca debe ver (solo el precio con su
+// markup, que ya queda en la cotización).
 const COTIZACION_POPULATE = {
   path: 'cotizacion_id',
   populate: [
-    { path: 'producto_id', select: 'nombre tipo precio_base' },
+    { path: 'producto_id', select: 'nombre tipo' },
     { path: 'agencia_id', select: 'nombre' },
     { path: 'mayorista_id', select: 'nombre razon_social' },
   ],

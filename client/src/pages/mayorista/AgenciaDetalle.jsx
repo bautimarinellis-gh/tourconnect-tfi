@@ -10,7 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { formatCurrency } from '../../utils/formatters';
 import agenciaService from '../../services/agenciaService';
 import productoService from '../../services/productoService';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import { HistorialEstadoPersonaTimeline } from '../../components/shared/HistorialEstadoPersonaTimeline';
 
 export const MayoristaAgenciaDetalle = () => {

@@ -11,7 +11,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Textarea } from '../../components/ui/Textarea';
 import { Alert } from '../../components/ui/Alert';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import agenciaService from '../../services/agenciaService';
 import { usePermiso } from '../../hooks/usePermiso';
 import { formatCuit, isValidCuit } from '../../utils/cuit';

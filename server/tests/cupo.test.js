@@ -2,7 +2,12 @@ const { test, describe, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { calcularVencimiento, estaVigente, horasVigencia } = require('../utils/vigenciaCotizacion');
-const { contarPasajerosComprometidos } = require('../utils/cupoValidator');
+const {
+  contarPasajerosComprometidos,
+  diasOcupados,
+  picoOcupacion,
+  calcularDisponibilidad,
+} = require('../utils/cupoValidator');
 
 const HORA = 60 * 60 * 1000;
 const ahora = new Date('2026-09-24T15:00:00Z');
@@ -73,5 +78,55 @@ describe('contarPasajerosComprometidos', () => {
   test('una aprobada que venció sin reservarse libera su cupo', () => {
     const total = contarPasajerosComprometidos([aprobada('a', 3, 100), aprobada('d', 2)], new Set(), ahora);
     assert.equal(total, 2);
+  });
+});
+
+describe('diasOcupados', () => {
+  test('una actividad ocupa solo su día', () => {
+    assert.deepEqual(diasOcupados('actividad', '2026-11-10', '2026-11-10'), ['2026-11-10']);
+  });
+
+  test('un hotel ocupa las noches: el día de salida no ocupa plaza', () => {
+    assert.deepEqual(diasOcupados('hotel', '2026-11-10', '2026-11-13'), ['2026-11-10', '2026-11-11', '2026-11-12']);
+  });
+
+  test('un paquete ocupa todos los días del viaje, inclusive', () => {
+    assert.deepEqual(diasOcupados('paquete', '2026-11-30', '2026-12-02'), ['2026-11-30', '2026-12-01', '2026-12-02']);
+  });
+
+  test('acepta fechas como Date (medianoche UTC)', () => {
+    assert.deepEqual(diasOcupados('hotel', new Date('2026-11-10T00:00:00Z'), new Date('2026-11-11T00:00:00Z')), ['2026-11-10']);
+  });
+});
+
+describe('picoOcupacion', () => {
+  const estadia = (inicio, fin, pasajeros) => ({ fecha_inicio: inicio, fecha_fin: fin, pasajeros });
+
+  test('dos estadías que no se pisan no se suman aunque caigan en el mismo rango', () => {
+    const r = picoOcupacion([estadia('2026-11-01', '2026-11-03', 8), estadia('2026-11-05', '2026-11-07', 6)], 'hotel', '2026-11-01', '2026-11-07');
+    assert.deepEqual(r, { pico: 8, dia_pico: '2026-11-01' });
+  });
+
+  test('las estadías superpuestas se suman en los días que comparten', () => {
+    const r = picoOcupacion([estadia('2026-11-01', '2026-11-04', 8), estadia('2026-11-03', '2026-11-06', 6)], 'hotel', '2026-11-01', '2026-11-07');
+    assert.deepEqual(r, { pico: 14, dia_pico: '2026-11-03' });
+  });
+
+  test('la salida de una estadía y la llegada de otra el mismo día no se pisan', () => {
+    const r = picoOcupacion([estadia('2026-11-01', '2026-11-03', 8), estadia('2026-11-03', '2026-11-05', 8)], 'hotel', '2026-11-01', '2026-11-05');
+    assert.equal(r.pico, 8);
+  });
+
+  test('solo cuentan los días dentro del rango consultado', () => {
+    const r = picoOcupacion([estadia('2026-11-01', '2026-11-10', 5)], 'paquete', '2026-11-20', '2026-11-25');
+    assert.deepEqual(r, { pico: 0, dia_pico: null });
+  });
+});
+
+describe('calcularDisponibilidad', () => {
+  test('un producto sin cupo definido no tiene límite', async () => {
+    const r = await calcularDisponibilidad({ _id: 'p1', tipo: 'hotel' }, '2026-11-01', '2026-11-03');
+    assert.equal(r.ilimitado, true);
+    assert.equal(r.disponibles, null);
   });
 });

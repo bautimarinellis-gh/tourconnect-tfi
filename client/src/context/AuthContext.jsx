@@ -1,9 +1,8 @@
-import React, { createContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import { marcarCierreDeSesion, marcarSesionIniciada } from '../services/api';
-
-export const AuthContext = createContext();
+import { AuthContext } from './contexts';
 
 // Ventana mínima entre revalidaciones por foco. Sin esto, alt-tabear varias
 // veces seguidas dispara un /auth/me por cada cambio de pestaña.

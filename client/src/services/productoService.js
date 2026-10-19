@@ -6,6 +6,8 @@ const productoService = {
   update: (id, data) => api.put(`/productos/${id}`, data).then(r => r.data),
   delete: (id) => api.delete(`/productos/${id}`).then(r => r.data),
   checkAgencias: (id) => api.get(`/productos/${id}/agencias`).then(r => r.data),
+  getDisponibilidad: (id, params) =>
+    api.get(`/productos/${id}/disponibilidad`, { params }).then(r => r.data?.data ?? null),
 };
 
 export default productoService;

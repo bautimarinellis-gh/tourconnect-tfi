@@ -777,3 +777,91 @@
   }
 }
 
+
+/* ── Estado de la IA (Gemini) en el encabezado ──
+   Verde: la IA interpreta y redacta. Gris: sin API key, modo básico.
+   Ámbar: IA pausada (sin cuota o con error); el asistente sigue en modo básico. */
+.assistant-ia-estado {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+
+.assistant-ia-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-text-muted);
+}
+
+.assistant-ia-dot--activa {
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px var(--color-success-soft);
+}
+
+.assistant-ia-dot--pausada {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 3px var(--color-warning-soft);
+}
+
+/* Cómo se resolvió cada respuesta */
+.message-origen {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  padding: 0 2px;
+}
+
+.message-origen--ia {
+  color: var(--assistant-accent);
+}
+
+.assistant-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+
+/* ── Consultas armadas: números, variación y evolución mensual ── */
+.assistant-result-table td.is-numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.assistant-variacion {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.assistant-variacion--sube {
+  color: var(--color-success);
+}
+
+.assistant-variacion--baja {
+  color: var(--color-error);
+}
+
+.assistant-stat-card .assistant-variacion {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.assistant-serie-chart {
+  height: 140px;
+  margin: 8px 0 4px;
+}

@@ -8,6 +8,7 @@ const Producto = require('../models/Producto');
 const Cotizacion = require('../models/Cotizacion');
 const { enviarInvitacion, enviarNotificacionDesactivacion, enviarNotificacionReactivacion } = require('../utils/mailer');
 const { SUBSCRIPTION_PLAN_NAMES } = require('../utils/subscriptionPlans');
+const { vencimientoInvitacion } = require('../utils/invitacion');
 const { registrarAuditoria } = require('../utils/auditService');
 const { registrarCambioEstadoPersona } = require('../utils/historialEstadoPersona');
 const HistorialEstadoPersona = require('../models/HistorialEstadoPersona');
@@ -46,7 +47,7 @@ exports.getMayoristas = async (req, res, next) => {
  * @access  Private/Admin
  */
 exports.crearMayorista = async (req, res, next) => {
-  const { nombre, razon_social, telefono, cuit, plan_suscripcion, email, password } = req.body;
+  const { nombre, razon_social, telefono, cuit, plan_suscripcion, email } = req.body;
   const planSuscripcion = plan_suscripcion || 'Starter';
 
   const session = await mongoose.startSession();
@@ -63,14 +64,10 @@ exports.crearMayorista = async (req, res, next) => {
       throw error;
     }
 
-    const tienePassword = password && String(password).trim().length >= 8;
-    let inviteToken = null;
-    let expiresIn = null;
-
-    if (!tienePassword) {
-      inviteToken = crypto.randomBytes(32).toString('hex');
-      expiresIn = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    }
+    // Solo por invitación: la contraseña la define el propio usuario, nunca
+    // el admin (Ley 25.326: nadie más conoce la credencial).
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const expiresIn = vencimientoInvitacion();
 
     // El rol Administrador es protegido y no se puede asignar desde la
     // aplicación: esta alta que ejecuta el super-admin es la única vía por la
@@ -96,13 +93,10 @@ exports.crearMayorista = async (req, res, next) => {
       email,
       rol: 'mayorista',
       rol_id: rolAdministrador._id,
-      activo: tienePassword,
-      invite_token: tienePassword ? undefined : inviteToken,
-      invite_token_expires: tienePassword ? undefined : expiresIn,
+      activo: false,
+      invite_token: inviteToken,
+      invite_token_expires: expiresIn,
     });
-    if (tienePassword) {
-      nuevoUsuario.password_hash = await Usuario.hashPassword(password.trim());
-    }
     await nuevoUsuario.save({ session });
 
     // 3. Crear el Mayorista
@@ -132,16 +126,14 @@ exports.crearMayorista = async (req, res, next) => {
       accion: 'USUARIO_CREADO',
       entidad_afectada: 'Usuario',
       entidad_id: nuevoUsuario._id,
-      detalle: { email, rol: 'mayorista', con_invitacion: !tienePassword },
+      detalle: { email, rol: 'mayorista', con_invitacion: true },
     });
 
-    // 6. Enviar email de invitación (solo si no se configuró password)
-    if (!tienePassword && inviteToken) {
-      try {
-        await enviarInvitacion(email, inviteToken, 'Mayorista');
-      } catch (mailError) {
-        console.error('Error al enviar email de invitación, pero la cuenta fue creada:', mailError.message);
-      }
+    // 6. Enviar email de invitación
+    try {
+      await enviarInvitacion(email, inviteToken, 'Mayorista');
+    } catch (mailError) {
+      console.error('Error al enviar email de invitación, pero la cuenta fue creada:', mailError.message);
     }
 
     res.status(201).json({
@@ -230,31 +222,50 @@ exports.updateMayorista = async (req, res, next) => {
 };
 
 /**
- * @desc    Activar usuario y configurar contraseña de un mayorista (para mayoristas que no pudieron setearla)
- * @route   POST /api/v1/admin/mayoristas/:id/activar-usuario
+ * @desc    Reenviar la invitación a un mayorista que todavía no definió su
+ *          contraseña (se le venció el link o no le llegó el email).
+ * @route   POST /api/v1/admin/mayoristas/:id/reenviar-invitacion
  * @access  Private/Admin
+ *
+ * Reemplaza al endpoint que dejaba al admin escribir la contraseña del
+ * mayorista: la credencial la define solo su dueño (Ley 25.326).
  */
-exports.activarUsuarioMayorista = async (req, res, next) => {
+exports.reenviarInvitacionMayorista = async (req, res, next) => {
   try {
-    const { password } = req.body;
     const mayorista = await Mayorista.findById(req.params.id);
     if (!mayorista) {
       return res.status(404).json({ success: false, message: 'Mayorista no encontrado' });
     }
-    if (!password || String(password).trim().length < 8) {
-      return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 8 caracteres.' });
+    // Un mayorista desactivado se reactiva por su propio flujo (con motivo e
+    // historial), no reenviándole una invitación.
+    if (!mayorista.activo) {
+      return res.status(400).json({ success: false, message: 'El mayorista está desactivado. Reactivalo antes de reenviar la invitación.' });
     }
     const usuario = await Usuario.findById(mayorista.usuario_id).select('+password_hash');
     if (!usuario) {
       return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
     }
-    usuario.password_hash = await Usuario.hashPassword(password.trim());
-    usuario.activo = true;
-    usuario.invite_token = undefined;
-    usuario.invite_token_expires = undefined;
+    if (usuario.password_hash) {
+      return res.status(400).json({
+        success: false,
+        message: 'El usuario ya definió su contraseña. Si la olvidó, puede recuperarla con "¿Olvidaste tu contraseña?" en el login.',
+      });
+    }
+
+    // Token nuevo: el link anterior deja de valer.
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    usuario.invite_token = inviteToken;
+    usuario.invite_token_expires = vencimientoInvitacion();
     await usuario.save();
 
-    res.json({ success: true, data: { message: 'Usuario activado. Puede iniciar sesión.' } });
+    try {
+      await enviarInvitacion(usuario.email, inviteToken, 'Mayorista');
+    } catch (mailError) {
+      console.error('Error al reenviar la invitación:', mailError.message);
+      return res.status(502).json({ success: false, message: 'No se pudo enviar el email de invitación. Intentá de nuevo más tarde.' });
+    }
+
+    res.json({ success: true, data: { message: `Invitación reenviada a ${usuario.email}.` } });
   } catch (error) {
     next(error);
   }
@@ -375,9 +386,11 @@ exports.deleteMayorista = async (req, res, next) => {
     // Opcional: Desactivar también al usuario asociado
     let usuario = null;
     if (mayorista.usuario_id) {
+      // findByIdAndUpdate no pasa por el hook de save: el $inc de
+      // sesion_version (que invalida sus sesiones abiertas) va explícito.
       usuario = await Usuario.findByIdAndUpdate(
         mayorista.usuario_id,
-        { activo: false },
+        { activo: false, $inc: { sesion_version: 1 } },
         { session, new: true }
       );
     }

@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const { tokenBlacklist } = require('../controllers/authController');
 const Usuario = require('../models/Usuario');
 const Mayorista = require('../models/Mayorista');
 const Agencia = require('../models/Agencia');
@@ -8,6 +7,7 @@ const Agencia = require('../models/Agencia');
 require('../models/Rol');
 require('../models/Permiso');
 const { resolverPermisosEfectivos } = require('../utils/permisos');
+const { COOKIE, estaRevocado, versionVencida } = require('../utils/sesion');
 
 const ACCOUNT_DISABLED_RESPONSE = {
   success: false,
@@ -30,7 +30,7 @@ const ACCOUNT_DISABLED_RESPONSE = {
  */
 const verificarCuentaActiva = async (decoded) => {
   const usuario = await Usuario.findById(decoded.id)
-    .select('activo rol rol_id permisos_individuales')
+    .select('activo rol rol_id permisos_individuales sesion_version')
     .populate({ path: 'rol_id', populate: { path: 'permisos' } })
     .populate('permisos_individuales');
 
@@ -61,20 +61,12 @@ const verificarCuentaActiva = async (decoded) => {
  * Agrega req.usuario con los datos decodificados del token.
  */
 const auth = async (req, res, next) => {
-  const token = req.cookies?.token;
+  const token = req.cookies?.[COOKIE];
 
   if (!token) {
     return res.status(401).json({
       success: false,
       message: 'Acceso denegado. Token no proporcionado.',
-    });
-  }
-
-  // Verificar si el token fue invalidado (logout)
-  if (tokenBlacklist.has(token)) {
-    return res.status(401).json({
-      success: false,
-      message: 'Token inválido. Sesión cerrada.',
     });
   }
 
@@ -89,9 +81,26 @@ const auth = async (req, res, next) => {
   }
 
   try {
+    // Token cerrado con logout (persistido en base: sobrevive a reinicios)
+    if (await estaRevocado(token)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token inválido. Sesión cerrada.',
+      });
+    }
+
     const usuario = await verificarCuentaActiva(decoded);
     if (!usuario) {
       return res.status(403).json(ACCOUNT_DISABLED_RESPONSE);
+    }
+
+    // Emitido antes de un cambio de contraseña o de una desactivación:
+    // esa sesión ya no vale (ver sesion_version en el modelo Usuario).
+    if (versionVencida(decoded, usuario)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Tu sesión ya no es válida: cambió la contraseña o el acceso de la cuenta. Iniciá sesión de nuevo.',
+      });
     }
 
     req.usuario = decoded;

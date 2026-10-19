@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Send, Sparkles, ChevronRight, Eraser, X } from 'lucide-react';
 import assistantService from '../../services/assistantService';
 import { formatCurrency } from '../../utils/formatters';
@@ -6,7 +6,22 @@ import { usePermisos } from '../../hooks/usePermiso';
 import { PERMISO_POR_SECCION as P } from '../../config/navegacion';
 import './assistant.css';
 
+// recharts se carga solo cuando hay una evolución mensual para mostrar
+const AssistantSerieChart = lazy(() => import('./AssistantSerieChart'));
+
 // ─── Suggestions predefinidas ──────────────────────────────────────
+// Con IA: muestran lo que se puede preguntar con las consultas armadas. Cada
+// una lista TODOS los permisos que necesita (fuente + VerReportes si hay plata).
+const SUGERENCIAS_IA = [
+  { texto: '¿Cómo me fue este mes contra el anterior?', permisos: [P.reservas, P.reportes] },
+  { texto: '¿Qué agencia me cancela más este año?', permisos: [P.reservas] },
+  { texto: '¿Cómo evolucionó la facturación en los últimos 6 meses?', permisos: [P.reservas, P.reportes] },
+  { texto: '¿Qué viajes salen la semana que viene?', permisos: [P.reservas] },
+  { texto: '¿Qué pagos tengo para confirmar?', permisos: [P.reservas] },
+  { texto: '¿Qué porcentaje de cotizaciones se convierte en reserva?', permisos: [P.cotizaciones, P.reportes] },
+];
+
+// Modo básico: las 6 consultas fijas del clasificador
 const INITIAL_SUGGESTIONS = [
   { texto: '¿Cuáles son mis top 5 agencias?', permiso: P.agencias },
   { texto: '¿Cuántas cotizaciones tengo pendientes?', permiso: P.cotizaciones },
@@ -15,9 +30,87 @@ const INITIAL_SUGGESTIONS = [
   { texto: '¿Qué agencias están inactivas?', permiso: P.agencias },
 ];
 
+// Cuántas respuestas anteriores se mandan como contexto de seguimiento
+const MAX_HISTORIAL = 3;
+
+// ─── Estado de la IA ───────────────────────────────────────────────
+// Texto y color del indicador según lo que informa el servidor.
+const ESTADO_IA = {
+  activa:         { texto: 'IA activa', clase: 'activa' },
+  no_configurada: { texto: 'Modo básico', clase: 'inactiva' },
+  sin_cuota:      { texto: 'Sin cuota de IA · modo básico', clase: 'pausada' },
+  key_invalida:   { texto: 'IA no disponible · modo básico', clase: 'pausada' },
+  error:          { texto: 'IA no disponible · modo básico', clase: 'pausada' },
+};
+
+function IndicadorIA({ ia }) {
+  if (!ia) {
+    return <div className="assistant-header-subtitle">Consultá tus datos en lenguaje natural</div>;
+  }
+  const { texto, clase } = ESTADO_IA[ia.estado] || ESTADO_IA.error;
+  const detalle = ia.detalle || (ia.modelo ? `Gemini (${ia.modelo}) interpreta tus preguntas y redacta las respuestas.` : '');
+  return (
+    <div className="assistant-header-subtitle assistant-ia-estado" title={detalle}>
+      <span className={`assistant-ia-dot assistant-ia-dot--${clase}`} aria-hidden="true" />
+      <span>{texto}</span>
+      <span className="assistant-sr-only">{detalle}</span>
+    </div>
+  );
+}
+
+/** Cómo se resolvió una respuesta: con IA o en modo básico. */
+function OrigenRespuesta({ origen }) {
+  if (!origen) return null;
+  const conIA = origen.interpretacion === 'ia' || origen.redaccion === 'ia';
+  const detalle = conIA
+    ? [
+        origen.interpretacion === 'ia' ? 'pregunta interpretada con IA' : 'pregunta interpretada por el clasificador',
+        origen.redaccion === 'ia' ? 'respuesta redactada con IA' : 'resumen del sistema',
+      ].join(' · ')
+    : 'Clasificador y resumen del sistema';
+  return (
+    <p className={`message-origen${conIA ? ' message-origen--ia' : ''}`} title={detalle}>
+      {conIA ? <><Sparkles size={11} aria-hidden="true" /> Respondido con IA</> : 'Modo básico'}
+    </p>
+  );
+}
+
+// ─── Formato de valores ────────────────────────────────────────────
+
+/** Formatea un valor según el tipo de columna que manda el servidor. */
+function formatearValor(valor, tipo) {
+  if (valor === null || valor === undefined || valor === '') return '-';
+  if (typeof valor !== 'number') return valor;
+  switch (tipo) {
+    case 'moneda': return formatCurrency(valor);
+    case 'porcentaje': return `${valor.toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
+    case 'numero': return valor.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    default: return valor;
+  }
+}
+
+/** Variación porcentual con flecha y color (▲ sube, ▼ baja). */
+function Variacion({ valor }) {
+  if (valor === null || valor === undefined) return <span className="assistant-variacion">—</span>;
+  if (valor === 0) return <span className="assistant-variacion">=</span>;
+  const sube = valor > 0;
+  return (
+    <span className={`assistant-variacion assistant-variacion--${sube ? 'sube' : 'baja'}`}>
+      {sube ? '▲' : '▼'} {Math.abs(valor).toLocaleString('en-US', { maximumFractionDigits: 1 })}%
+    </span>
+  );
+}
+
 // ─── Sub-componentes de visualización ─────────────────────────────
 
-function ResultTable({ data, columns, columnLabels }) {
+function Celda({ valor, tipo, col }) {
+  if (tipo === 'variacion') return <Variacion valor={valor} />;
+  // Respuestas sin tipos (versiones anteriores): la facturación es moneda
+  if (!tipo && col === 'facturacion' && typeof valor === 'number') return formatCurrency(valor);
+  return formatearValor(valor, tipo);
+}
+
+function ResultTable({ data, columns, columnLabels, columnTypes }) {
   if (!data || data.length === 0) return null;
   return (
     <div style={{ overflowX: 'auto' }}>
@@ -33,10 +126,8 @@ function ResultTable({ data, columns, columnLabels }) {
           {data.map((row, i) => (
             <tr key={i}>
               {columns.map((col) => (
-                <td key={col}>
-                  {typeof row[col] === 'number' && col === 'facturacion'
-                    ? formatCurrency(row[col])
-                    : row[col] ?? '-'}
+                <td key={col} className={columnTypes?.[col] && columnTypes[col] !== 'texto' ? 'is-numeric' : undefined}>
+                  <Celda valor={row[col]} tipo={columnTypes?.[col]} col={col} />
                 </td>
               ))}
             </tr>
@@ -53,6 +144,7 @@ function ResultStat({ stat }) {
     <div className="assistant-stat-card">
       <div className="assistant-stat-value">{stat.value}</div>
       <div className="assistant-stat-label">{stat.label}</div>
+      {stat.variacion !== undefined && <Variacion valor={stat.variacion} />}
       {stat.sub && <div className="assistant-stat-sub">{stat.sub}</div>}
     </div>
   );
@@ -69,6 +161,20 @@ function ResultList({ data, columns }) {
         </div>
       ))}
     </div>
+  );
+}
+
+/** Evolución mensual: mini gráfico + tabla. */
+function ResultSerie({ data, columns, columnLabels, columnTypes }) {
+  if (!data || data.length === 0) return null;
+  const tipo = columnTypes?.valor;
+  return (
+    <>
+      <Suspense fallback={<div className="assistant-serie-chart" />}>
+        <AssistantSerieChart data={data} formatear={(v) => formatearValor(v, tipo)} />
+      </Suspense>
+      <ResultTable data={data} columns={columns} columnLabels={columnLabels} columnTypes={columnTypes} />
+    </>
   );
 }
 
@@ -129,7 +235,10 @@ function MessageBubble({ msg, onSuggestionClick, onRetry }) {
           <ResultStat stat={msg.stat} />
         )}
         {!isError && !isUnknown && msg.visualization === 'table' && msg.data?.length > 0 && (
-          <ResultTable data={msg.data} columns={msg.columns} columnLabels={msg.columnLabels} />
+          <ResultTable data={msg.data} columns={msg.columns} columnLabels={msg.columnLabels} columnTypes={msg.columnTypes} />
+        )}
+        {!isError && !isUnknown && msg.visualization === 'serie' && msg.data?.length > 0 && (
+          <ResultSerie data={msg.data} columns={msg.columns} columnLabels={msg.columnLabels} columnTypes={msg.columnTypes} />
         )}
         {!isError && !isUnknown && msg.visualization === 'list' && msg.data?.length > 0 && (
           <ResultList data={msg.data} columns={msg.columns} />
@@ -141,22 +250,23 @@ function MessageBubble({ msg, onSuggestionClick, onRetry }) {
         )}
       </div>
 
-      {/* Summary debajo de la burbuja */}
-      {msg.summary && !isUnknown && (
-        <p className="message-summary">{msg.summary}</p>
-      )}
+      {/* Cómo se resolvió la respuesta */}
+      {!isError && !isUnknown && <OrigenRespuesta origen={msg.origen} />}
     </div>
   );
 }
 
 // ─── Componente principal ──────────────────────────────────────────
 
-export function AssistantChat({ floating = false, onCollapse }) {
+export function AssistantChat({ floating = false, abierto = true, onCollapse }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [ia, setIa] = useState(null);
   const permisos = usePermisos();
-  const sugerencias = INITIAL_SUGGESTIONS.filter((s) => permisos.includes(s.permiso));
+  const sugerencias = ia?.estado === 'activa'
+    ? SUGERENCIAS_IA.filter((s) => s.permisos.every((p) => permisos.includes(p))).slice(0, 5)
+    : INITIAL_SUGGESTIONS.filter((s) => permisos.includes(s.permiso));
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const lastMsg = messages[messages.length - 1];
@@ -170,6 +280,17 @@ export function AssistantChat({ floating = false, onCollapse }) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading]);
+
+  // Estado de la IA: se consulta cada vez que se abre el panel (la cuota o la
+  // disponibilidad pueden haber cambiado) y se actualiza con cada respuesta.
+  useEffect(() => {
+    if (!abierto) return;
+    let cancelado = false;
+    assistantService.estado()
+      .then((estado) => { if (!cancelado) setIa(estado); })
+      .catch(() => { /* sin indicador: el chat funciona igual */ });
+    return () => { cancelado = true; };
+  }, [abierto]);
 
   // El textarea crece con el contenido (hasta el max-height del CSS); así una
   // pregunta de dos líneas no dispara una scrollbar interna.
@@ -190,8 +311,18 @@ export function AssistantChat({ floating = false, onCollapse }) {
     setInput('');
     setIsLoading(true);
 
+    // Contexto para preguntas de seguimiento: las últimas respuestas con datos.
+    // El servidor lo valida y solo lo usa como contexto de la IA.
+    const historial = messages
+      .filter((m) => m.role === 'assistant' && !m.isError && (m.consulta || m.params) && m.intent !== 'unknown')
+      .slice(-MAX_HISTORIAL)
+      .map((m) => (m.consulta
+        ? { pregunta: m.pregunta, consulta: m.consulta }
+        : { pregunta: m.pregunta, intent: m.intent, params: m.params }));
+
     try {
-      const res = await assistantService.query(trimmed);
+      const res = await assistantService.query(trimmed, historial);
+      if (res.ia) setIa(res.ia);
 
       if (!res.success) {
         throw new Error(res.message || 'Error desconocido');
@@ -211,11 +342,16 @@ export function AssistantChat({ floating = false, onCollapse }) {
         content,
         id: Date.now() + 1,
         intent: res.intent,
+        pregunta: trimmed,
+        params: res.params,
+        consulta: res.consulta,
+        origen: res.origen,
         visualization: res.visualization,
         data: res.data,
         stat: res.stat,
         columns: res.columns || [],
         columnLabels: res.columnLabels || {},
+        columnTypes: res.columnTypes || {},
         suggestions: res.suggestions,
       };
 
@@ -241,7 +377,7 @@ export function AssistantChat({ floating = false, onCollapse }) {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isLoading]);
+  }, [isLoading, messages]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -263,7 +399,7 @@ export function AssistantChat({ floating = false, onCollapse }) {
         </div>
         <div className="assistant-header-text">
           <div className="assistant-header-title">Asistente Inteligente</div>
-          <div className="assistant-header-subtitle">Consultá tus datos en lenguaje natural</div>
+          <IndicadorIA ia={ia} />
         </div>
         {messages.length > 0 && (
           <button
@@ -298,6 +434,9 @@ export function AssistantChat({ floating = false, onCollapse }) {
             </div>
             <h4>¿Qué querés consultar hoy?</h4>
             <p>Escribí una pregunta sobre tus agencias, reservas, cotizaciones o ingresos.</p>
+            {ia?.estado === 'activa' && (
+              <p>Con la IA activa podés preguntar con tus palabras (cancelaciones, pagos, viajes próximos, comparaciones) y repreguntar sobre la respuesta anterior, por ejemplo: «¿y el mes pasado?».</p>
+            )}
           </div>
         ) : (
           messages.map((msg) => (

@@ -8,7 +8,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Alert } from '../../components/ui/Alert';
 import { Modal } from '../../components/ui/Modal';
 import { AuditEventDetail } from '../../components/ui/AuditEventDetail';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import { ACCION_LABELS, ACCIONES_POR_ROL } from '../../utils/auditoriaConstants';
 import { useAuditoria } from '../../hooks/useAuditoria';
 import { useAuth } from '../../hooks/useAuth';

@@ -7,8 +7,7 @@ const { enviarInvitacion, enviarResetClave } = require('../utils/mailer');
 const { registrarAuditoria } = require('../utils/auditService');
 const { PERMISOS_NO_ASIGNABLES } = require('../utils/permisosCatalogo');
 
-const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
-const RESET_ADMIN_TTL_MS = 48 * 60 * 60 * 1000;
+const { vencimientoInvitacion } = require('../utils/invitacion');
 
 const error = (message, statusCode) => {
   const err = new Error(message);
@@ -337,7 +336,7 @@ exports.createUsuario = async (req, res, next) => {
       rol_id: rolAsignado?._id ?? null,
       activo: false,
       invite_token: inviteToken,
-      invite_token_expires: new Date(Date.now() + INVITE_TTL_MS),
+      invite_token_expires: vencimientoInvitacion(),
     });
 
     await usuario.save();
@@ -583,7 +582,7 @@ exports.resetearClave = async (req, res, next) => {
 
     const resetToken = crypto.randomBytes(32).toString('hex');
     usuario.reset_token = resetToken;
-    usuario.reset_token_expires = new Date(Date.now() + RESET_ADMIN_TTL_MS);
+    usuario.reset_token_expires = vencimientoInvitacion();
     // Invalida cualquier código de verificación del autoservicio que haya
     // quedado pendiente, para no dejar dos vías de reseteo abiertas a la vez.
     usuario.reset_code_hash = undefined;

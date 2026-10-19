@@ -6,7 +6,7 @@ import { Button } from '../ui/Button';
 import { PasswordInput } from '../ui/PasswordInput';
 import { Alert } from '../ui/Alert';
 import { Spinner } from '../ui/Spinner';
-import { useToast } from '../ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import authService from '../../services/authService';
 
 const ROLE_LABEL = {

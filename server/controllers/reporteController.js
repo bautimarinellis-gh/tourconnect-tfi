@@ -10,6 +10,7 @@ const {
   agenciaCollection,
 } = require('../utils/reporteHelpers');
 const { drawTable } = require('../utils/pdfHelpers');
+const { hoyDateString } = require('../utils/dateHelpers');
 
 const ESTADOS_INGRESO = ['pago_informado', 'pagada', 'cerrada'];
 
@@ -348,6 +349,8 @@ exports.getMayoristaDashboard = async (req, res, next) => {
     const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
 
     const cotLookup = lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId });
+    // Las fechas de viaje se guardan como medianoche UTC del día elegido.
+    const inicioHoy = new Date(hoyDateString(now));
 
     const [
       reservasActivasAgg,
@@ -400,10 +403,19 @@ exports.getMayoristaDashboard = async (req, res, next) => {
         },
         { $unwind: { path: '$prod', preserveNullAndEmptyArrays: true } },
       ]),
+      // Pagos por confirmar, y cuántos de ellos son de viajes que ya
+      // empezaron: el sistema no los toca (es decisión del mayorista), pero
+      // tienen que destacarse para que no queden olvidados.
       Reserva.aggregate([
         ...cotLookup,
         { $match: { estado: 'pago_informado' } },
-        { $count: 'total' },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            viaje_iniciado: { $sum: { $cond: [{ $lt: ['$cot.fecha_inicio', inicioHoy] }, 1, 0] } },
+          },
+        },
       ]),
     ]);
 
@@ -414,6 +426,7 @@ exports.getMayoristaDashboard = async (req, res, next) => {
         : 0;
     const agenciasActivas = agenciasActivasAgg[0]?.total ?? 0;
     const pagosPorConfirmar = pagosPorConfirmarAgg[0]?.total ?? 0;
+    const pagosViajeIniciado = pagosPorConfirmarAgg[0]?.viaje_iniciado ?? 0;
     const producto_top_mes =
       productoTopData.length > 0 && productoTopData[0].prod ? productoTopData[0].prod.nombre : null;
 
@@ -428,6 +441,7 @@ exports.getMayoristaDashboard = async (req, res, next) => {
           : null,
         cotizaciones_pendientes: cotizacionesPendientes,
         pagos_por_confirmar: pagosPorConfirmar,
+        pagos_viaje_iniciado: pagosViajeIniciado,
       },
     });
   } catch (err) {

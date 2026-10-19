@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/Input';
 import { Spinner } from '../../components/ui/Spinner';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { useToast } from '../../components/ui/Toast';
+import { useToast } from '../../hooks/useToast';
 import { formatCurrency } from '../../utils/formatters';
 import reporteService from '../../services/reporteService';
 import './reportes.css';

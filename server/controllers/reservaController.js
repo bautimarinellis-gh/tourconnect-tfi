@@ -3,6 +3,10 @@ const Reserva = require('../models/Reserva');
 const Cotizacion = require('../models/Cotizacion');
 const HistorialEstadoReserva = require('../models/HistorialEstadoReserva');
 const Pago = require('../models/Pago');
+const Agencia = require('../models/Agencia');
+const IntentoPago = require('../models/IntentoPago');
+const mercadoPago = require('../utils/mercadoPago');
+const { resolverPagosAlCancelar } = require('../utils/devolucionPagos');
 const { registrarCambioEstado } = require('../utils/historialEstadoReserva');
 const { registrarAuditoria } = require('../utils/auditService');
 const {
@@ -15,6 +19,10 @@ const {
 } = require('../utils/reservaHelpers');
 const { hoyDateString, toDateString } = require('../utils/dateHelpers');
 const { estaVigente } = require('../utils/vigenciaCotizacion');
+const { leerPaginacion, describirPagina } = require('../utils/paginacion');
+
+/** El texto del usuario se busca literal: sin esto, "(" o ".*" serían regex. */
+const escaparRegex = (texto) => texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // =============================================
 // RESERVAS
@@ -22,28 +30,53 @@ const { estaVigente } = require('../utils/vigenciaCotizacion');
 
 exports.getReservas = async (req, res, next) => {
   try {
-    const { estado, agencia_id: filtroAgencia, desde, hasta } = req.query;
+    const { rol, mayorista_id, agencia_id } = req.usuario;
+    const { estado, agencia_id: filtroAgencia, buscar_agencia: buscarAgencia, desde, hasta } = req.query;
 
-    const cotizacionIds = await buildCotizacionIdsFilter(req.usuario, {
-      agencia_id: filtroAgencia,
-      desde,
-      hasta,
-    });
-
-    if (cotizacionIds.length === 0) {
-      return res.status(200).json({ success: true, data: [] });
+    // Filtro por tenant sobre la propia reserva (campos indexados), en vez de
+    // juntar primero los ids de todas las cotizaciones del tenant.
+    const query = {};
+    if (rol === 'mayorista') {
+      query.mayorista_id = mayorista_id;
+      if (filtroAgencia) {
+        if (!mongoose.Types.ObjectId.isValid(filtroAgencia)) {
+          return res.status(400).json({
+            success: false,
+            message: 'El parámetro agencia_id no es un identificador válido',
+          });
+        }
+        query.agencia_id = filtroAgencia;
+      }
+      // Búsqueda por nombre de agencia: se resuelve acá y no en el navegador,
+      // porque con paginación el cliente solo tiene la página actual.
+      if (!filtroAgencia && typeof buscarAgencia === 'string' && buscarAgencia.trim()) {
+        const patron = new RegExp(escaparRegex(buscarAgencia.trim().slice(0, 100)), 'i');
+        const ids = await Agencia.find({ mayorista_id, nombre: patron }).distinct('_id');
+        query.agencia_id = { $in: ids };
+      }
+    } else {
+      query.agencia_id = agencia_id;
     }
-
-    const query = { cotizacion_id: { $in: cotizacionIds } };
     if (estado) query.estado = estado;
 
-    const reservas = await Reserva.find(query)
-      .populate(COTIZACION_POPULATE)
-      .sort({ created_at: -1 });
+    // El rango de fechas es sobre la fecha del viaje, que vive en la cotización.
+    if (desde || hasta) {
+      query.cotizacion_id = { $in: await buildCotizacionIdsFilter(req.usuario, { desde, hasta }) };
+    }
+
+    const paginacion = leerPaginacion(req.query);
+    let consulta = Reserva.find(query).populate(COTIZACION_POPULATE).sort({ created_at: -1 });
+    if (paginacion) consulta = consulta.skip(paginacion.skip).limit(paginacion.limit);
+
+    const [reservas, total] = await Promise.all([
+      consulta,
+      paginacion ? Reserva.countDocuments(query) : null,
+    ]);
 
     res.status(200).json({
       success: true,
       data: reservas.map((r) => enriquecerReserva(r)),
+      ...(paginacion && { pagination: describirPagina(paginacion, total) }),
     });
   } catch (error) {
     next(error);
@@ -135,7 +168,12 @@ exports.createReserva = async (req, res, next) => {
     }
 
     const [reserva] = await Reserva.create(
-      [{ cotizacion_id: cotizacion._id, estado: 'pendiente_pago' }],
+      [{
+        cotizacion_id: cotizacion._id,
+        mayorista_id: cotizacion.mayorista_id,
+        agencia_id: cotizacion.agencia_id,
+        estado: 'pendiente_pago',
+      }],
       { session }
     );
 
@@ -186,11 +224,14 @@ exports.getReservaById = async (req, res, next) => {
       return res.status(acceso.status).json({ success: false, message: acceso.message });
     }
 
-    const [historial, pagos] = await Promise.all([
+    const [historial, pagos, ultimoIntento] = await Promise.all([
       HistorialEstadoReserva.find({ reserva_id: id })
         .populate('usuario_id', 'email rol')
         .sort({ created_at: 1 }),
       Pago.find({ reserva_id: id }).sort({ created_at: 1 }),
+      IntentoPago.findOne({ reserva_id: id })
+        .sort({ created_at: -1 })
+        .select('estado status_detail monto_ars tipo_cambio created_at'),
     ]);
 
     const ultimoRechazo = extraerUltimoRechazo(historial);
@@ -206,6 +247,11 @@ exports.getReservaById = async (req, res, next) => {
         pago_informado_datos: pagoPendiente,
         rechazo_datos: ultimoRechazo,
         ultimo_rechazo: ultimoRechazo,
+        pasarela: {
+          disponible: mercadoPago.estaConfigurado(),
+          tipo_cambio: mercadoPago.tipoDeCambio(),
+          ultimo_intento: ultimoIntento,
+        },
       }),
     });
   } catch (error) {
@@ -332,17 +378,60 @@ exports.cancelarReserva = async (req, res, next) => {
       });
     }
 
+    // La agencia solo cancela lo que todavía no pagó: con plata de por medio,
+    // la devolución la decide y la gestiona el mayorista.
+    if (req.usuario.rol === 'agencia' && reserva.estado !== 'pendiente_pago') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Solo podés cancelar una reserva que todavía no pagaste. Si ya pagaste, pedile la cancelación al mayorista: él gestiona la devolución.',
+      });
+    }
+
+    let devoluciones = { cambios: [], resumen: [], devueltos: [] };
+    if (['pagada', 'pago_informado'].includes(reserva.estado)) {
+      const pagos = await Pago.find({ reserva_id: reserva._id }).sort({ created_at: 1 }).session(session);
+      try {
+        devoluciones = await resolverPagosAlCancelar({
+          reserva,
+          pagos,
+          devolucionManual: req.body.devolucion,
+          usuarioId: usuario_id,
+        });
+      } catch (error) {
+        if (!(error instanceof mercadoPago.MercadoPagoError)) throw error;
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(502).json({
+          success: false,
+          message: `No se pudo devolver el pago en Mercado Pago (${error.detalle || error.message}). La reserva no se canceló.`,
+        });
+      }
+      if (devoluciones.error) {
+        await session.abortTransaction();
+        session.endSession();
+        const { status, message, code } = devoluciones.error;
+        return res.status(status).json({ success: false, message, code });
+      }
+    }
+
     const estadoAnterior = reserva.estado;
     reserva.estado = 'cancelada';
     reserva.motivo_cancelacion = motivoCancelacionTrim;
     await reserva.save({ session });
+
+    for (const { pago, set } of devoluciones.cambios) {
+      pago.set(set);
+      await pago.save({ session });
+    }
 
     await registrarCambioEstado(
       reserva._id,
       usuario_id,
       estadoAnterior,
       'cancelada',
-      motivoCancelacionTrim,
+      [motivoCancelacionTrim, ...devoluciones.resumen].join('. '),
       session
     );
 
@@ -358,6 +447,16 @@ exports.cancelarReserva = async (req, res, next) => {
       entidad_id: reserva._id,
       detalle: { motivo_cancelacion: motivoCancelacionTrim },
     });
+
+    for (const devuelto of devoluciones.devueltos) {
+      registrarAuditoria({
+        req,
+        accion: 'PAGO_DEVUELTO',
+        entidad_afectada: 'Reserva',
+        entidad_id: reserva._id,
+        detalle: devuelto,
+      });
+    }
 
     res.status(200).json({ success: true, data: enriquecerReserva(actualizada) });
   } catch (error) {
@@ -536,6 +635,15 @@ exports.confirmarPago = async (req, res, next) => {
       });
     }
 
+    if (pagoPendiente.origen === 'pasarela') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Este pago lo acredita Mercado Pago automáticamente; no se confirma a mano',
+      });
+    }
+
     const estadoAnterior = reserva.estado;
     reserva.estado = 'pagada';
     await reserva.save({ session });
@@ -616,6 +724,14 @@ exports.rechazarPago = async (req, res, next) => {
     const pagoVigente = await Pago.findOne({ reserva_id: reserva._id, rechazado: false })
       .sort({ created_at: -1 })
       .session(session);
+    if (pagoVigente?.origen === 'pasarela') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Este pago lo resuelve Mercado Pago; no se puede rechazar a mano',
+      });
+    }
     if (pagoVigente) {
       pagoVigente.rechazado = true;
       pagoVigente.motivo_rechazo = motivo.trim();
