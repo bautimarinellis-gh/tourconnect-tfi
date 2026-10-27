@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
+const ocultarMarkupAgencia = require('../middlewares/ocultarMarkupAgencia');
 const { checkPermiso, checkPermisoMayorista } = require('../middlewares/permisoMiddleware');
 
 const {
@@ -20,6 +21,7 @@ const router = express.Router();
 
 // Middleware: Todas las rutas requieren autenticación
 router.use(auth);
+router.use(ocultarMarkupAgencia);
 
 // ---------------------
 // Reservas

@@ -131,6 +131,16 @@ app.use((err, _req, res, _next) => {
     });
   }
 
+  // Conflicto de escritura entre dos transacciones simultáneas (p. ej. doble
+  // clic al confirmar una reserva): la que llegó primero ya se aplicó, la otra
+  // se abortó sin cambios. No es un error del servidor.
+  if (err.hasErrorLabel?.('TransientTransactionError') || err.code === 112) {
+    return res.status(409).json({
+      success: false,
+      message: 'La operación se cruzó con otra al mismo tiempo. Actualizá la pantalla y revisá el estado.',
+    });
+  }
+
   // Error genérico
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({

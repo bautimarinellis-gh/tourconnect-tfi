@@ -201,8 +201,10 @@ async function fetchProductosTopData(mayoristaId, fechaInicio, fechaFin) {
   const pipeline = [
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
     {
+      // Mismo criterio que "Ingresos del periodo": la columna se lee como
+      // ingresos, así que una reserva sin pagar no suma.
       $match: {
-        estado: { $ne: 'cancelada' },
+        estado: { $in: ESTADOS_INGRESO },
         created_at: { $gte: fechaInicio, $lte: fechaFin },
       },
     },
@@ -262,8 +264,9 @@ async function fetchRankingAgenciasData(mayoristaId, fechaInicio, fechaFin, item
   const pipeline = [
     ...lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId }),
     {
+      // Igual que en productos: el monto tiene que cerrar con los ingresos.
       $match: {
-        estado: { $ne: 'cancelada' },
+        estado: { $in: ESTADOS_INGRESO },
         created_at: { $gte: fechaInicio, $lte: fechaFin },
       },
     },
@@ -368,8 +371,9 @@ exports.getMayoristaDashboard = async (req, res, next) => {
       Reserva.aggregate([
         ...cotLookup,
         {
+          // "Ingresos del Mes" tiene que coincidir con Reportes.
           $match: {
-            estado: { $ne: 'cancelada' },
+            estado: { $in: ESTADOS_INGRESO },
             created_at: { $gte: startOfMonth, $lte: endOfMonth },
           },
         },
@@ -385,8 +389,9 @@ exports.getMayoristaDashboard = async (req, res, next) => {
       Reserva.aggregate([
         ...cotLookup,
         {
+          // Igual que "Productos más vendidos" en Reportes.
           $match: {
-            estado: { $ne: 'cancelada' },
+            estado: { $in: ESTADOS_INGRESO },
             created_at: { $gte: startOfMonth, $lte: endOfMonth },
           },
         },
@@ -470,14 +475,16 @@ exports.getAgenciaDashboard = async (req, res, next) => {
       await Promise.all([
         Reserva.aggregate([
           ...cotLookup,
-          { $match: { estado: { $in: ['pendiente_pago', 'pagada'] } } },
+          { $match: { estado: { $in: ['pendiente_pago', 'pago_informado', 'pagada'] } } },
           { $count: 'total' },
         ]),
         Reserva.aggregate([
           ...cotLookup,
           {
+            // Gasto = lo pagado o informado, con el mismo criterio que los
+            // ingresos del mayorista.
             $match: {
-              estado: { $ne: 'cancelada' },
+              estado: { $in: ESTADOS_INGRESO },
               created_at: { $gte: startOfMonth, $lte: endOfMonth },
             },
           },

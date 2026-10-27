@@ -72,13 +72,13 @@ exports.getProductos = async (req, res, next) => {
           // Calcular precio final
           const precio_final = calcularPrecioFinal(productoObj.precio_base, rel.markup_porcentaje);
           
-          // NUNCA DEVOLVER precio_base
+          // NUNCA DEVOLVER precio_base. Tampoco el markup: con el precio
+          // final y el porcentaje, la agencia despejaría el precio base.
           delete productoObj.precio_base;
-          
+
           return {
             ...productoObj,
             precio_final,
-            markup_aplicado: rel.markup_porcentaje
           };
         });
 
@@ -246,6 +246,7 @@ exports.getProductoById = async (req, res, next) => {
       const productoObj = producto.toObject();
       const precio_final = calcularPrecioFinal(productoObj.precio_base, relacion.markup_porcentaje);
       
+      // Ni precio_base ni markup (ver getProductos).
       delete productoObj.precio_base;
 
       return res.status(200).json({
@@ -253,7 +254,6 @@ exports.getProductoById = async (req, res, next) => {
         data: {
           ...productoObj,
           precio_final,
-          markup_aplicado: relacion.markup_porcentaje
         },
       });
     }

@@ -1,6 +1,7 @@
 const express = require('express');
 const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
+const ocultarMarkupAgencia = require('../middlewares/ocultarMarkupAgencia');
 const { checkPermiso, checkPermisoMayorista } = require('../middlewares/permisoMiddleware');
 
 const {
@@ -15,6 +16,7 @@ const router = express.Router();
 
 // Middleware para todas las rutas de este router
 router.use(auth);
+router.use(ocultarMarkupAgencia);
 
 router
   .route('/')

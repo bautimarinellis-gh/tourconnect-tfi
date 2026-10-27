@@ -387,6 +387,14 @@ exports.asignarRol = async (req, res, next) => {
       req.params.id,
       req.mayorista_id
     );
+    await usuario.populate('rol_id', 'protegido');
+
+    // Igual que al desactivar: sacarle el rol al Administrador dejaría al
+    // mayorista sin nadie con GestionarRoles, y ese rol no se puede volver a
+    // asignar desde la aplicación.
+    if (usuario.rol_id?.protegido) {
+      throw error('No se puede cambiar el rol del Administrador del mayorista', 403);
+    }
 
     // rol_id: null quita el rol. Los permisos individuales no se tocan: son
     // independientes del rol.

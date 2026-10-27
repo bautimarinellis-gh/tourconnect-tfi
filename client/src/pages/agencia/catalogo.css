@@ -113,6 +113,7 @@
 
 .catalog-item-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   color: var(--color-text-soft);
@@ -128,6 +129,7 @@
 .catalog-item-price {
   font-size: 0.875rem;
   font-weight: 750;
+  white-space: nowrap;
   color: var(--color-text);
 }
 
@@ -282,7 +284,9 @@
   font-size: 0.875rem;
 }
 
-@media (max-width: 1020px) {
+/* El corte va por el viewport, pero el contenido descuenta el menú lateral:
+   por debajo de ~1200px la lista queda muy angosta al lado del panel. */
+@media (max-width: 1200px) {
   .catalog-shell {
     grid-template-columns: 1fr;
   }
