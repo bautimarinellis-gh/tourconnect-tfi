@@ -70,6 +70,8 @@
   background-color: transparent;
   color: var(--color-text-soft);
 }
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--color-surface-subtle);
   color: var(--color-text);
 }
 

@@ -109,7 +109,9 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Verificar que la cuenta de usuario esté activa
+    // Verificar que la cuenta de usuario esté activa. Acá ya tiene contraseña,
+    // así que no es una invitación pendiente (esas no pasan del chequeo de
+    // password_hash): la cuenta se desactivó a propósito.
     if (!usuario.activo) {
       await registrarAuditoria({
         req,
@@ -121,7 +123,7 @@ const login = async (req, res, next) => {
       });
       return res.status(403).json({
         success: false,
-        message: 'Tu cuenta no está activa. Revisá tu email de invitación.',
+        message: 'Tu cuenta fue desactivada. Contactá a un administrador.',
       });
     }
 
@@ -314,7 +316,7 @@ const forgotPassword = async (req, res, next) => {
       return res.json({
         success: true,
         data: {
-          message: 'Si el email existe, recibirás un enlace para restablecer tu contraseña.',
+          message: 'Si el email existe, recibirás un código para restablecer tu contraseña.',
         },
       });
     }

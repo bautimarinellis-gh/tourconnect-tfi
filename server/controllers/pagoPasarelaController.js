@@ -162,6 +162,11 @@ exports.webhook = async (req, res) => {
     const resultado = await aplicarPagoMercadoPago(pagoMP);
     res.status(200).json({ success: true, resultado: resultado.resultado });
   } catch (error) {
+    // Un pago que MP no conoce no se va a resolver reintentando: con un 500,
+    // MP repetiría la notificación durante días.
+    if (error.statusCode === 404) {
+      return res.status(200).json({ success: true, ignorado: true });
+    }
     console.error('[MercadoPago] Error procesando webhook:', error.message, error.detalle ?? '');
     res.status(500).json({ success: false });
   }

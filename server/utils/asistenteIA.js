@@ -114,7 +114,11 @@ function schemaConsulta(permitidas) {
       orden: { type: 'string', enum: ['desc', 'asc'] },
       limite: entero,
     },
-    required: ['tipo'],
+    // Sin `fuente`, `modo` y `metrica` validarConsulta() descarta la consulta.
+    // Con solo `tipo` obligatorio, el modelo lite solía omitir la métrica y
+    // toda pregunta caía al modo básico (ni la IA ni el contexto se usaban).
+    // En "ninguna" el modelo igual los completa y no se miran.
+    required: ['tipo', 'fuente', 'modo', 'metrica'],
   };
 }
 
