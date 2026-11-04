@@ -418,3 +418,32 @@
 [data-theme="dark"] .avatar {
   color: #12140F; /* Texto oscuro sobre el fondo claro del avatar */
 }
+
+/* ── Grillas de las páginas de detalle (reserva, agencia) ──
+   Antes eran estilos inline con columnas fijas: en mobile la columna del
+   estado de cuenta quedaba de ~100px. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.detail-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 900px) {
+  .detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .detail-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+}

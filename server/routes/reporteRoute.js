@@ -10,6 +10,7 @@ const {
 } = require('../controllers/reporteController');
 
 const auth = require('../middlewares/authMiddleware');
+const { limiteExportacion } = require('../middlewares/limitadores');
 const roleCheck = require('../middlewares/roleMiddleware');
 const { tenant } = require('../middlewares/tenantMiddleware');
 const { checkPermiso } = require('../middlewares/permisoMiddleware');
@@ -36,7 +37,7 @@ router.get('/agencias/ranking', roleCheck(['mayorista']), checkPermiso('VerRepor
 // El dashboard del mayorista no exige permiso: es la home de cualquier
 // usuario autenticado del tenant.
 router.get('/dashboard', roleCheck(['mayorista']), getMayoristaDashboard);
-router.get('/exportar', roleCheck(['mayorista']), checkPermiso('VerReportes'), exportarReportePDF);
+router.get('/exportar', roleCheck(['mayorista']), checkPermiso('VerReportes'), limiteExportacion, exportarReportePDF);
 
 // ==========================================
 // ENDPOINTS AGENCIA (rol: agencia)

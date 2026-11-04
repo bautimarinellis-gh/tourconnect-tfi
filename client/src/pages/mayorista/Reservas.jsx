@@ -11,14 +11,21 @@ import reservaService from '../../services/reservaService';
 const TAMANO_PAGINA = 20;
 
 export const MayoristaReservas = () => {
-  const [searchParams] = useSearchParams();
+  // El estado vive en la URL (?estado=…, ?agencia=…): los accesos del
+  // dashboard y de otras pantallas llegan ya filtrados.
+  const [searchParams, setSearchParams] = useSearchParams();
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtroEstado, setFiltroEstado] = useState(searchParams.get('estado') ?? '');
-  const [filtroAgencia, setFiltroAgencia] = useState('');
+  const filtroEstado = searchParams.get('estado') ?? '';
+  const setFiltroEstado = (estado) => setSearchParams((prev) => {
+    const next = new URLSearchParams(prev);
+    if (estado) next.set('estado', estado); else next.delete('estado');
+    return next;
+  }, { replace: true });
+  const [filtroAgencia, setFiltroAgencia] = useState(searchParams.get('agencia') ?? '');
   // La búsqueda por agencia la resuelve el servidor (con paginación el
   // navegador solo tiene la página actual); se espera a que se deje de tipear.
-  const [busquedaAgencia, setBusquedaAgencia] = useState('');
+  const [busquedaAgencia, setBusquedaAgencia] = useState(filtroAgencia.trim());
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
 

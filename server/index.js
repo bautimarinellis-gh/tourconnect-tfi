@@ -2,13 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
-const dotenv = require('dotenv');
 const helmet = require('helmet');
+const compression = require('compression');
+const mongoose = require('mongoose');
+const { cargarEnv } = require('./config/env');
+
+// Cargar y validar variables de entorno (antes de cualquier otro módulo que las lea)
+cargarEnv();
+
 const connectDB = require('./config/db');
 const { sanitizeInput } = require('./middlewares/sanitizeInput');
-
-// Cargar variables de entorno
-dotenv.config({ path: '../.env' });
 
 // Crear app de Express
 const app = express();
@@ -22,6 +25,8 @@ app.set('trust proxy', 1);
 // Middlewares globales
 // ---------------------
 app.use(helmet());
+// gzip de las respuestas: los listados JSON se achican varias veces.
+app.use(compression());
 
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -46,9 +51,13 @@ if (process.env.NODE_ENV !== 'production') {
 // Rutas
 // ---------------------
 // Ruta de health-check
+// Incluye el estado de la base: sin Mongo la API no sirve, así que responde 503.
 app.get('/api/v1/health', (_req, res) => {
-  res.json({
-    status: 'ok',
+  const baseConectada = mongoose.connection.readyState === 1;
+  res.status(baseConectada ? 200 : 503).json({
+    status: baseConectada ? 'ok' : 'degradado',
+    base_de_datos: baseConectada ? 'conectada' : 'desconectada',
+    tareas_periodicas: estadoTareas,
     timestamp: new Date().toISOString(),
     entorno: process.env.NODE_ENV || 'development',
   });
@@ -188,22 +197,72 @@ const startServer = async () => {
     console.error('❌ Falló completar el tenant de las reservas:', error.message);
   }
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 TourConnect corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 
     // Tareas periódicas: al iniciar y cada 1 hora. Vencen las cotizaciones
     // fuera de plazo, cancelan las reservas cuyo viaje pasó sin pago y cierran
-    // las pagadas cuyo viaje ya terminó.
-    const tareasPeriodicas = async () => {
-      await checkCotizacionesVencidas();
-      await cancelarReservasVencidas();
-      await cerrarReservasFinalizadas();
-    };
-    tareasPeriodicas();
-    setInterval(tareasPeriodicas, 60 * 60 * 1000);
+    // las pagadas cuyo viaje ya terminó. Con TAREAS_PERIODICAS=false no
+    // corren en esta instancia (para levantar varias y que lo haga una sola).
+    if (process.env.TAREAS_PERIODICAS === 'false') {
+      console.log('⏸️ Tareas periódicas deshabilitadas en esta instancia (TAREAS_PERIODICAS=false).');
+      return;
+    }
+    ejecutarTareasPeriodicas();
+    intervaloTareas = setInterval(ejecutarTareasPeriodicas, 60 * 60 * 1000);
   });
+
+  // Apagado ordenado: deja de aceptar requests, frena las tareas y cierra
+  // la conexión a la base antes de salir.
+  const apagar = (senal) => {
+    console.log(`\n${senal} recibido: cerrando TourConnect...`);
+    clearInterval(intervaloTareas);
+    server.close(async () => {
+      await mongoose.disconnect().catch(() => {});
+      process.exit(0);
+    });
+    // Si alguna conexión no se cierra a tiempo, se sale igual.
+    setTimeout(() => process.exit(1), 10000).unref();
+  };
+  process.on('SIGTERM', () => apagar('SIGTERM'));
+  process.on('SIGINT', () => apagar('SIGINT'));
 };
 
-startServer();
+// Estado de las tareas periódicas, expuesto en /health.
+const estadoTareas = { ultima_ejecucion: null, en_ejecucion: false, ultimo_error: null };
+let intervaloTareas = null;
+
+const ejecutarTareasPeriodicas = async () => {
+  // Si una corrida tarda más que el intervalo, la siguiente no se superpone.
+  if (estadoTareas.en_ejecucion) return;
+  estadoTareas.en_ejecucion = true;
+  try {
+    await checkCotizacionesVencidas();
+    await cancelarReservasVencidas();
+    await cerrarReservasFinalizadas();
+    estadoTareas.ultimo_error = null;
+  } catch (error) {
+    estadoTareas.ultimo_error = error.message;
+    console.error('❌ Falló una tarea periódica:', error.message);
+  } finally {
+    estadoTareas.en_ejecucion = false;
+    estadoTareas.ultima_ejecucion = new Date().toISOString();
+  }
+};
+
+// Errores que se escaparon de un handler: se registran en lugar de dejar el
+// proceso en un estado desconocido sin rastro.
+process.on('unhandledRejection', (razon) => {
+  console.error('❌ Promesa rechazada sin manejar:', razon instanceof Error ? razon.stack : razon);
+});
+process.on('uncaughtException', (error) => {
+  console.error('❌ Excepción no capturada:', error.stack);
+  process.exit(1);
+});
+
+startServer().catch((error) => {
+  console.error('❌ No se pudo iniciar el servidor:', error.message);
+  process.exit(1);
+});
 
 module.exports = app;

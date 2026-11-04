@@ -2,7 +2,9 @@
   position: fixed;
   top: 1rem;
   right: 1rem;
-  z-index: 9999;
+  /* Encima de los modales (10050): el aviso de una acción hecha desde un
+     modal tiene que verse aunque el modal siga abierto. */
+  z-index: 10100;
   display: flex;
   flex-direction: column;
   gap: 0.625rem;

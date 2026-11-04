@@ -126,11 +126,15 @@ export const AdminMayoristas = () => {
         plan_suscripcion: formData.plan_suscripcion,
         email: formData.admin_email,
       };
-      await mayoristaService.create(payload);
+      const res = await mayoristaService.create(payload);
       setIsModalOpen(false);
       setFormData({ nombre: '', razon_social: '', cuit: '', plan_suscripcion: 'Starter', telefono: '', admin_email: '' });
       fetchMayoristas();
-      toast.success('Mayorista creado. Se le envió un email de invitación para configurar su contraseña.');
+      if (res?.email_enviado === false) {
+        toast.warning('Mayorista creado, pero la invitación no se pudo enviar por email (revisá la configuración de mails).');
+      } else {
+        toast.success('Mayorista creado. Se le envió un email de invitación para configurar su contraseña.');
+      }
     } catch (err) {
       showFormError(getErrorMessage(err, 'Error al crear mayorista'));
     } finally {

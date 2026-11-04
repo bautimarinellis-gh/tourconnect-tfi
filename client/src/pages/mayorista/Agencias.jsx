@@ -109,11 +109,15 @@ export const MayoristaAgencias = () => {
         cuit: createForm.cuit,
         email: createForm.admin_email,
       };
-      await agenciaService.create(payload);
+      const res = await agenciaService.create(payload);
       setIsCreateModalOpen(false);
       setCreateForm({ nombre: '', razon_social: '', cuit: '', telefono: '', admin_email: '' });
       fetchAgencias();
-      toast.success('Agencia creada. Se le envió un email de invitación para configurar su contraseña.');
+      if (res?.email_enviado === false) {
+        toast.warning('Agencia creada, pero la invitación no se pudo enviar por email (revisá la configuración de mails).');
+      } else {
+        toast.success('Agencia creada. Se le envió un email de invitación para configurar su contraseña.');
+      }
     } catch (err) {
       setCreateError(err.response?.data?.message || err.response?.data?.mensaje || 'Error al crear la agencia');
     } finally {
@@ -142,6 +146,7 @@ export const MayoristaAgencias = () => {
         ag._id === editAgenciaRef.current._id ? { ...ag, ...updated.data } : ag
       ));
       setIsEditModalOpen(false);
+      toast.success('Agencia actualizada.');
     } catch (err) {
       setEditError(err.response?.data?.message || 'Error al actualizar la agencia.');
     } finally {
@@ -217,6 +222,7 @@ export const MayoristaAgencias = () => {
         ag._id === reactivarAgencia._id ? { ...ag, activo: true } : ag
       ));
       setIsReactivarModalOpen(false);
+      toast.success('Agencia reactivada.');
     } catch (err) {
       setReactivarError(err.response?.data?.message || 'Error al reactivar la agencia.');
     } finally {
@@ -536,7 +542,11 @@ export const MayoristaAgencias = () => {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setIsBlockedModalOpen(false); navigate('/mayorista/reservas'); }}
+                onClick={() => {
+                  setIsBlockedModalOpen(false);
+                  // Llega filtrado por la agencia bloqueada.
+                  navigate(`/mayorista/reservas?agencia=${encodeURIComponent(blockedAgencia?.nombre ?? '')}`);
+                }}
               >
                 <CalendarCheck size={15} /> Ver Reservas
               </Button>

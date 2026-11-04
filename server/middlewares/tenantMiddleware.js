@@ -80,8 +80,10 @@ const checkOwnership = (Model, tenantField = 'mayorista_id') => {
         return res.status(404).json({ success: false, message: 'Recurso no encontrado' });
       }
 
-      // Validar pertenencia
-      if (resource[tenantField] && resource[tenantField].toString() !== req.mayorista_id.toString()) {
+      // Validar pertenencia. Falla cerrado: un recurso sin el campo de tenant
+      // (o una request sin mayorista) no se considera propio.
+      if (!resource[tenantField] || !req.mayorista_id
+        || resource[tenantField].toString() !== req.mayorista_id.toString()) {
         return res.status(403).json({ success: false, message: 'No tienes permisos sobre este recurso' });
       }
 

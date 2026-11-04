@@ -135,8 +135,9 @@ exports.createAgencia = async (req, res, next) => {
     // Enviar correo de invitación. Se envía después del commit: si la
     // transacción abortara más tarde, no queremos haber invitado a una
     // cuenta que nunca existió.
+    let emailEnviado = false;
     try {
-      await enviarInvitacion(email, inviteToken, 'Agencia');
+      emailEnviado = Boolean(await enviarInvitacion(email, inviteToken, 'Agencia'));
     } catch (mailError) {
       console.error('Error al enviar email de invitación, pero la agencia fue creada:', mailError.message);
     }
@@ -144,6 +145,7 @@ exports.createAgencia = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: nuevaAgencia,
+      email_enviado: emailEnviado,
     });
   } catch (error) {
     await session.abortTransaction();

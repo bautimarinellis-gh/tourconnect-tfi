@@ -22,6 +22,9 @@ const { estaVigente } = require('../utils/vigenciaCotizacion');
 const { leerPaginacion, describirPagina } = require('../utils/paginacion');
 
 /** El texto del usuario se busca literal: sin esto, "(" o ".*" serían regex. */
+// Mismo tope que el resto de los motivos (cancelación, rechazo de cotización).
+const MAX_MOTIVO = 500;
+
 const escaparRegex = (texto) => texto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // =============================================
@@ -687,10 +690,15 @@ exports.rechazarPago = async (req, res, next) => {
     const { id: usuario_id } = req.usuario;
     const { motivo } = req.body;
 
-    if (!motivo || motivo.trim() === '') {
+    if (typeof motivo !== 'string' || motivo.trim() === '') {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ success: false, message: 'El motivo del rechazo es obligatorio' });
+    }
+    if (motivo.trim().length > MAX_MOTIVO) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ success: false, message: `El motivo no puede superar los ${MAX_MOTIVO} caracteres` });
     }
 
     const reserva = await Reserva.findById(id).populate(COTIZACION_POPULATE).session(session);

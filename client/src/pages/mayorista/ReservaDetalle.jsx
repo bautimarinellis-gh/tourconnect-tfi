@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Check, X, Lock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, X, Lock, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -8,6 +8,7 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useToast } from '../../hooks/useToast';
 import { ReservaTimeline } from '../../components/shared/ReservaTimeline';
 import { EstadoCuentaCard } from '../../components/shared/EstadoCuentaCard';
@@ -25,7 +26,9 @@ export const MayoristaReservaDetalle = () => {
   const toast = useToast();
   const [reserva, setReserva] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
 
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -37,17 +40,21 @@ export const MayoristaReservaDetalle = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [modalError, setModalError] = useState('');
 
-  const fetchReserva = useCallback(async () => {
-    setLoading(true);
+  // silencioso: después de una acción se recarga sin tapar la página con el
+  // spinner (la reserva anterior queda visible hasta que llega la nueva).
+  const fetchReserva = useCallback(async ({ silencioso = false } = {}) => {
+    if (!silencioso) setLoading(true);
     try {
       const data = await reservaService.getById(id);
       setReserva(data);
+      setLoadError('');
     } catch (err) {
-      console.error(err);
+      if (silencioso) toast.error('No se pudo actualizar la reserva. Recargá la página.');
+      else setLoadError(err.response?.data?.message || 'No se pudo cargar la reserva.');
     } finally {
-      setLoading(false);
+      if (!silencioso) setLoading(false);
     }
-  }, [id]);
+  }, [id, toast]);
 
   useEffect(() => {
     fetchReserva();
@@ -71,7 +78,8 @@ export const MayoristaReservaDetalle = () => {
       setIsCancelModalOpen(false);
       setCancelReason('');
       setDevolucion({ metodo: '', comprobante: '' });
-      fetchReserva();
+      toast.success('Reserva cancelada.');
+      fetchReserva({ silencioso: true });
     } catch (err) {
       setCancelError(err.response?.data?.message || 'Error al cancelar la reserva.');
     } finally {
@@ -83,7 +91,9 @@ export const MayoristaReservaDetalle = () => {
     setActionLoading(true);
     try {
       await reservaService.cerrar(id);
-      fetchReserva();
+      setIsCloseModalOpen(false);
+      toast.success('Reserva cerrada.');
+      fetchReserva({ silencioso: true });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al cerrar la reserva.');
     } finally {
@@ -96,7 +106,8 @@ export const MayoristaReservaDetalle = () => {
     try {
       await reservaService.confirmarPago(id);
       setIsConfirmModalOpen(false);
-      fetchReserva();
+      toast.success('Pago confirmado: la reserva quedó pagada.');
+      fetchReserva({ silencioso: true });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error al confirmar el pago.');
     } finally {
@@ -115,7 +126,8 @@ export const MayoristaReservaDetalle = () => {
       await reservaService.rechazarPago(id, rejectReason);
       setIsRejectModalOpen(false);
       setRejectReason('');
-      fetchReserva();
+      toast.success('Pago rechazado: la agencia puede volver a informarlo.');
+      fetchReserva({ silencioso: true });
     } catch (err) {
       setModalError(err.response?.data?.message || 'Error al rechazar pago');
     } finally {
@@ -123,7 +135,21 @@ export const MayoristaReservaDetalle = () => {
     }
   };
 
-  if (loading || !reserva) return <Spinner center size="lg" />;
+  if (loading) return <Spinner center size="lg" />;
+  if (loadError || !reserva) {
+    return (
+      <EmptyState
+        title="No se pudo mostrar la reserva"
+        description={loadError || 'La reserva no existe o no tenés acceso.'}
+        action={
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+            <Link to="/mayorista/reservas" className="btn btn-ghost btn-md">Volver a reservas</Link>
+            <Button variant="secondary" onClick={() => fetchReserva()}><RefreshCw size={16} /> Reintentar</Button>
+          </div>
+        }
+      />
+    );
+  }
 
   const precioFinal = toFloat(reserva.precio_final);
   const pid = reserva.pago_informado_datos;
@@ -163,14 +189,14 @@ export const MayoristaReservaDetalle = () => {
           </Badge>
 
           {reserva.estado === 'pagada' && (
-            <Button variant="secondary" onClick={handleCerrar} isLoading={actionLoading}>
-              <Lock size={16} /> Cerrar Reserva
+            <Button variant="secondary" onClick={() => setIsCloseModalOpen(true)}>
+              <Lock size={16} /> Cerrar reserva
             </Button>
           )}
 
           {!['cerrada', 'cancelada'].includes(reserva.estado) && (
             <Button variant="danger" onClick={() => setIsCancelModalOpen(true)}>
-              <X size={16} /> Cancelar
+              <X size={16} /> Cancelar reserva
             </Button>
           )}
         </div>
@@ -178,12 +204,12 @@ export const MayoristaReservaDetalle = () => {
 
       {/* Card de acción para pago_informado */}
       {reserva.estado === 'pago_informado' && pid && (
-        <Card style={{ marginBottom: '1.5rem', borderColor: '#F59E0B', borderWidth: '2px' }}>
+        <Card style={{ marginBottom: '1.5rem', borderColor: 'var(--color-warning)', borderWidth: '2px' }}>
           <CardBody>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', marginBottom: '1.25rem' }}>
-              <AlertTriangle size={22} style={{ color: '#D97706', flexShrink: 0 }} />
+              <AlertTriangle size={22} style={{ color: 'var(--color-warning)', flexShrink: 0 }} />
               <div>
-                <h3 style={{ margin: '0 0 0.25rem', color: '#92400E' }}>
+                <h3 style={{ margin: '0 0 0.25rem', color: 'var(--color-warning)' }}>
                   {esPasarela ? 'Pago pendiente en Mercado Pago' : 'Pago informado por la agencia'}
                 </h3>
                 <p style={{ margin: 0, color: 'var(--color-text-soft)', fontSize: '0.875rem' }}>
@@ -193,35 +219,35 @@ export const MayoristaReservaDetalle = () => {
                 </p>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', background: '#FFFBEB', padding: '1rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem', background: 'var(--color-warning-soft)', padding: '1rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
               <div>
-                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Agencia</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{reserva.agencia_id?.nombre || '—'}</p>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Agencia</p>
+                <p style={{ color: 'var(--color-text)',fontWeight: 600, margin: 0 }}>{reserva.agencia_id?.nombre || '—'}</p>
               </div>
               <div>
-                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Método de pago</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0, textTransform: 'capitalize' }}>{pid.metodo}</p>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Método de pago</p>
+                <p style={{ color: 'var(--color-text)',fontWeight: 600, margin: 0, textTransform: 'capitalize' }}>{pid.metodo}</p>
               </div>
               <div>
-                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Comprobante</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.comprobante || '—'}</p>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Comprobante</p>
+                <p style={{ color: 'var(--color-text)',fontWeight: 600, margin: 0 }}>{pid.comprobante || '—'}</p>
               </div>
               <div>
-                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Fecha del pago</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.fecha_pago ? formatFecha(pid.fecha_pago) : '—'}</p>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Fecha del pago</p>
+                <p style={{ color: 'var(--color-text)',fontWeight: 600, margin: 0 }}>{pid.fecha_pago ? formatFecha(pid.fecha_pago) : '—'}</p>
               </div>
               <div>
-                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Monto informado</p>
-                <p style={{ color: '#1F2937', fontWeight: 700, margin: 0, fontSize: '1.1rem' }}>{formatCurrency(toFloat(pid.monto))}</p>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Monto informado</p>
+                <p style={{ color: 'var(--color-text)',fontWeight: 700, margin: 0, fontSize: '1.1rem' }}>{formatCurrency(toFloat(pid.monto))}</p>
               </div>
               <div>
-                <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Informado el</p>
-                <p style={{ color: '#1F2937', fontWeight: 600, margin: 0 }}>{pid.created_at ? formatDateTime(pid.created_at) : '—'}</p>
+                <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Informado el</p>
+                <p style={{ color: 'var(--color-text)',fontWeight: 600, margin: 0 }}>{pid.created_at ? formatDateTime(pid.created_at) : '—'}</p>
               </div>
               {pid.notas && (
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <p style={{ color: '#92400E', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Notas</p>
-                  <p style={{ color: '#1F2937', fontWeight: 500, margin: 0, fontStyle: 'italic' }}>{pid.notas}</p>
+                  <p style={{ color: 'var(--color-text-soft)', fontSize: '0.75rem', margin: '0 0 0.25rem' }}>Notas</p>
+                  <p style={{ color: 'var(--color-text)',fontWeight: 500, margin: 0, fontStyle: 'italic' }}>{pid.notas}</p>
                 </div>
               )}
             </div>
@@ -237,13 +263,13 @@ export const MayoristaReservaDetalle = () => {
         </Card>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="detail-grid">
         {/* Columna Izquierda */}
         <div>
           <Card style={{ marginBottom: '1.5rem' }}>
             <CardHeader><h3>Información del Servicio</h3></CardHeader>
             <CardBody>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div className="detail-fields">
                 <div>
                   <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Producto</p>
                   <p style={{ fontWeight: 600, fontSize: '1.125rem' }}>{reserva.producto_id?.nombre || 'N/A'}</p>
@@ -295,7 +321,7 @@ export const MayoristaReservaDetalle = () => {
                           </p>
                         )}
                         {p.rechazado && p.motivo_rechazo && (
-                          <p style={{ fontSize: '0.75rem', color: 'var(--color-error, #DC2626)', margin: '0.25rem 0 0' }}>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--color-error)', margin: '0.25rem 0 0' }}>
                             Motivo: {p.motivo_rechazo}
                           </p>
                         )}
@@ -403,6 +429,25 @@ export const MayoristaReservaDetalle = () => {
         </div>
       </Modal>
 
+      {/* Modal Cerrar Reserva */}
+      <Modal
+        isOpen={isCloseModalOpen}
+        onClose={() => setIsCloseModalOpen(false)}
+        title="Cerrar reserva"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setIsCloseModalOpen(false)}>Atrás</Button>
+            <Button onClick={handleCerrar} isLoading={actionLoading}>
+              <Lock size={16} /> Cerrar reserva
+            </Button>
+          </>
+        }
+      >
+        <p style={{ margin: 0 }}>
+          La reserva pasa a <strong>cerrada</strong> y ya no admite cambios. Si no la cerrás, el sistema la cierra sola cuando termina el viaje.
+        </p>
+      </Modal>
+
       {/* Modal Confirmar Pago */}
       <Modal
         isOpen={isConfirmModalOpen}
@@ -421,9 +466,9 @@ export const MayoristaReservaDetalle = () => {
           <p style={{ margin: 0 }}>
             ¿Confirmás que recibiste el pago de <strong>{formatCurrency(toFloat(pid?.monto))}</strong>?
           </p>
-          <div style={{ padding: '0.75rem 1rem', background: '#FEF3C7', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', color: '#92400E' }}>
+          <Alert variant="warning">
             Verificá en tu cuenta bancaria antes de confirmar. Esta acción no se puede deshacer.
-          </div>
+          </Alert>
         </div>
       </Modal>
 
@@ -442,11 +487,7 @@ export const MayoristaReservaDetalle = () => {
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {modalError && (
-            <div style={{ padding: '0.75rem 1rem', background: '#FEE2E2', borderRadius: 'var(--radius-sm)', color: '#991B1B', fontSize: '0.875rem' }}>
-              {modalError}
-            </div>
-          )}
+          {modalError && <Alert variant="error">{modalError}</Alert>}
           <div>
             <p style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', color: 'var(--color-text-soft)' }}>Sugerencias rápidas:</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -459,8 +500,8 @@ export const MayoristaReservaDetalle = () => {
                     padding: '0.375rem 0.75rem',
                     borderRadius: '9999px',
                     border: '1px solid var(--color-border)',
-                    background: rejectReason === m ? '#FEE2E2' : 'var(--color-bg)',
-                    color: rejectReason === m ? '#991B1B' : 'var(--color-text)',
+                    background: rejectReason === m ? 'var(--color-error-soft)' : 'var(--color-bg)',
+                    color: rejectReason === m ? 'var(--color-error)' : 'var(--color-text)',
                     cursor: 'pointer',
                     fontSize: '0.8rem',
                     fontWeight: 500,

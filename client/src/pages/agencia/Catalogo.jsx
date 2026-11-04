@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Tag, Hotel, Map, Package as PackageIcon, ShoppingCart, Calendar, Minus, Plus, Search } from 'lucide-react';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -15,6 +16,9 @@ import productoService from '../../services/productoService';
 import cotizacionService from '../../services/cotizacionService';
 import { useToast } from '../../hooks/useToast';
 import './catalogo.css';
+
+// Igual que MAX_PASAJEROS en server/controllers/cotizacionController.js.
+const MAX_PASAJEROS = 30;
 
 const QUOTE_DURATION_PRESETS = [
   { label: '1 día', days: 1 },
@@ -43,6 +47,8 @@ export const AgenciaCatalogo = () => {
   const [busqueda, setBusqueda] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  // Después de cotizar se ofrece el siguiente paso (ver la cotización).
+  const [cotizacionCreada, setCotizacionCreada] = useState(false);
   const [formData, setFormData] = useState({
     fecha_inicio: '',
     fecha_fin: '',
@@ -120,6 +126,7 @@ export const AgenciaCatalogo = () => {
       });
       toast.success('Cotización generada exitosamente. El mayorista la revisará pronto.');
       setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
+      setCotizacionCreada(true);
     } catch (err) {
       toast.error(err.response?.data?.message || err.response?.data?.mensaje || 'Error al generar la cotización.');
     } finally {
@@ -133,6 +140,7 @@ export const AgenciaCatalogo = () => {
 
   const selectProduct = (producto) => {
     setSelectedProduct(producto);
+    setCotizacionCreada(false);
     setFormData({ fecha_inicio: '', fecha_fin: '', cantidad_pasajeros: 1 });
   };
 
@@ -151,6 +159,8 @@ export const AgenciaCatalogo = () => {
   const unSoloDia = esDeUnSoloDia(selectedProduct?.tipo);
   const plazasLibres = disponibilidad && !disponibilidad.ilimitado ? disponibilidad.disponibles : null;
   const sinCupoSuficiente = plazasLibres !== null && formData.cantidad_pasajeros > plazasLibres;
+  // Mismo tope que valida el servidor; con cupo definido, las plazas libres.
+  const maxPasajeros = plazasLibres !== null ? Math.max(1, Math.min(plazasLibres, MAX_PASAJEROS)) : MAX_PASAJEROS;
   const estimado = selectedProduct
     ? estimarPrecio({
       tipo: selectedProduct.tipo,
@@ -207,7 +217,15 @@ export const AgenciaCatalogo = () => {
       </div>
 
       {productos.length === 0 ? (
-        <EmptyState title="Catálogo vacío" description="Su mayorista aún no ha habilitado productos para su agencia." />
+        filtroTipo ? (
+          <EmptyState
+            title="No hay productos de este tipo"
+            description="Tu mayorista no tiene productos de este tipo habilitados para tu agencia."
+            action={<Button variant="secondary" onClick={() => setFiltroTipo('')}>Ver todos los productos</Button>}
+          />
+        ) : (
+          <EmptyState title="Catálogo vacío" description="Tu mayorista todavía no habilitó productos para tu agencia." />
+        )
       ) : (
         <div className="catalog-shell">
           <Card className="catalog-list-card">
@@ -264,6 +282,11 @@ export const AgenciaCatalogo = () => {
 
               {selectedProduct ? (
                 <>
+                  {cotizacionCreada && (
+                    <Alert variant="success" title="Cotización enviada">
+                      El mayorista la va a revisar. <Link to="/agencia/cotizaciones?estado=pendiente">Ver mis cotizaciones</Link>
+                    </Alert>
+                  )}
                   <p className="quote-description">{selectedProduct.descripcion}</p>
                   <div className="quote-info-row">
                     <span>{etiquetaPrecio(selectedProduct.tipo)}</span>
@@ -326,15 +349,18 @@ export const AgenciaCatalogo = () => {
                     <div className="quote-stepper">
                       <button
                         type="button"
+                        aria-label="Quitar un pasajero"
+                        disabled={formData.cantidad_pasajeros <= 1}
                         onClick={() => setFormData({ ...formData, cantidad_pasajeros: Math.max(1, formData.cantidad_pasajeros - 1) })}
                       >
                         <Minus size={14} />
                       </button>
-                      <strong>{formData.cantidad_pasajeros}</strong>
+                      <strong aria-live="polite">{formData.cantidad_pasajeros}</strong>
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, cantidad_pasajeros: formData.cantidad_pasajeros + 1 })}
-                        disabled={plazasLibres !== null && formData.cantidad_pasajeros >= plazasLibres}
+                        aria-label="Agregar un pasajero"
+                        onClick={() => setFormData({ ...formData, cantidad_pasajeros: Math.min(maxPasajeros, formData.cantidad_pasajeros + 1) })}
+                        disabled={formData.cantidad_pasajeros >= maxPasajeros}
                         title={plazasLibres !== null && formData.cantidad_pasajeros >= plazasLibres ? 'No quedan más plazas para esas fechas' : undefined}
                       >
                         <Plus size={14} />

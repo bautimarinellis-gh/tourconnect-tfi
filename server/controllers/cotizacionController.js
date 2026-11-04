@@ -115,6 +115,17 @@ exports.createCotizacion = async (req, res, next) => {
       });
     }
 
+    // Solo fechas de calendario (YYYY-MM-DD). Con hora o zona, lo que se
+    // valida (los primeros 10 caracteres) y lo que se guarda (el instante en
+    // UTC) podían caer en días distintos y desfasar cupo, noches y vencimientos.
+    const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+    if (!FORMATO_FECHA.test(String(fecha_inicio)) || !FORMATO_FECHA.test(String(fecha_fin))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Las fechas no tienen un formato válido.',
+      });
+    }
+
     const fechaInicio = new Date(fecha_inicio);
     const fechaFin    = new Date(fecha_fin);
 

@@ -8,6 +8,19 @@ export const ACCION_LABELS = {
   USUARIO_ACTIVADO:           'Cuenta activada (invitación aceptada)',
   USUARIO_DESACTIVADO:        'Usuario desactivado',
   ACCESO_DENEGADO:            'Acceso denegado por falta de permisos',
+  ROL_CREADO:                 'Rol creado',
+  ROL_MODIFICADO:             'Rol modificado',
+  ROL_ELIMINADO:              'Rol eliminado',
+  ROL_ASIGNADO:               'Rol asignado a un usuario',
+  PERMISOS_ASIGNADOS:         'Permisos individuales modificados',
+  USUARIO_MODIFICADO:         'Usuario modificado',
+  USUARIO_REACTIVADO:         'Usuario reactivado',
+  RESET_FORZADO:              'Reseteo de clave enviado',
+  PLAN_MODIFICADO:            'Plan de suscripción modificado',
+  COTIZACION_APROBADA:        'Cotización aprobada',
+  COTIZACION_RECHAZADA:       'Cotización rechazada',
+  COTIZACION_CANCELADA:       'Cotización cancelada',
+  MARKUP_MODIFICADO:          'Productos y markup de una agencia modificados',
   RESERVA_CREADA:             'Reserva creada',
   PAGO_INFORMADO:             'Pago informado',
   PAGO_CONFIRMADO:            'Pago confirmado',
@@ -28,7 +41,7 @@ export const ACCION_LABELS = {
 const SEGURIDAD_ADMIN = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
   'RESET_PASSWORD', 'CAMBIO_PASSWORD', 'USUARIO_ACTIVADO',
-  'USUARIO_CREADO', 'USUARIO_DESACTIVADO',
+  'USUARIO_CREADO', 'USUARIO_DESACTIVADO', 'USUARIO_REACTIVADO', 'PLAN_MODIFICADO',
 ];
 const NEGOCIO_ADMIN = [];
 
@@ -36,9 +49,12 @@ const NEGOCIO_ADMIN = [];
 const SEGURIDAD_MAYORISTA = [
   'LOGIN_EXITOSO', 'LOGIN_FALLIDO', 'LOGOUT',
   'RESET_PASSWORD', 'CAMBIO_PASSWORD', 'USUARIO_ACTIVADO',
-  'USUARIO_CREADO', 'USUARIO_DESACTIVADO', 'ACCESO_DENEGADO',
+  'USUARIO_CREADO', 'USUARIO_DESACTIVADO', 'USUARIO_REACTIVADO', 'USUARIO_MODIFICADO',
+  'ROL_CREADO', 'ROL_MODIFICADO', 'ROL_ELIMINADO', 'ROL_ASIGNADO', 'PERMISOS_ASIGNADOS',
+  'RESET_FORZADO', 'ACCESO_DENEGADO',
 ];
 const NEGOCIO_MAYORISTA = [
+  'COTIZACION_APROBADA', 'COTIZACION_RECHAZADA', 'MARKUP_MODIFICADO',
   'PAGO_CONFIRMADO', 'PAGO_RECHAZADO', 'PAGO_DEVUELTO',
   'RESERVA_CERRADA', 'RESERVA_CANCELADA',
 ];
@@ -49,7 +65,7 @@ const SEGURIDAD_AGENCIA = [
   'RESET_PASSWORD', 'CAMBIO_PASSWORD', 'USUARIO_ACTIVADO',
 ];
 const NEGOCIO_AGENCIA = [
-  'RESERVA_CREADA', 'PAGO_INFORMADO', 'RESERVA_CANCELADA',
+  'COTIZACION_CANCELADA', 'RESERVA_CREADA', 'PAGO_INFORMADO', 'RESERVA_CANCELADA',
 ];
 
 export const ACCIONES_POR_ROL = {

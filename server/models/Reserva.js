@@ -45,7 +45,7 @@ const reservaSchema = new mongoose.Schema(
 );
 
 // Índices para filtros frecuentes en listados y aggregations de reportes
-reservaSchema.index({ estado: 1 });
+// ({ estado } solo queda cubierto por el prefijo de este compuesto)
 reservaSchema.index({ estado: 1, created_at: -1 });
 // Filtro por tenant: listados, reportes y asistente del mayorista; vista de la agencia.
 reservaSchema.index({ mayorista_id: 1, created_at: -1 });

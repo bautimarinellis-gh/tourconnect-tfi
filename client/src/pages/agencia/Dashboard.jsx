@@ -30,7 +30,7 @@ export const AgenciaDashboard = () => {
   const kpis = [
     { label: 'Reservas Activas', value: data?.reservas_activas || 0, icon: <Calendar size={18} />, link: '/agencia/reservas' },
     { label: 'Gasto del Mes', value: formatCurrency(data?.gasto_mes || 0), icon: <DollarSign size={18} />, link: '/agencia/reservas' },
-    { label: 'Cotizaciones Pendientes', value: data?.cotizaciones_pendientes || 0, icon: <FileText size={18} />, link: '/agencia/cotizaciones' },
+    { label: 'Cotizaciones Pendientes', value: data?.cotizaciones_pendientes || 0, icon: <FileText size={18} />, link: '/agencia/cotizaciones?estado=pendiente' },
     { label: 'Aprobadas — Listas para Reservar', value: data?.cotizaciones_aprobadas || 0, icon: <CheckCircle size={18} />, link: '/agencia/cotizaciones?estado=aprobada' },
   ];
 

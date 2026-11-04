@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Check, X, Eye } from 'lucide-react';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Card } from '../../components/ui/Card';
@@ -11,6 +12,8 @@ import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { CotizacionDetailModal } from '../../components/shared/CotizacionDetailModal';
+import { VencimientoCotizacion } from '../../components/shared/VencimientoCotizacion';
+import { useToast } from '../../hooks/useToast';
 import { Paginador } from '../../components/ui/Paginador';
 import { formatCurrency, formatDate, formatRangoFechas, formatEstadoCotizacion } from '../../utils/formatters';
 import { toDateInputValue } from '../../utils/dateRanges';
@@ -20,9 +23,14 @@ import productoService from '../../services/productoService';
 const TAMANO_PAGINA = 20;
 
 export const MayoristaCotizaciones = () => {
+  // El filtro vive en la URL (?estado=pendiente): los accesos del dashboard
+  // llegan ya filtrados y el filtro sobrevive a un F5 o al botón "atrás".
+  const [searchParams, setSearchParams] = useSearchParams();
+  const toast = useToast();
   const [cotizaciones, setCotizaciones] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtroEstado, setFiltroEstado] = useState('');
+  const filtroEstado = searchParams.get('estado') ?? '';
+  const setFiltroEstado = (estado) => setSearchParams(estado ? { estado } : {}, { replace: true });
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
   
@@ -44,10 +52,6 @@ export const MayoristaCotizaciones = () => {
   // Plazas del producto para las fechas de la cotización a aprobar
   // ({ ilimitado, cupo_maximo, comprometidas, disponibles }), o null.
   const [approveCupo, setApproveCupo] = useState(null);
-
-  // Modal: Éxito al confirmar
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
 
   const fetchCotizaciones = useCallback(async () => {
     setLoading(true);
@@ -106,8 +110,7 @@ export const MayoristaCotizaciones = () => {
       await cotizacionService.updateStatus(approveTarget._id, 'aprobada');
       closeApproveModal();
       fetchCotizaciones();
-      setSuccessMessage('La cotización fue aprobada exitosamente. La agencia podrá generar la reserva.');
-      setIsSuccessModalOpen(true);
+      toast.success('Cotización aprobada: la agencia ya puede confirmar la reserva.');
     } catch (err) {
       setApproveError(err?.response?.data?.message || 'Ocurrió un error al aprobar la cotización.');
     } finally {
@@ -126,6 +129,7 @@ export const MayoristaCotizaciones = () => {
       await cotizacionService.updateStatus(id, status, reason);
       setIsRejectModalOpen(false);
       setRejectReason('');
+      toast.success('Cotización rechazada. La agencia verá el motivo.');
       fetchCotizaciones();
     } catch (err) {
       const msg = err?.response?.data?.message || 'Ocurrió un error al actualizar la cotización.';
@@ -201,18 +205,19 @@ export const MayoristaCotizaciones = () => {
                     ) : (
                       <Badge variant={c.estado}>{formatEstadoCotizacion(c.estado)}</Badge>
                     )}
+                    {c.estado === 'pendiente' && <VencimientoCotizacion cotizacion={c} />}
                   </TableCell>
                   <TableCell>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <Button variant="ghost" size="sm" onClick={() => { setDetailCotizacion(c); setIsDetailModalOpen(true); }}>
+                      <Button variant="ghost" size="sm" aria-label="Ver detalle" title="Ver detalle" onClick={() => { setDetailCotizacion(c); setIsDetailModalOpen(true); }}>
                         <Eye size={16} />
                       </Button>
                       {c.estado === 'pendiente' && (
                         <>
-                          <Button size="sm" variant="success" onClick={() => { setApproveTarget(c); setIsApproveModalOpen(true); }}>
+                          <Button size="sm" variant="success" aria-label="Aprobar" title="Aprobar" onClick={() => { setApproveTarget(c); setIsApproveModalOpen(true); }}>
                             <Check size={16} />
                           </Button>
-                          <Button size="sm" variant="danger" onClick={() => { selectedCotizacionRef.current = c; setIsRejectModalOpen(true); }}>
+                          <Button size="sm" variant="danger" aria-label="Rechazar" title="Rechazar" onClick={() => { selectedCotizacionRef.current = c; setIsRejectModalOpen(true); }}>
                             <X size={16} />
                           </Button>
                         </>
@@ -289,9 +294,9 @@ export const MayoristaCotizaciones = () => {
               Cancelar
             </Button>
             <Button
+              variant="danger"
               onClick={() => handleAction(selectedCotizacionRef.current._id, 'rechazada', rejectReason)}
               isLoading={actionLoading}
-              style={{ backgroundColor: 'var(--color-error, #DC2626)', borderColor: 'var(--color-error, #DC2626)' }}
             >
               Rechazar
             </Button>
@@ -319,20 +324,6 @@ export const MayoristaCotizaciones = () => {
         cotizacion={detailCotizacion}
         showAgencia
       />
-
-      {/* Modal: Éxito al confirmar */}
-      <Modal
-        isOpen={isSuccessModalOpen}
-        onClose={() => setIsSuccessModalOpen(false)}
-        title="Cotización Aprobada"
-        footer={
-          <Button onClick={() => setIsSuccessModalOpen(false)}>
-            Cerrar
-          </Button>
-        }
-      >
-        <Alert variant="success">{successMessage}</Alert>
-      </Modal>
     </div>
   );
 };

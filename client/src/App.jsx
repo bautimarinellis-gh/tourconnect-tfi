@@ -73,6 +73,7 @@ function App() {
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="mayoristas" element={<AdminMayoristas />} />
                   <Route path="auditoria" element={<AuditoriaPage title="Mi actividad — Administrador" />} />
+                  <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
                 </Routes>
               </PageWrapper>
             } />
@@ -111,6 +112,7 @@ function App() {
                       </React.Suspense>
                     </ConPermiso>
                   } />
+                  <Route path="*" element={<Navigate to="/mayorista/dashboard" replace />} />
                 </Routes>
 
                 {/* Asistente Inteligente: widget flotante, presente en todas
@@ -133,6 +135,7 @@ function App() {
                   <Route path="reservas" element={<AgenciaReservas />} />
                   <Route path="reservas/:id" element={<AgenciaReservaDetalle />} />
                   <Route path="auditoria" element={<AuditoriaPage title="Mi actividad — Agencia" />} />
+                  <Route path="*" element={<Navigate to="/agencia/dashboard" replace />} />
                 </Routes>
               </PageWrapper>
             } />

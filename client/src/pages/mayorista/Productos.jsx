@@ -15,6 +15,7 @@ import { formatCurrency, formatFecha } from '../../utils/formatters';
 import { etiquetaPrecio } from '../../utils/precio';
 import { applyRangePreset, daysBetween, isValidDateRange, toDateInputValue, todayDateInput } from '../../utils/dateRanges';
 import productoService from '../../services/productoService';
+import { useToast } from '../../hooks/useToast';
 import './productos.css';
 
 const INITIAL_FORM = {
@@ -114,6 +115,7 @@ const getIconForType = (tipo) => {
 };
 
 export const MayoristaProductos = () => {
+  const toast = useToast();
   const [productos, setProductos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -198,6 +200,7 @@ export const MayoristaProductos = () => {
     try {
       await productoService.create(buildPayload(tipoProducto, formData));
       setIsCreateModalOpen(false);
+      toast.success('Producto creado.');
       fetchProductos();
     } catch (err) {
       setFormError(err.response?.data?.message || 'Error al crear producto.');
@@ -258,6 +261,7 @@ export const MayoristaProductos = () => {
         p._id === editProductoRef.current._id ? { ...p, ...result.data } : p
       ));
       setIsEditModalOpen(false);
+      toast.success('Producto actualizado.');
     } catch (err) {
       setEditError(err.response?.data?.message || 'Error al actualizar producto.');
     } finally {
@@ -291,6 +295,7 @@ export const MayoristaProductos = () => {
       setProductos(prev => prev.filter(p => p._id !== deleteTarget._id));
       setIsDeleteModalOpen(false);
       setDeleteTarget(null);
+      toast.success('Producto eliminado.');
     } catch (err) {
       const msg = err?.response?.data?.message || 'Ocurrió un error al intentar eliminar el producto.';
       setDeleteError(msg);

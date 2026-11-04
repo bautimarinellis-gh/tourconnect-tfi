@@ -32,6 +32,8 @@ const agenciaProductoSchema = new mongoose.Schema(
 // Índices
 // ---------------------
 agenciaProductoSchema.index({ agencia_id: 1, producto_id: 1 }, { unique: true });
+// Búsquedas solo por producto (al borrarlo o editarlo): el único empieza por agencia.
+agenciaProductoSchema.index({ producto_id: 1 });
 
 // Transformación para JSON
 agenciaProductoSchema.set('toJSON', {

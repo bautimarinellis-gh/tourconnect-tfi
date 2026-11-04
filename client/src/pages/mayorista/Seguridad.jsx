@@ -67,6 +67,9 @@ const TabUsuarios = ({ roles, catalogo }) => {
   // { tipo: 'desactivar' | 'resetear', usuario } — confirmación de las dos
   // acciones sensibles, en vez de window.confirm.
   const [confirmAccion, setConfirmAccion] = useState(null);
+  // { usuario, rolId, rolNombre } — el cambio de rol cambia los permisos del
+  // usuario en el acto, así que se confirma antes de aplicarlo.
+  const [cambioRol, setCambioRol] = useState(null);
 
   const [usuarioPermisos, setUsuarioPermisos] = useState(null);
   const [seleccionPermisos, setSeleccionPermisos] = useState([]);
@@ -90,12 +93,13 @@ const TabUsuarios = ({ roles, catalogo }) => {
     }
     setGuardando(true);
     try {
-      await seguridadService.createUsuario({
+      const res = await seguridadService.createUsuario({
         nombre: formAlta.nombre.trim(),
         email: formAlta.email.trim(),
         rol_id: formAlta.rol_id || null,
       });
-      toast.success('Usuario creado. Le llegó la invitación por email.');
+      if (res?.email_enviado === false) toast.warning(res.message);
+      else toast.success('Usuario creado. Se le envió la invitación por email.');
       setModalAlta(false);
       setFormAlta({ nombre: '', email: '', rol_id: '' });
       cargar();
@@ -107,12 +111,16 @@ const TabUsuarios = ({ roles, catalogo }) => {
   };
 
   const cambiarRol = async (usuario, rolId) => {
+    setGuardando(true);
     try {
       await seguridadService.asignarRol(usuario._id, rolId || null);
       toast.success('Rol actualizado');
+      setCambioRol(null);
       cargar();
     } catch (err) {
       notificarError(toast, err, 'No se pudo cambiar el rol');
+    } finally {
+      setGuardando(false);
     }
   };
 
@@ -162,8 +170,10 @@ const TabUsuarios = ({ roles, catalogo }) => {
         toast.success('Usuario desactivado');
         cargar();
       } else {
-        await seguridadService.resetearClave(usuario._id);
-        toast.success('Se le envió el email para resetear su contraseña');
+        const res = await seguridadService.resetearClave(usuario._id);
+        // El servidor avisa si el mail no pudo salir (envío deshabilitado o sin SMTP).
+        if (res?.email_enviado === false) toast.warning(res.message);
+        else toast.success('Se le envió el email para resetear su contraseña');
       }
       setConfirmAccion(null);
     } catch (err) {
@@ -258,7 +268,12 @@ const TabUsuarios = ({ roles, catalogo }) => {
                         <Select
                           options={opcionesRol}
                           value={usuario.rol_id?._id ?? ''}
-                          onChange={e => cambiarRol(usuario, e.target.value)}
+                          aria-label={`Rol de ${usuario.nombre || usuario.email}`}
+                          onChange={e => setCambioRol({
+                            usuario,
+                            rolId: e.target.value,
+                            rolNombre: opcionesRol.find(o => o.value === e.target.value)?.label,
+                          })}
                         />
                       )}
                     </TableCell>
@@ -396,6 +411,29 @@ const TabUsuarios = ({ roles, catalogo }) => {
           value={formEditar.email}
           onChange={e => setFormEditar({ ...formEditar, email: e.target.value })}
         />
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(cambioRol)}
+        onClose={() => setCambioRol(null)}
+        title="Cambiar rol"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCambioRol(null)}>Cancelar</Button>
+            <Button onClick={() => cambiarRol(cambioRol.usuario, cambioRol.rolId)} isLoading={guardando}>
+              Cambiar rol
+            </Button>
+          </>
+        }
+      >
+        {cambioRol && (
+          <Alert variant="warning">
+            <strong>{cambioRol.usuario.nombre || cambioRol.usuario.email}</strong> va a pasar de{' '}
+            <strong>{cambioRol.usuario.rol_id?.nombre || 'sin rol'}</strong> a{' '}
+            <strong>{cambioRol.rolNombre || 'sin rol'}</strong>. Sus permisos cambian en el acto
+            (los permisos individuales se mantienen).
+          </Alert>
+        )}
       </Modal>
 
       <Modal

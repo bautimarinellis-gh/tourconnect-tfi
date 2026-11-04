@@ -17,17 +17,8 @@ import cotizacionService from '../../services/cotizacionService';
 import reservaService from '../../services/reservaService';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '../../hooks/useToast';
-
-// El servidor calcula cuándo vence cada cotización (vence_at): una pendiente
-// si el mayorista no la responde, una aprobada si la agencia no confirma la
-// reserva a tiempo. Acá solo se muestra el tiempo que queda.
-const getVencimientoInfo = (cotizacion) => {
-  if (!cotizacion.vence_at) return null;
-  const expira = new Date(cotizacion.vence_at);
-  const diffMs = expira - Date.now();
-  const diffHs = Math.floor(diffMs / 3600000);
-  return { expira, diffHs, vencido: diffMs <= 0 };
-};
+import { VencimientoCotizacion } from '../../components/shared/VencimientoCotizacion';
+import { getVencimientoInfo } from '../../utils/vencimiento';
 
 const TAMANO_PAGINA = 20;
 
@@ -184,21 +175,7 @@ export const AgenciaCotizaciones = () => {
                         Motivo: {c.motivo_rechazo}
                       </div>
                     )}
-                    {(() => {
-                      const v = getVencimientoInfo(c);
-                      if (!v) return null;
-                      if (v.vencido) return null;
-                      if (v.diffHs < 24) return (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--color-warning)', fontWeight: 600, marginTop: '0.25rem' }}>
-                          ⚠ Vence en {v.diffHs}h
-                        </div>
-                      );
-                      return (
-                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-soft)', marginTop: '0.25rem' }}>
-                          Vence en {Math.ceil(v.diffHs / 24)}d
-                        </div>
-                      );
-                    })()}
+                    <VencimientoCotizacion cotizacion={c} />
                   </TableCell>
                   <TableCell>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>

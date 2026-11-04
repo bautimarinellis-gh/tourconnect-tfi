@@ -5,7 +5,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  /* Por encima de los botones flotantes (tema 9999, asistente 10000), que si
+     no tapaban el footer del modal; por debajo de los toasts. */
+  z-index: 10050;
   padding: 1.25rem;
   animation: fadeIn 0.15s ease-out;
 }

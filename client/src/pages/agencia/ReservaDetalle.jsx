@@ -8,6 +8,8 @@ import { Spinner } from '../../components/ui/Spinner';
 import { Modal } from '../../components/ui/Modal';
 import { Input } from '../../components/ui/Input';
 import { Alert } from '../../components/ui/Alert';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { useToast } from '../../hooks/useToast';
 import { ReservaTimeline } from '../../components/shared/ReservaTimeline';
 import { EstadoCuentaCard } from '../../components/shared/EstadoCuentaCard';
 import { formatCurrency, formatDateTime, formatFecha, formatRangoFechas, formatEstadoReserva } from '../../utils/formatters';
@@ -53,6 +55,8 @@ export const AgenciaReservaDetalle = () => {
   const { id } = useParams();
   const [reserva, setReserva] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const toast = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -78,8 +82,10 @@ export const AgenciaReservaDetalle = () => {
     try {
       const data = await reservaService.getById(id);
       setReserva(data);
+      setLoadError('');
     } catch (err) {
-      console.error(err);
+      // En una recarga silenciosa se conserva lo que ya se ve en pantalla.
+      if (!silencioso) setLoadError(err.response?.data?.message || 'No se pudo cargar la reserva.');
     } finally {
       if (!silencioso) setLoading(false);
     }
@@ -206,7 +212,8 @@ export const AgenciaReservaDetalle = () => {
         notas: pagoForm.notas || undefined,
       });
       setIsModalOpen(false);
-      fetchReserva();
+      toast.success('Pago informado: el mayorista lo va a revisar.');
+      fetchReserva({ silencioso: true });
     } catch (err) {
       setError(err.response?.data?.message || 'Error al informar el pago.');
     } finally {
@@ -214,7 +221,21 @@ export const AgenciaReservaDetalle = () => {
     }
   };
 
-  if (loading || !reserva) return <Spinner center size="lg" />;
+  if (loading) return <Spinner center size="lg" />;
+  if (loadError || !reserva) {
+    return (
+      <EmptyState
+        title="No se pudo mostrar la reserva"
+        description={loadError || 'La reserva no existe o no tenés acceso.'}
+        action={
+          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+            <Link to="/agencia/reservas" className="btn btn-ghost btn-md">Volver a mis reservas</Link>
+            <Button variant="secondary" onClick={() => fetchReserva()}><RefreshCw size={16} /> Reintentar</Button>
+          </div>
+        }
+      />
+    );
+  }
 
   const precioFinal = toFloat(reserva.precio_final);
   const pid = reserva.pago_informado_datos;
@@ -257,13 +278,13 @@ export const AgenciaReservaDetalle = () => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="detail-grid">
         <div>
           {/* Info del servicio */}
           <Card style={{ marginBottom: '1.5rem' }}>
             <CardHeader><h3>Información del Servicio</h3></CardHeader>
             <CardBody>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+              <div className="detail-fields">
                 <div>
                   <p style={{ color: 'var(--color-text-soft)', fontSize: '0.875rem', marginBottom: '0.25rem' }}>Producto</p>
                   <p style={{ fontWeight: 600, fontSize: '1.125rem' }}>{reserva.producto_id?.nombre || 'N/A'}</p>
@@ -522,6 +543,7 @@ export const AgenciaReservaDetalle = () => {
           <Input
             label="Fecha del pago *"
             type="date"
+            max={todayDateInput()}
             value={pagoForm.fecha_pago}
             onChange={e => setPagoForm({ ...pagoForm, fecha_pago: e.target.value })}
           />

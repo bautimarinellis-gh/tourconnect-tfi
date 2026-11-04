@@ -15,6 +15,21 @@ const ACCIONES = [
   'USUARIO_ACTIVADO',
   'USUARIO_DESACTIVADO',
   'ACCESO_DENEGADO',
+  // Seguridad — cambios de roles y permisos dentro del tenant
+  'ROL_CREADO',
+  'ROL_MODIFICADO',
+  'ROL_ELIMINADO',
+  'ROL_ASIGNADO',
+  'PERMISOS_ASIGNADOS',
+  'USUARIO_MODIFICADO',
+  'USUARIO_REACTIVADO',
+  'RESET_FORZADO',
+  'PLAN_MODIFICADO',
+  // Negocio — decisiones sobre cotizaciones y condiciones comerciales
+  'COTIZACION_APROBADA',
+  'COTIZACION_RECHAZADA',
+  'COTIZACION_CANCELADA',
+  'MARKUP_MODIFICADO',
   // Negocio — ciclo de vida completo de la reserva (trazabilidad, anexo 14.3)
   'RESERVA_CREADA',
   'PAGO_INFORMADO',

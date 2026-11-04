@@ -58,6 +58,13 @@ describe('crear cotización: cupo y salida del hotel', () => {
     assert.equal(r.creada, false);
   });
 
+  test('fechas con hora o zona se rechazan: solo se aceptan días de calendario', async () => {
+    conCompromisos([]);
+    const r = await pedir({ fecha_inicio: '2099-01-11T22:00:00-03:00', fecha_fin: '2099-01-13', pasajeros: 1 });
+    assert.equal(r.status, 400);
+    assert.equal(r.creada, false);
+  });
+
   test('una estadía que no se pisa con otra no consume su cupo', async () => {
     conCompromisos([reservada('c1', '2099-01-10', '2099-01-12', 8)]);
     const r = await pedir({ fecha_inicio: '2099-01-12', fecha_fin: '2099-01-14', pasajeros: 10 });

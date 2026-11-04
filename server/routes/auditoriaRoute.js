@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const auth = require('../middlewares/authMiddleware');
+const { limiteExportacion } = require('../middlewares/limitadores');
 const role = require('../middlewares/roleMiddleware');
 const { checkPermisoMayorista } = require('../middlewares/permisoMiddleware');
 const { getAuditoria, getAuditoriaById, exportarAuditoriaPDF } = require('../controllers/auditoriaController');
@@ -15,7 +16,7 @@ router.use(auth, role('admin', 'mayorista', 'agencia'));
 
 router.get('/', checkPermisoMayorista('VerAuditoria'), getAuditoria);
 // Antes de '/:id': si no, '/exportar' matchea la ruta de detalle con id='exportar'.
-router.get('/exportar', checkPermisoMayorista('VerAuditoria'), exportarAuditoriaPDF);
+router.get('/exportar', checkPermisoMayorista('VerAuditoria'), limiteExportacion, exportarAuditoriaPDF);
 router.get('/:id', checkPermisoMayorista('VerAuditoria'), getAuditoriaById);
 
 module.exports = router;

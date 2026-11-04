@@ -43,6 +43,18 @@ describe('contarOperacionesActivas', () => {
     assert.ok(filtro instanceof mongoose.Types.ObjectId);
     assert.equal(String(filtro), MAYORISTA);
   });
+
+  test('una reserva con pago informado cuenta como activa (plata en tránsito)', async () => {
+    let pipeline;
+    mock.method(Cotizacion, 'countDocuments', async () => 0);
+    mock.method(Reserva, 'aggregate', async (p) => { pipeline = p; return []; });
+
+    await contarOperacionesActivas({ mayorista_id: MAYORISTA }, { 'cot.mayorista_id': MAYORISTA });
+
+    const condiciones = pipeline.find((s) => s.$match?.$or).$match.$or;
+    const enCurso = condiciones.find((c) => c.estado?.$in);
+    assert.deepEqual(enCurso.estado.$in.sort(), ['pago_informado', 'pendiente_pago']);
+  });
 });
 
 describe('paginación', () => {

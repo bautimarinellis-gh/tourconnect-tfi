@@ -11,78 +11,77 @@ const {
 } = require('../utils/reporteHelpers');
 const { drawTable } = require('../utils/pdfHelpers');
 const { hoyDateString } = require('../utils/dateHelpers');
+const { hoyAR, inicioDiaAR } = require('../utils/fechasAR');
 
 const ESTADOS_INGRESO = ['pago_informado', 'pagada', 'cerrada'];
 
-const getDefaultFechas = (desde, hasta, mesesAtras = 6, paraMesActual = false) => {
-  let fechaInicio, fechaFin;
+// Los reportes cortan y agrupan por días y meses de Argentina, igual que el
+// resto del sistema (fechasAR). En UTC, una reserva de las 22 h del día 31
+// caía en el mes siguiente.
+const TZ_AR = '-03:00';
+const finDiaAR = (y, m, d) => new Date(inicioDiaAR(y, m, d + 1).getTime() - 1);
+const leerDia = (texto) => {
+  if (typeof texto !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+  const [y, m, d] = texto.split('-').map(Number);
+  const control = new Date(Date.UTC(y, m - 1, d));
+  if (control.getUTCFullYear() !== y || control.getUTCMonth() !== m - 1 || control.getUTCDate() !== d) return null;
+  return { y, m: m - 1, d };
+};
 
-  if (desde && hasta) {
-    fechaInicio = new Date(desde);
-    fechaFin = new Date(hasta);
-    fechaFin.setUTCHours(23, 59, 59, 999);
-  } else if (paraMesActual) {
-    const now = new Date();
-    fechaInicio = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    fechaFin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-  } else {
-    const now = new Date();
-    fechaFin = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
-    fechaInicio = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (mesesAtras - 1), 1));
+const getDefaultFechas = (desde, hasta, mesesAtras = 6, paraMesActual = false) => {
+  const diaDesde = leerDia(desde);
+  const diaHasta = leerDia(hasta);
+  // Un rango con fechas inválidas se ignora (antes terminaba en "Invalid Date").
+  if (diaDesde && diaHasta) {
+    return {
+      fechaInicio: inicioDiaAR(diaDesde.y, diaDesde.m, diaDesde.d),
+      fechaFin: finDiaAR(diaHasta.y, diaHasta.m, diaHasta.d),
+    };
   }
 
-  return { fechaInicio, fechaFin };
+  const { y, m, d } = hoyAR();
+  if (paraMesActual) {
+    return { fechaInicio: inicioDiaAR(y, m, 1), fechaFin: finDiaAR(y, m + 1, 0) };
+  }
+  return { fechaInicio: inicioDiaAR(y, m - (mesesAtras - 1), 1), fechaFin: finDiaAR(y, m, d) };
 };
 
 const pad2 = (value) => String(value).padStart(2, '0');
 
 const parsePeriodoIngresos = (periodo = 'mes', valor) => {
-  const now = new Date();
+  const hoy = hoyAR();
   const selected = periodo || 'mes';
   const defaultValor = selected === 'dia'
-    ? `${now.getUTCFullYear()}-${pad2(now.getUTCMonth() + 1)}-${pad2(now.getUTCDate())}`
+    ? `${hoy.y}-${pad2(hoy.m + 1)}-${pad2(hoy.d)}`
     : selected === 'anio'
-      ? `${now.getUTCFullYear()}`
-      : `${now.getUTCFullYear()}-${pad2(now.getUTCMonth() + 1)}`;
+      ? `${hoy.y}`
+      : `${hoy.y}-${pad2(hoy.m + 1)}`;
   const rawValor = valor || defaultValor;
 
   if (selected === 'dia') {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(rawValor)) return null;
-    const [year, month, day] = rawValor.split('-').map(Number);
-    const fechaInicio = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-    const fechaFin = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
-    if (
-      fechaInicio.getUTCFullYear() !== year ||
-      fechaInicio.getUTCMonth() !== month - 1 ||
-      fechaInicio.getUTCDate() !== day
-    ) {
-      return null;
-    }
+    const dia = leerDia(rawValor);
+    if (!dia) return null;
     return {
       periodo: selected,
       valor: rawValor,
-      fechaInicio,
-      fechaFin,
-      groupId: { $hour: '$created_at' },
+      fechaInicio: inicioDiaAR(dia.y, dia.m, dia.d),
+      fechaFin: finDiaAR(dia.y, dia.m, dia.d),
+      groupId: { $hour: { date: '$created_at', timezone: TZ_AR } },
       labelFor: (id) => `${pad2(id)}:00`,
-      fechaFor: (id) => `${rawValor}T${pad2(id)}:00:00.000Z`,
+      fechaFor: (id) => `${rawValor}T${pad2(id)}:00:00${TZ_AR}`,
     };
   }
 
   if (selected === 'mes') {
     if (!/^\d{4}-\d{2}$/.test(rawValor)) return null;
     const [year, month] = rawValor.split('-').map(Number);
-    const fechaInicio = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-    const fechaFin = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
-    if (fechaInicio.getUTCFullYear() !== year || fechaInicio.getUTCMonth() !== month - 1) {
-      return null;
-    }
+    if (month < 1 || month > 12) return null;
     return {
       periodo: selected,
       valor: rawValor,
-      fechaInicio,
-      fechaFin,
-      groupId: { $dayOfMonth: '$created_at' },
+      fechaInicio: inicioDiaAR(year, month - 1, 1),
+      fechaFin: finDiaAR(year, month, 0),
+      groupId: { $dayOfMonth: { date: '$created_at', timezone: TZ_AR } },
       labelFor: (id) => String(id),
       fechaFor: (id) => `${rawValor}-${pad2(id)}`,
     };
@@ -91,14 +90,12 @@ const parsePeriodoIngresos = (periodo = 'mes', valor) => {
   if (selected === 'anio') {
     if (!/^\d{4}$/.test(rawValor)) return null;
     const year = Number(rawValor);
-    const fechaInicio = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
-    const fechaFin = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
     return {
       periodo: selected,
       valor: rawValor,
-      fechaInicio,
-      fechaFin,
-      groupId: { $month: '$created_at' },
+      fechaInicio: inicioDiaAR(year, 0, 1),
+      fechaFin: finDiaAR(year, 11, 31),
+      groupId: { $month: { date: '$created_at', timezone: TZ_AR } },
       labelFor: (id) => `${pad2(id)}/${year}`,
       fechaFor: (id) => `${year}-${pad2(id)}`,
     };
@@ -331,7 +328,9 @@ async function fetchRankingAgenciasData(mayoristaId, fechaInicio, fechaFin, item
 exports.getRankingAgencias = async (req, res, next) => {
   try {
     const { desde, hasta, limit } = req.query;
-    const itemsLimit = parseInt(limit, 10) || 10;
+    // Entre 1 y 50: un $limit negativo o enorme hacía fallar la agregación.
+    const limitNum = parseInt(limit, 10);
+    const itemsLimit = Number.isInteger(limitNum) ? Math.min(Math.max(limitNum, 1), 50) : 10;
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 6, false);
     const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
@@ -348,8 +347,10 @@ exports.getMayoristaDashboard = async (req, res, next) => {
     const mayoristaId = new mongoose.Types.ObjectId(req.mayorista_id);
 
     const now = new Date();
-    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    // Mes en curso de Argentina (ver TZ_AR).
+    const mesAR = hoyAR(now);
+    const startOfMonth = inicioDiaAR(mesAR.y, mesAR.m, 1);
+    const endOfMonth = finDiaAR(mesAR.y, mesAR.m + 1, 0);
 
     const cotLookup = lookupCotizacionStages({ 'cot.mayorista_id': mayoristaId });
     // Las fechas de viaje se guardan como medianoche UTC del día elegido.
@@ -463,8 +464,10 @@ exports.getAgenciaDashboard = async (req, res, next) => {
     const { fechaInicio, fechaFin } = getDefaultFechas(desde, hasta, 1, true);
 
     const now = new Date();
-    const startOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-    const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    // Mes en curso de Argentina (ver TZ_AR).
+    const mesAR = hoyAR(now);
+    const startOfMonth = inicioDiaAR(mesAR.y, mesAR.m, 1);
+    const endOfMonth = finDiaAR(mesAR.y, mesAR.m + 1, 0);
 
     const cotLookup = lookupCotizacionStages({
       'cot.mayorista_id': mayoristaId,
@@ -511,8 +514,8 @@ exports.getAgenciaDashboard = async (req, res, next) => {
           {
             $group: {
               _id: {
-                year: { $year: '$created_at' },
-                month: { $month: '$created_at' },
+                year: { $year: { date: '$created_at', timezone: TZ_AR } },
+                month: { $month: { date: '$created_at', timezone: TZ_AR } },
               },
               cantidad: { $sum: 1 },
               monto: { $sum: '$cot.precio_total' },

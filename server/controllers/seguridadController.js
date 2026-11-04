@@ -176,6 +176,14 @@ exports.createRol = async (req, res, next) => {
 
     await rol.save();
 
+    registrarAuditoria({
+      req,
+      accion: 'ROL_CREADO',
+      entidad_afectada: 'Rol',
+      entidad_id: rol._id,
+      detalle: { nombre: rol.nombre, permisos: permisos ?? [] },
+    });
+
     res.status(201).json({ success: true, data: rol });
   } catch (err) {
     if (err.code === 11000) {
@@ -194,6 +202,8 @@ exports.updateRol = async (req, res, next) => {
   try {
     const { nombre, permisos } = req.body;
     const rol = await buscarRolEditable(req.params.id, req.mayorista_id);
+    // Valores originales, para la auditoría (antes / después).
+    const antes = { nombre: rol.nombre, permisos: rol.permisos.map(String) };
 
     if (nombre !== undefined) {
       if (!String(nombre).trim()) {
@@ -207,6 +217,14 @@ exports.updateRol = async (req, res, next) => {
     }
 
     await rol.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'ROL_MODIFICADO',
+      entidad_afectada: 'Rol',
+      entidad_id: rol._id,
+      detalle: { antes, despues: { nombre: rol.nombre, permisos: rol.permisos.map(String) } },
+    });
 
     res.json({ success: true, data: rol });
   } catch (err) {
@@ -240,6 +258,14 @@ exports.deleteRol = async (req, res, next) => {
     }
 
     await rol.deleteOne();
+
+    registrarAuditoria({
+      req,
+      accion: 'ROL_ELIMINADO',
+      entidad_afectada: 'Rol',
+      entidad_id: rol._id,
+      detalle: { nombre: rol.nombre, permisos: rol.permisos.map(String) },
+    });
 
     res.json({ success: true, message: 'Rol eliminado' });
   } catch (err) {
@@ -356,8 +382,9 @@ exports.createUsuario = async (req, res, next) => {
 
     // Después de persistir: si el mail falla, la cuenta ya existe y se puede
     // reenviar la invitación. Al revés no se puede deshacer.
+    let emailEnviado = false;
     try {
-      await enviarInvitacion(emailNormalizado, inviteToken, 'Mayorista');
+      emailEnviado = Boolean(await enviarInvitacion(emailNormalizado, inviteToken, 'Mayorista'));
     } catch (mailError) {
       console.error(
         'Error al enviar la invitación, la cuenta fue creada igual:',
@@ -368,7 +395,10 @@ exports.createUsuario = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: usuario,
-      message: 'Usuario creado. Se le envió la invitación por email.',
+      email_enviado: emailEnviado,
+      message: emailEnviado
+        ? 'Usuario creado. Se le envió la invitación por email.'
+        : 'Usuario creado, pero la invitación no se pudo enviar por email (revisá la configuración de mails).',
     });
   } catch (err) {
     next(err);
@@ -387,7 +417,15 @@ exports.asignarRol = async (req, res, next) => {
       req.params.id,
       req.mayorista_id
     );
-    await usuario.populate('rol_id', 'protegido');
+    await usuario.populate('rol_id', 'protegido nombre');
+    const rolAnterior = usuario.rol_id ? { id: String(usuario.rol_id._id), nombre: usuario.rol_id.nombre } : null;
+    const auditarAsignacion = (rolNuevo) => registrarAuditoria({
+      req,
+      accion: 'ROL_ASIGNADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email, antes: rolAnterior, despues: rolNuevo },
+    });
 
     // Igual que al desactivar: sacarle el rol al Administrador dejaría al
     // mayorista sin nadie con GestionarRoles, y ese rol no se puede volver a
@@ -401,6 +439,7 @@ exports.asignarRol = async (req, res, next) => {
     if (!rol_id) {
       usuario.rol_id = null;
       await usuario.save();
+      auditarAsignacion(null);
 
       return res.json({ success: true, data: usuario });
     }
@@ -435,6 +474,7 @@ exports.asignarRol = async (req, res, next) => {
 
     usuario.rol_id = rol._id;
     await usuario.save();
+    auditarAsignacion({ id: String(rol._id), nombre: rol.nombre });
 
     res.json({ success: true, data: usuario });
   } catch (err) {
@@ -456,9 +496,18 @@ exports.asignarPermisos = async (req, res, next) => {
     );
 
     const idsPermisos = await resolverPermisosAsignables(permisos ?? []);
+    const antes = usuario.permisos_individuales.map(String);
 
     usuario.permisos_individuales = idsPermisos;
     await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'PERMISOS_ASIGNADOS',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email, antes, despues: idsPermisos.map(String), codigos: permisos ?? [] },
+    });
 
     res.json({ success: true, data: usuario });
   } catch (err) {
@@ -475,6 +524,7 @@ exports.updateUsuario = async (req, res, next) => {
   try {
     const { nombre, email } = req.body;
     const usuario = await buscarUsuarioDelTenant(req.params.id, req.mayorista_id);
+    const antes = { nombre: usuario.nombre, email: usuario.email };
 
     if (nombre !== undefined) {
       if (!String(nombre).trim()) throw error('El nombre es obligatorio', 400);
@@ -492,10 +542,27 @@ exports.updateUsuario = async (req, res, next) => {
         });
         if (existente) throw error('El email ya está registrado', 400);
         usuario.email = emailNormalizado;
+        // Las sesiones y los links pendientes (invitación, reseteo) eran del
+        // email anterior: se invalidan para que nadie tome la cuenta con ellos.
+        usuario.sesion_version = (usuario.sesion_version || 0) + 1;
+        usuario.invite_token = undefined;
+        usuario.invite_token_expires = undefined;
+        usuario.reset_token = undefined;
+        usuario.reset_token_expires = undefined;
+        usuario.reset_code_hash = undefined;
+        usuario.reset_code_expires = undefined;
       }
     }
 
     await usuario.save();
+
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_MODIFICADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { antes, despues: { nombre: usuario.nombre, email: usuario.email } },
+    });
 
     res.json({ success: true, data: usuario });
   } catch (err) {
@@ -566,6 +633,14 @@ exports.reactivarUsuario = async (req, res, next) => {
     usuario.activo = true;
     await usuario.save();
 
+    registrarAuditoria({
+      req,
+      accion: 'USUARIO_REACTIVADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email },
+    });
+
     res.json({ success: true, message: 'Usuario reactivado' });
   } catch (err) {
     next(err);
@@ -598,15 +673,29 @@ exports.resetearClave = async (req, res, next) => {
     usuario.reset_code_attempts = 0;
     await usuario.save();
 
+    // enviarEmail devuelve null si el envío está deshabilitado o sin SMTP:
+    // la respuesta dice lo que pasó en lugar de afirmar siempre "se envió".
+    let emailEnviado = false;
     try {
-      await enviarResetClave(usuario.email, usuario.nombre, resetToken);
+      emailEnviado = Boolean(await enviarResetClave(usuario.email, usuario.nombre, resetToken));
     } catch (mailError) {
       console.error('Error al enviar el email de reseteo de clave:', mailError.message);
     }
 
+    registrarAuditoria({
+      req,
+      accion: 'RESET_FORZADO',
+      entidad_afectada: 'Usuario',
+      entidad_id: usuario._id,
+      detalle: { email: usuario.email, email_enviado: emailEnviado },
+    });
+
     res.json({
       success: true,
-      message: 'Se le envió un email para que defina una nueva contraseña.',
+      email_enviado: emailEnviado,
+      message: emailEnviado
+        ? 'Se le envió un email para que defina una nueva contraseña.'
+        : 'Se generó el link de reseteo, pero el email no se pudo enviar (revisá la configuración de mails).',
     });
   } catch (err) {
     next(err);

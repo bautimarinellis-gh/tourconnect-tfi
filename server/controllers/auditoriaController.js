@@ -2,6 +2,16 @@ const AuditLog = require('../models/AuditLog');
 const { ACCIONES } = require('../models/AuditLog');
 const PDFDocument = require('pdfkit');
 const { drawTable } = require('../utils/pdfHelpers');
+const { inicioDiaAR } = require('../utils/fechasAR');
+
+/** 'AAAA-MM-DD' válido → { y, m (0-based), d }; cualquier otra cosa → null. */
+const leerDia = (texto) => {
+  if (typeof texto !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(texto)) return null;
+  const [y, m, d] = texto.split('-').map(Number);
+  const control = new Date(Date.UTC(y, m - 1, d));
+  if (control.getUTCFullYear() !== y || control.getUTCMonth() !== m - 1 || control.getUTCDate() !== d) return null;
+  return { y, m: m - 1, d };
+};
 
 const PAGE_LIMIT_MAX = 100;
 const PAGE_LIMIT_DEFAULT = 25;
@@ -46,14 +56,16 @@ const construirQueryAuditoria = (req) => {
     if (entidad_id) query.entidad_id = entidad_id;
   }
 
+  // Días de Argentina (no la hora local del servidor, que en la nube es UTC).
   if (desde || hasta) {
-    query.timestamp = {};
-    if (desde) query.timestamp.$gte = new Date(desde);
-    if (hasta) {
-      const hastaDate = new Date(hasta);
-      hastaDate.setHours(23, 59, 59, 999);
-      query.timestamp.$lte = hastaDate;
+    const diaDesde = desde ? leerDia(desde) : null;
+    const diaHasta = hasta ? leerDia(hasta) : null;
+    if ((desde && !diaDesde) || (hasta && !diaHasta)) {
+      return { error: 'Las fechas del filtro deben tener el formato AAAA-MM-DD.' };
     }
+    query.timestamp = {};
+    if (diaDesde) query.timestamp.$gte = inicioDiaAR(diaDesde.y, diaDesde.m, diaDesde.d);
+    if (diaHasta) query.timestamp.$lte = new Date(inicioDiaAR(diaHasta.y, diaHasta.m, diaHasta.d + 1).getTime() - 1);
   }
 
   if (accion) {

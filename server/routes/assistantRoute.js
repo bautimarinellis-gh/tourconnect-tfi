@@ -8,6 +8,7 @@ const { checkPermiso } = require('../middlewares/permisoMiddleware');
 const intentCatalog = require('../utils/intentCatalog');
 const { FUENTES } = require('../utils/piezasConsulta');
 const { query, estado } = require('../controllers/assistantController');
+const { limiteAsistente } = require('../middlewares/limitadores');
 
 // Permisos que habilitan al menos una intención. Quien no tiene ninguno no
 // puede consultar nada, así que se lo corta acá; el permiso de cada intención
@@ -21,7 +22,7 @@ const permisosDelAsistente = [...new Set([
 // permiso del asistente
 router.use(auth, role('mayorista'), tenant, checkPermiso(...permisosDelAsistente));
 
-router.post('/query', query);
+router.post('/query', limiteAsistente, query);
 router.get('/estado', estado);
 
 module.exports = router;

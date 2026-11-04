@@ -130,8 +130,9 @@ exports.crearMayorista = async (req, res, next) => {
     });
 
     // 6. Enviar email de invitación
+    let emailEnviado = false;
     try {
-      await enviarInvitacion(email, inviteToken, 'Mayorista');
+      emailEnviado = Boolean(await enviarInvitacion(email, inviteToken, 'Mayorista'));
     } catch (mailError) {
       console.error('Error al enviar email de invitación, pero la cuenta fue creada:', mailError.message);
     }
@@ -139,6 +140,7 @@ exports.crearMayorista = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: nuevoMayorista,
+      email_enviado: emailEnviado,
     });
   } catch (error) {
     await session.abortTransaction();

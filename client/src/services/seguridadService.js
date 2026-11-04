@@ -9,7 +9,8 @@ const seguridadService = {
   deleteRol: (id) => api.delete(`/seguridad/roles/${id}`).then(r => r.data),
 
   getUsuarios: () => api.get('/seguridad/usuarios').then(r => r.data?.data),
-  createUsuario: (data) => api.post('/seguridad/usuarios', data).then(r => r.data?.data),
+  // Devuelve el sobre completo: incluye email_enviado y el mensaje del servidor.
+  createUsuario: (data) => api.post('/seguridad/usuarios', data).then(r => r.data),
   updateUsuario: (id, data) => api.put(`/seguridad/usuarios/${id}`, data).then(r => r.data?.data),
   desactivarUsuario: (id) => api.delete(`/seguridad/usuarios/${id}`).then(r => r.data),
   reactivarUsuario: (id) => api.patch(`/seguridad/usuarios/${id}/reactivar`).then(r => r.data),

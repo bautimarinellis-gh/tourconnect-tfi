@@ -9,9 +9,13 @@ const icons = {
   info: <Info className="alert-icon" size={20} />
 };
 
-export const Alert = ({ variant = 'info', title, children, className = '' }) => {
+export const Alert = ({ variant = 'info', title, children, className = '', ...props }) => {
   return (
-    <div className={`alert alert-${variant} ${className}`}>
+    <div
+      className={`alert alert-${variant} ${className}`}
+      role={variant === 'error' || variant === 'warning' ? 'alert' : 'status'}
+      {...props}
+    >
       <div className="alert-icon-wrapper">
         {icons[variant]}
       </div>

@@ -9,8 +9,11 @@ const { lookupCotizacionStages } = require('./reporteHelpers');
  * agencias) como si una Agencia individual puede desactivarse.
  *
  * Cotizaciones activas: estado IN ['pendiente', 'aprobada']
- * Reservas activas:     estado = 'pendiente_pago'
+ * Reservas activas:     estado IN ['pendiente_pago', 'pago_informado']
  *                    OR (estado = 'pagada' AND fecha_fin >= hoy)
+ *
+ * `pago_informado` cuenta: hay un pago en revisión o en acreditación en
+ * Mercado Pago, es decir, plata en tránsito que alguien tiene que resolver.
  *
  * @param {object} cotizacionFiltro - filtro adicional para Cotizacion.countDocuments
  * @param {object} reservaMatch     - filtro adicional ($match) tras el lookup de Cotizacion
@@ -44,7 +47,7 @@ async function contarOperacionesActivas(cotizacionFiltro, reservaMatch) {
       {
         $match: {
           $or: [
-            { estado: 'pendiente_pago' },
+            { estado: { $in: ['pendiente_pago', 'pago_informado'] } },
             { estado: 'pagada', 'cot.fecha_fin': { $gte: ahora } },
           ],
         },

@@ -8,7 +8,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
-dotenv.config({ path: '../.env' });
+dotenv.config({ path: require('path').resolve(__dirname, '..', '..', '.env') });
 
 const { completarTenantReservas } = require('../utils/completarTenantReservas');
 

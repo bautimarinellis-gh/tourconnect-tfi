@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Select } from '../../components/ui/Select';
 import { Spinner } from '../../components/ui/Spinner';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -11,7 +12,11 @@ const TAMANO_PAGINA = 20;
 export const AgenciaReservas = () => {
   const [reservas, setReservas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtroEstado, setFiltroEstado] = useState('');
+  // El filtro vive en la URL (?estado=…): los accesos del dashboard llegan
+  // ya filtrados y sobrevive a un F5 o al botón "atrás".
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filtroEstado = searchParams.get('estado') ?? '';
+  const setFiltroEstado = (estado) => setSearchParams(estado ? { estado } : {}, { replace: true });
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
 

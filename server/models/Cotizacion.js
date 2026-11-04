@@ -126,5 +126,11 @@ cotizacionSchema.index({ mayorista_id: 1, estado: 1 });
 cotizacionSchema.index({ estado: 1, created_at: 1 });
 // Queries de agencia sin mayorista_id (getCotizaciones, getAgenciaDashboard)
 cotizacionSchema.index({ agencia_id: 1, estado: 1, created_at: -1 });
+// Cálculo de cupo (cupoValidator): corre al cotizar, al aprobar dentro de la
+// transacción y al editar un producto; filtra por producto, estado y fechas.
+cotizacionSchema.index({ producto_id: 1, estado: 1, fecha_inicio: 1 });
+// Cron de vencimiento de aprobadas: por aprobación vieja o viaje iniciado.
+cotizacionSchema.index({ estado: 1, aprobada_at: 1 });
+cotizacionSchema.index({ estado: 1, fecha_inicio: 1 });
 
 module.exports = mongoose.model('Cotizacion', cotizacionSchema);

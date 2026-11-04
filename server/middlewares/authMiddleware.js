@@ -72,7 +72,8 @@ const auth = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // El algoritmo se fija: el token no puede elegir con qué se verifica.
+    decoded = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] });
   } catch (error) {
     return res.status(401).json({
       success: false,

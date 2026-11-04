@@ -2,19 +2,41 @@ const nodemailer = require('nodemailer');
 const { horasInvitacion } = require('./invitacion');
 
 /**
- * Crea el transporter de nodemailer con la configuración SMTP
- * definida en las variables de entorno.
+ * Transporter único, reutilizado entre envíos (pool de conexiones).
+ *
+ * Los timeouts acotan la espera: los valores por defecto de nodemailer llegan
+ * a minutos, y un SMTP lento dejaba colgada el alta de agencias y usuarios.
  */
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+let transporter = null;
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT),
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      pool: true,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+  }
+  return transporter;
 };
+
+/** Escapa un texto para insertarlo en el HTML del mail (nombres y mensajes libres). */
+const escapeHtml = (texto) =>
+  String(texto ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/** Indica si el envío de mails está habilitado (ENABLE_EMAIL=true). */
+const emailHabilitado = () => process.env.ENABLE_EMAIL === 'true';
 
 /**
  * Envía un email genérico.
@@ -24,8 +46,8 @@ const createTransporter = () => {
  * @param {string} opciones.html — cuerpo del email en HTML
  */
 const enviarEmail = async ({ para, asunto, html, to, subject }) => {
-  // Deshabilitado: no se envían emails por ahora
-  if (process.env.ENABLE_EMAIL !== 'true') {
+  // Con ENABLE_EMAIL distinto de 'true' no se envía nada (se avisa al arrancar).
+  if (!emailHabilitado()) {
     return null;
   }
   const destinatario = para || to;
@@ -39,8 +61,6 @@ const enviarEmail = async ({ para, asunto, html, to, subject }) => {
     console.warn('⚠️ SMTP no configurado: usa credenciales reales en .env (SMTP_USER, SMTP_PASS) para enviar emails.');
     return null;
   }
-  const transporter = createTransporter();
-
   const mailOptions = {
     from: `"TourConnect" <${process.env.EMAIL_FROM}>`,
     to: destinatario,
@@ -49,7 +69,7 @@ const enviarEmail = async ({ para, asunto, html, to, subject }) => {
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const info = await getTransporter().sendMail(mailOptions);
     console.log(`📧 Email enviado: ${info.messageId}`);
     return info;
   } catch (error) {
@@ -71,7 +91,7 @@ const enviarInvitacion = async (email, token, rol) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #2563eb;">¡Bienvenido a TourConnect!</h2>
-      <p>Fuiste invitado como <strong>${rol}</strong> a la plataforma.</p>
+      <p>Fuiste invitado como <strong>${escapeHtml(rol)}</strong> a la plataforma.</p>
       <p>Hacé clic en el siguiente botón para configurar tu contraseña:</p>
       <a href="${link}"
          style="display: inline-block; padding: 12px 24px; background-color: #2563eb;
@@ -107,7 +127,7 @@ const enviarResetClave = async (email, nombre, token) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #2563eb;">Restablecer contraseña</h2>
-      <p>Hola${nombre ? ` ${nombre}` : ''},</p>
+      <p>Hola${nombre ? ` ${escapeHtml(nombre)}` : ''},</p>
       <p>Un administrador solicitó restablecer tu contraseña en TourConnect.</p>
       <p>Hacé clic en el siguiente botón para definir una contraseña nueva:</p>
       <a href="${link}"
@@ -153,9 +173,9 @@ const enviarNotificacionDesactivacion = async (email, nombreEntidad, motivo, men
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #dc2626;">Cuenta desactivada</h2>
       <p>Hola,</p>
-      <p>Te informamos que la cuenta de <strong>${nombreEntidad}</strong> en TourConnect fue desactivada.</p>
+      <p>Te informamos que la cuenta de <strong>${escapeHtml(nombreEntidad)}</strong> en TourConnect fue desactivada.</p>
       <p><strong>Motivo:</strong> ${motivoLabel}</p>
-      ${mensaje ? `<p><strong>Mensaje:</strong><br />${mensaje}</p>` : ''}
+      ${mensaje ? `<p><strong>Mensaje:</strong><br />${escapeHtml(mensaje)}</p>` : ''}
       <p style="color: #6b7280; font-size: 14px;">
         Si considerás que esto es un error, comunicate para más información.
       </p>
@@ -181,7 +201,7 @@ const enviarNotificacionReactivacion = async (email, nombreEntidad) => {
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #16a34a;">¡Bienvenido de nuevo!</h2>
       <p>Hola,</p>
-      <p>Te informamos que la cuenta de <strong>${nombreEntidad}</strong> en TourConnect fue reactivada. Ya podés volver a ingresar al sistema con normalidad.</p>
+      <p>Te informamos que la cuenta de <strong>${escapeHtml(nombreEntidad)}</strong> en TourConnect fue reactivada. Ya podés volver a ingresar al sistema con normalidad.</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb;" />
       <p style="color: #9ca3af; font-size: 12px;">TourConnect — Gestión de reservas turísticas</p>
     </div>
@@ -195,6 +215,8 @@ const enviarNotificacionReactivacion = async (email, nombreEntidad) => {
 };
 
 module.exports = {
+  emailHabilitado,
+  escapeHtml,
   enviarEmail,
   enviarInvitacion,
   enviarResetClave,

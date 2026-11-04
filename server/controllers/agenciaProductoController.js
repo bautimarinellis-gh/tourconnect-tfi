@@ -3,6 +3,9 @@ const AgenciaProducto = require('../models/AgenciaProducto');
 const Agencia = require('../models/Agencia');
 const Producto = require('../models/Producto');
 
+// Tope de productos por sincronización (un catálogo real queda muy por debajo).
+const MAX_PRODUCTOS_SYNC = 500;
+
 /**
  * Helper para validar que la agencia pertenezca al mayorista actual
  */
@@ -108,6 +111,25 @@ exports.syncProductosAgencia = async (req, res, next) => {
     const agenciaId = req.params.id;
     const mayoristaId = req.usuario.mayorista_id;
     const { productos = [] } = req.body;
+
+    // 0. Forma del body: una lista (con tope) de productos sin repetir.
+    //    Antes un body mal formado daba 500 y un id repetido un 403 engañoso.
+    const formaInvalida =
+      !Array.isArray(productos)
+      || productos.length > MAX_PRODUCTOS_SYNC
+      || productos.some((p) => !p || typeof p !== 'object' || !mongoose.isValidObjectId(p.producto_id));
+    const repetidos = !formaInvalida
+      && new Set(productos.map((p) => String(p.producto_id))).size !== productos.length;
+    if (formaInvalida || repetidos) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: repetidos
+          ? 'Un mismo producto figura más de una vez'
+          : `Se espera una lista de hasta ${MAX_PRODUCTOS_SYNC} productos con producto_id y markup_porcentaje`,
+      });
+    }
 
     // 1. Validar que la agencia pertenece al mayorista
     const agencia = await Agencia.findOne({ _id: agenciaId, mayorista_id: mayoristaId }).session(session);
