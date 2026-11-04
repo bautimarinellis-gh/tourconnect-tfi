@@ -1,9 +1,9 @@
 const crypto = require('crypto');
 const Usuario = require('../models/Usuario');
-const { enviarEmail } = require('../utils/mailer');
+const { enviarEmail } = require('../services/mailer');
 const { resolverContextoPersona, enriquecerUsuario } = require('../utils/personaContext');
 const { resolverPermisosEfectivos } = require('../utils/permisos');
-const { registrarAuditoria } = require('../utils/auditService');
+const { registrarAuditoria } = require('../services/auditService');
 const { COOKIE, iniciarSesion, cerrarCookie, revocarToken } = require('../utils/sesion');
 
 // ---------------------

@@ -20,7 +20,7 @@ const cargarEnv = () => {
 
   const faltantes = OBLIGATORIAS.filter((nombre) => !process.env[nombre]);
   if (faltantes.length > 0) {
-    console.error(`❌ Faltan variables de entorno obligatorias: ${faltantes.join(', ')} (ver .env.example)`);
+    console.error(`❌ Faltan variables de entorno obligatorias: ${faltantes.join(', ')} (ver el README)`);
     process.exit(1);
   }
 

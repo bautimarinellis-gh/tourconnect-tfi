@@ -1,4 +1,4 @@
-const mercadoPago = require('./mercadoPago');
+const mercadoPago = require('../services/mercadoPago');
 
 /**
  * Qué hacer con los pagos de una reserva que el mayorista cancela.

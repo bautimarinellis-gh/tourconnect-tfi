@@ -5,8 +5,8 @@ const auth = require('../middlewares/authMiddleware');
 const role = require('../middlewares/roleMiddleware');
 const { tenant } = require('../middlewares/tenantMiddleware');
 const { checkPermiso } = require('../middlewares/permisoMiddleware');
-const intentCatalog = require('../utils/intentCatalog');
-const { FUENTES } = require('../utils/piezasConsulta');
+const intentCatalog = require('../utils/asistente/intentCatalog');
+const { FUENTES } = require('../utils/asistente/piezasConsulta');
 const { query, estado } = require('../controllers/assistantController');
 const { limiteAsistente } = require('../middlewares/limitadores');
 

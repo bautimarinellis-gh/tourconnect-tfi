@@ -16,7 +16,7 @@ import './assistant.css';
  * no se desmontan): minimizar no debe borrar la conversación en curso.
  *
  * Cada intención del asistente exige el mismo permiso que la sección
- * equivalente del sistema (ver `permiso` en server/utils/intentCatalog.js).
+ * equivalente del sistema (ver `permiso` en server/utils/asistente/intentCatalog.js).
  * Si el usuario no tiene ninguno, el botón no se muestra.
  *
  * El aislamiento por tenant es 100% server-side (assistantRoute + middleware

@@ -1,5 +1,5 @@
 const { CODIGOS_VALIDOS } = require('../utils/permisosCatalogo');
-const { registrarAuditoria } = require('../utils/auditService');
+const { registrarAuditoria } = require('../services/auditService');
 
 /**
  * Middlewares de autorización por permiso.

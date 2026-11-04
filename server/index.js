@@ -189,7 +189,7 @@ const startServer = async () => {
   // Reservas creadas antes de que guardaran mayorista_id/agencia_id: se
   // completan antes de atender requests, porque las consultas por tenant
   // filtran por esos campos. Idempotente; si falla, se reintenta al próximo
-  // arranque (o con npm run migrate:reservas).
+  // arranque.
   try {
     const completadas = await completarTenantReservas();
     if (completadas > 0) console.log(`🔧 Reservas completadas con su tenant: ${completadas}`);

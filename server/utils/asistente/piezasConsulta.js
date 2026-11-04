@@ -12,7 +12,7 @@
  */
 
 const { PERIODOS_VALIDOS } = require('./queryExecutor');
-const { hoyAR } = require('./fechasAR');
+const { hoyAR } = require('../fechasAR');
 
 const PERMISO_DINERO = 'VerReportes';
 const LIMITE_MAX = 20;

@@ -15,7 +15,7 @@
  */
 
 const intentCatalog = require('./intentCatalog');
-const { MESES, hoyAR } = require('./fechasAR');
+const { MESES, hoyAR } = require('../fechasAR');
 
 // Umbral mínimo de confidence para aceptar un intent.
 // 0.20 requiere que las keywords matcheadas representen al menos el 20% del máximo

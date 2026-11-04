@@ -12,7 +12,6 @@ pnpm-debug.log*
 # Environment files
 .env
 .env.*
-!.env.example
 
 # Build output
 dist/
@@ -30,7 +29,4 @@ Thumbs.db
 # Claude Code
 .claude/settings.local.json
 CLAUDE.md
-# Restos locales (capturas, Word descomprimidos y el proyecto del video)
-/*.png
-/d[0-9]/
-/video-tourconnect-remotion/
+.claude/worktrees/

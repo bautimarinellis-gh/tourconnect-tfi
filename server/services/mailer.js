@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const { horasInvitacion } = require('./invitacion');
+const { horasInvitacion } = require('../utils/invitacion');
 
 /**
  * Transporter único, reutilizado entre envíos (pool de conexiones).

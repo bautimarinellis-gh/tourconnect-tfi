@@ -19,9 +19,9 @@
  *    plan gratuito Google puede usar el contenido para mejorar sus productos.
  */
 
-const gemini = require('./geminiService');
+const gemini = require('../../services/geminiService');
 const { PERIODOS_VALIDOS } = require('./queryExecutor');
-const { hoyAR, MESES } = require('./fechasAR');
+const { hoyAR, MESES } = require('../fechasAR');
 const {
   FUENTES, METRICAS, AGRUPACIONES, FILTROS, TIPOS_PRODUCTO, METODOS_PAGO,
   PERIODOS_FUTUROS, LIMITE_MAX, piezasPermitidas, validarConsulta,

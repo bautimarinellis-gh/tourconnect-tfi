@@ -5,11 +5,11 @@ const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const Cotizacion = require('../models/Cotizacion');
 const Agencia = require('../models/Agencia');
-const { validarConsulta } = require('../utils/piezasConsulta');
+const { validarConsulta } = require('../utils/asistente/piezasConsulta');
 const {
   ejecutarConsulta, rangoPeriodo, rangoAnterior, escaparRegex,
-} = require('../utils/constructorConsultas');
-const { seudonimizar, ocultarNombres, restaurarNombres } = require('../utils/asistenteIA');
+} = require('../utils/asistente/constructorConsultas');
+const { seudonimizar, ocultarNombres, restaurarNombres } = require('../utils/asistente/asistenteIA');
 
 const MAYORISTA = '64b000000000000000000001';
 const AGENCIA = '64b000000000000000000002';

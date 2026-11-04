@@ -1,8 +1,8 @@
 const Reserva = require('../models/Reserva');
 const IntentoPago = require('../models/IntentoPago');
 const { COTIZACION_POPULATE, validarAccesoReserva, obtenerPrecioFinal } = require('../utils/reservaHelpers');
-const mercadoPago = require('../utils/mercadoPago');
-const { aplicarPagoMercadoPago } = require('../utils/pagoPasarela');
+const mercadoPago = require('../services/mercadoPago');
+const { aplicarPagoMercadoPago } = require('../services/pagoPasarela');
 
 // =============================================
 // PASARELA DE PAGOS — Mercado Pago (Checkout Pro, credenciales de prueba)
@@ -157,7 +157,7 @@ exports.webhook = async (req, res) => {
 
   try {
     // Con una sola cuenta de prueba no hace falta saber el mayorista para
-    // elegir credenciales (ver credencialesPara en utils/mercadoPago).
+    // elegir credenciales (ver credencialesPara en services/mercadoPago).
     const pagoMP = await mercadoPago.obtenerPago(String(dataId));
     const resultado = await aplicarPagoMercadoPago(pagoMP);
     res.status(200).json({ success: true, resultado: resultado.resultado });

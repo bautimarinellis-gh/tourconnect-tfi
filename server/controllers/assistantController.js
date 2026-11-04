@@ -1,11 +1,11 @@
-const { classify } = require('../utils/intentClassifier');
-const { execute, describirPeriodo } = require('../utils/queryExecutor');
-const intentCatalog = require('../utils/intentCatalog');
-const { registrarAuditoria } = require('../utils/auditService');
-const asistenteIA = require('../utils/asistenteIA');
-const gemini = require('../utils/geminiService');
-const { validarConsulta } = require('../utils/piezasConsulta');
-const { ejecutarConsulta } = require('../utils/constructorConsultas');
+const { classify } = require('../utils/asistente/intentClassifier');
+const { execute, describirPeriodo } = require('../utils/asistente/queryExecutor');
+const intentCatalog = require('../utils/asistente/intentCatalog');
+const { registrarAuditoria } = require('../services/auditService');
+const asistenteIA = require('../utils/asistente/asistenteIA');
+const gemini = require('../services/geminiService');
+const { validarConsulta } = require('../utils/asistente/piezasConsulta');
+const { ejecutarConsulta } = require('../utils/asistente/constructorConsultas');
 
 // Cuántas preguntas anteriores se aceptan como contexto de seguimiento
 const MAX_HISTORIAL = 3;

@@ -8,15 +8,15 @@
  */
 
 const mongoose = require('mongoose');
-const Reserva = require('../models/Reserva');
-const Cotizacion = require('../models/Cotizacion');
-const Agencia = require('../models/Agencia');
+const Reserva = require('../../models/Reserva');
+const Cotizacion = require('../../models/Cotizacion');
+const Agencia = require('../../models/Agencia');
 const {
   lookupCotizacionStages,
   productoCollection,
   agenciaCollection,
-} = require('./reporteHelpers');
-const { MESES, hoyAR, inicioDiaAR } = require('./fechasAR');
+} = require('../reporteHelpers');
+const { MESES, hoyAR, inicioDiaAR } = require('../fechasAR');
 
 // ─────────────────────────────────────────────
 // Helpers de rango de fechas

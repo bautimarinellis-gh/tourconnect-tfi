@@ -1,7 +1,7 @@
 const { test, describe, mock, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
-const mercadoPago = require('../utils/mercadoPago');
+const mercadoPago = require('../services/mercadoPago');
 const { resolverPagosAlCancelar } = require('../utils/devolucionPagos');
 
 const reservaCon = (estado) => ({ _id: 'r1', estado, mayorista_id: 'm1' });

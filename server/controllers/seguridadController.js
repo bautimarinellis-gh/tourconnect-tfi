@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const Usuario = require('../models/Usuario');
 const Rol = require('../models/Rol');
 const Permiso = require('../models/Permiso');
-const { enviarInvitacion, enviarResetClave } = require('../utils/mailer');
-const { registrarAuditoria } = require('../utils/auditService');
+const { enviarInvitacion, enviarResetClave } = require('../services/mailer');
+const { registrarAuditoria } = require('../services/auditService');
 const { PERMISOS_NO_ASIGNABLES } = require('../utils/permisosCatalogo');
 
 const { vencimientoInvitacion } = require('../utils/invitacion');

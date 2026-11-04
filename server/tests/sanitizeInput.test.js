@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 // Aislar el middleware de la base: el intento se audita, pero en el test
 // alcanza con saber que se llamó.
-const auditService = require('../utils/auditService');
+const auditService = require('../services/auditService');
 const registrarAuditoria = mock.method(auditService, 'registrarAuditoria', () => {});
 
 const { sanitizeInput, buscarClaveProhibida } = require('../middlewares/sanitizeInput');

@@ -2,7 +2,7 @@ const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 
-const { getIp } = require('../utils/auditService');
+const { getIp } = require('../services/auditService');
 
 // Misma configuración que index.js: un único proxy de confianza (Nginx).
 const app = express();

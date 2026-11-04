@@ -5,10 +5,10 @@ const HistorialEstadoReserva = require('../models/HistorialEstadoReserva');
 const Pago = require('../models/Pago');
 const Agencia = require('../models/Agencia');
 const IntentoPago = require('../models/IntentoPago');
-const mercadoPago = require('../utils/mercadoPago');
+const mercadoPago = require('../services/mercadoPago');
 const { resolverPagosAlCancelar } = require('../utils/devolucionPagos');
 const { registrarCambioEstado } = require('../utils/historialEstadoReserva');
-const { registrarAuditoria } = require('../utils/auditService');
+const { registrarAuditoria } = require('../services/auditService');
 const {
   COTIZACION_POPULATE,
   enriquecerReserva,

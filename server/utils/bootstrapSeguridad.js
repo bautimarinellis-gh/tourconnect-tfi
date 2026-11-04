@@ -110,9 +110,8 @@ const bootstrapSeguridad = async () => {
     vinculosReparados = resultado.modifiedCount ?? 0;
   }
 
-  // 5. Aviso, no reparación: usuarios que quedaron sin rol. Puede ser
-  //    intencional (se lo quitaron) o dato viejo sin migrar. El server no
-  //    decide cuál de las dos cosas es.
+  // 5. Aviso, no reparación: usuarios que quedaron sin rol (se lo quitaron).
+  //    El server no se lo asigna solo.
   const sinRol = await Usuario.countDocuments({
     rol: 'mayorista',
     rol_id: null,
@@ -126,8 +125,7 @@ const bootstrapSeguridad = async () => {
   if (sinRol > 0) {
     console.warn(
       `⚠️  ${sinRol} usuario(s) de ámbito mayorista no tienen rol asignado y no pueden operar.` +
-        '\n   Si son cuentas anteriores al módulo de seguridad: npm run migrate:roles' +
-        '\n   Si les quitaron el rol a propósito: asignarles uno desde la sección Seguridad.'
+        '\n   Asignarles uno desde la sección Seguridad.'
     );
   }
 };

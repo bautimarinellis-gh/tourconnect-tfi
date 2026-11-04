@@ -3,8 +3,7 @@
  *
  * Arma desde cero una base con un año de operación de un mayorista:
  *  - 3 usuarios con acceso: el admin de la plataforma (ADMIN_EMAIL /
- *    ADMIN_PASSWORD del .env), el mayorista y una agencia (las credenciales
- *    de seeds/demoSeed.js);
+ *    ADMIN_PASSWORD del .env), el mayorista y una agencia (ver el README);
  *  - 6 agencias más del mismo mayorista, cada una con su usuario sin
  *    contraseña: no pueden iniciar sesión, solo aportan historia para los
  *    reportes y el asistente;

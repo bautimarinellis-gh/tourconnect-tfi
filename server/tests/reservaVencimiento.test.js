@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
 
 // Antes de requerir el módulo: reservaVencimiento toma la referencia al cargarse.
-const auditService = require('../utils/auditService');
+const auditService = require('../services/auditService');
 mock.method(auditService, 'registrarAuditoria', async () => {});
 
 const Reserva = require('../models/Reserva');

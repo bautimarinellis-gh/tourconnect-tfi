@@ -17,15 +17,15 @@
  */
 
 const mongoose = require('mongoose');
-const Reserva = require('../models/Reserva');
-const Cotizacion = require('../models/Cotizacion');
-const Agencia = require('../models/Agencia');
-const Producto = require('../models/Producto');
-const Pago = require('../models/Pago');
-const { cotizacionCollection, productoCollection } = require('./reporteHelpers');
+const Reserva = require('../../models/Reserva');
+const Cotizacion = require('../../models/Cotizacion');
+const Agencia = require('../../models/Agencia');
+const Producto = require('../../models/Producto');
+const Pago = require('../../models/Pago');
+const { cotizacionCollection, productoCollection } = require('../reporteHelpers');
 const { getDateRange, describirPeriodo } = require('./queryExecutor');
-const { MESES, hoyAR } = require('./fechasAR');
-const { hoyDateString } = require('./dateHelpers');
+const { MESES, hoyAR } = require('../fechasAR');
+const { hoyDateString } = require('../dateHelpers');
 const { FUENTES, METRICAS, AGRUPACIONES } = require('./piezasConsulta');
 
 const MAX_TIME_MS = 5000;

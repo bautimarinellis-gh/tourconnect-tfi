@@ -1,4 +1,4 @@
-const { registrarAuditoria } = require('../utils/auditService');
+const { registrarAuditoria } = require('../services/auditService');
 
 /**
  * Rechaza requests con claves que MongoDB interpretaría como operadores.

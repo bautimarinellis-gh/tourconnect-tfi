@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 
 // Antes de requerir el módulo: pagoPasarela toma la referencia al cargarse.
-const auditService = require('../utils/auditService');
+const auditService = require('../services/auditService');
 const auditorias = [];
 mock.method(auditService, 'registrarAuditoria', async (a) => { auditorias.push(a); });
 
@@ -12,8 +12,8 @@ const Reserva = require('../models/Reserva');
 const Pago = require('../models/Pago');
 const IntentoPago = require('../models/IntentoPago');
 const HistorialEstadoReserva = require('../models/HistorialEstadoReserva');
-const { aplicarPagoMercadoPago } = require('../utils/pagoPasarela');
-const mercadoPago = require('../utils/mercadoPago');
+const { aplicarPagoMercadoPago } = require('../services/pagoPasarela');
+const mercadoPago = require('../services/mercadoPago');
 
 const RESERVA = '64b0000000000000000000aa';
 const sesionFalsa = { withTransaction: async (fn) => fn(), endSession: async () => {} };

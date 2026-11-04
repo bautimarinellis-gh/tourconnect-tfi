@@ -1,7 +1,7 @@
 const { test, describe, mock, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 
-const auditService = require('../utils/auditService');
+const auditService = require('../services/auditService');
 mock.method(auditService, 'registrarAuditoria', async () => {});
 
 const Usuario = require('../models/Usuario');

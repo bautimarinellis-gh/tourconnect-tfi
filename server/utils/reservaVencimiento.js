@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const Cotizacion = require('../models/Cotizacion');
 const { registrarCambioEstado } = require('./historialEstadoReserva');
-const { registrarAuditoria } = require('./auditService');
+const { registrarAuditoria } = require('../services/auditService');
 const { hoyDateString } = require('./dateHelpers');
 
 const MOTIVO_AUTOMATICO = 'Cancelada automáticamente: la fecha del viaje pasó sin pago informado.';

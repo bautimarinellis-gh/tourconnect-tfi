@@ -2,7 +2,7 @@ const { test, describe, mock, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 
 // Antes de requerir el controller: toma la referencia al cargarse.
-const mailer = require('../utils/mailer');
+const mailer = require('../services/mailer');
 const enviarInvitacion = mock.method(mailer, 'enviarInvitacion', async () => {});
 
 const Mayorista = require('../models/Mayorista');

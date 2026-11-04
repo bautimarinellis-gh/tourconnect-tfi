@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Reserva = require('../models/Reserva');
 const Pago = require('../models/Pago');
 const IntentoPago = require('../models/IntentoPago');
-const { registrarCambioEstado } = require('./historialEstadoReserva');
+const { registrarCambioEstado } = require('../utils/historialEstadoReserva');
 const { registrarAuditoria } = require('./auditService');
 
 /**
