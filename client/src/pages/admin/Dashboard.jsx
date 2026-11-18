@@ -4,6 +4,9 @@ import { Card, CardBody } from '../../components/ui/Card';
 import { Table, TableRow, TableCell } from '../../components/ui/Table';
 import { Badge } from '../../components/ui/Badge';
 import { Spinner } from '../../components/ui/Spinner';
+import { DashboardHero } from '../../components/shared/DashboardHero';
+import { Stagger, StaggerItem } from '../../components/motion/Stagger';
+import { CountUp } from '../../components/motion/CountUp';
 import { Link } from 'react-router-dom';
 import reporteService from '../../services/reporteService';
 import '../mayorista/dashboard.css';
@@ -37,24 +40,21 @@ export const AdminDashboard = () => {
 
   return (
     <div className="dashboard-page">
-      <div className="page-header dashboard-heading">
-        <div>
-          <p className="page-kicker">Administración</p>
-          <h1 className="page-title">Dashboard Admin</h1>
-        </div>
+      <DashboardHero kicker="Administración" title="Dashboard Admin">
         <Link className="dashboard-quick-link" to="/admin/mayoristas">
           Ver mayoristas <ArrowRight size={14} />
         </Link>
-      </div>
+      </DashboardHero>
 
-      <div className="dashboard-kpi-grid">
+      <Stagger className="dashboard-kpi-grid">
         {kpis.map((kpi) => (
-          <Card key={kpi.label} className="metric-card">
+          <StaggerItem key={kpi.label} className="metric-card-motion">
+          <Card className="metric-card">
             <CardBody>
               <div className="dashboard-kpi-top">
                 <div>
                   <p className="metric-label">{kpi.label}</p>
-                  <h3 className="metric-value">{kpi.value}</h3>
+                  <h3 className="metric-value"><CountUp value={kpi.value} format={kpi.format} /></h3>
                 </div>
                 <div className="metric-icon">{kpi.icon}</div>
               </div>
@@ -65,8 +65,9 @@ export const AdminDashboard = () => {
               )}
             </CardBody>
           </Card>
+        </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       <Card>
         <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

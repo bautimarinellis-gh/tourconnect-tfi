@@ -7,6 +7,7 @@ import {
   Shield,
   User,
 } from 'lucide-react';
+import { motion as Motion } from 'motion/react';
 import { useAuth } from '../../hooks/useAuth';
 import { navegacionAgrupada } from '../../config/navegacion';
 import { ProfileModal } from '../shared/ProfileModal';
@@ -52,8 +53,15 @@ export const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <div className="navbar-left">
-          <Link to="/" className="navbar-logo">
-            <img src={logoImg} alt="TourConnect" className="navbar-logo-img" />
+          <Link to="/" className="navbar-logo tc-logo-crop navbar-logo-crop">
+            <Motion.img
+              src={logoImg}
+              alt="TourConnect"
+              className="navbar-logo-img"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            />
           </Link>
           <div className="workspace-switcher">
             <BriefcaseBusiness size={14} />
@@ -72,8 +80,16 @@ export const Navbar = () => {
                       to={link.path}
                       className={`nav-item ${isActive ? 'active' : ''}`}
                     >
-                      <Icon size={16} />
-                      {link.name}
+                      {/* Fondo del ítem activo: se desliza entre ítems al navegar */}
+                      {isActive && (
+                        <Motion.span
+                          layoutId="nav-active-pill"
+                          className="nav-active-pill"
+                          transition={{ type: 'spring', stiffness: 420, damping: 34 }}
+                        />
+                      )}
+                      <Icon size={16} className="nav-item-icon" />
+                      <span className="nav-item-label">{link.name}</span>
                     </Link>
                   );
                 })}

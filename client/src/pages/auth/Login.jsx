@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { PasswordInput } from '../../components/ui/PasswordInput';
 import { Alert } from '../../components/ui/Alert';
-import { AuthBackground } from '../../components/shared/AuthBackground';
+import { AuthShell, AuthLogo } from '../../components/shared/AuthShell';
 import './auth.css';
 import logoImg from '/logo.png';
 
@@ -47,11 +47,9 @@ export const Login = () => {
   };
 
   return (
-    <div className="auth-layout single-col">
-      <AuthBackground />
-      <div className="auth-form-container">
+    <AuthShell shakeKey={error}>
         <div className="auth-form-box">
-          <img src={logoImg} alt="TourConnect" className="auth-logo-img center auth-logo-hero-lg" />
+          <AuthLogo src={logoImg} />
           <h1 className="auth-title">Bienvenido de nuevo</h1>
           <p className="auth-subtitle">Ingrese sus credenciales para acceder a su cuenta</p>
 
@@ -84,7 +82,6 @@ export const Login = () => {
             </Button>
           </form>
         </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 };

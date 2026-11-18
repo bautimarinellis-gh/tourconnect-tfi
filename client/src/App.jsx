@@ -41,6 +41,14 @@ import { AgenciaCotizaciones } from './pages/agencia/Cotizaciones';
 import { AgenciaReservas } from './pages/agencia/Reservas';
 import { AgenciaReservaDetalle } from './pages/agencia/ReservaDetalle';
 
+// Al final: el pulido visual pisa a los estilos base de cada componente.
+import './styles/polish.css';
+
+// La landing pública se carga aparte: no pesa en los paneles.
+const Landing = React.lazy(() =>
+  import('./pages/landing/Landing').then(m => ({ default: m.Landing }))
+);
+
 const MayoristaReportes = React.lazy(() =>
   import('./pages/mayorista/Reportes').then(m => ({ default: m.MayoristaReportes }))
 );
@@ -48,7 +56,13 @@ const MayoristaReportes = React.lazy(() =>
 const RootRedirect = () => {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    return (
+      <React.Suspense fallback={<Spinner center size="lg" />}>
+        <Landing />
+      </React.Suspense>
+    );
+  }
   return <Navigate to={getDashboardPathForRole(user.rol)} replace />;
 };
 

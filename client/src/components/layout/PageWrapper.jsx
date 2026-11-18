@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navbar } from './Navbar';
+import { PageTransition } from '../motion/PageTransition';
 import './layout.css';
 
 export const PageWrapper = ({ children }) => {
@@ -8,7 +9,7 @@ export const PageWrapper = ({ children }) => {
       <Navbar />
       <main className="main-content">
         <div className="page-container">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
     </div>

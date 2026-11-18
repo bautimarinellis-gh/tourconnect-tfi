@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap');
 
 :root {
   --color-primary: #181A12;
@@ -25,6 +25,28 @@
   --color-info-soft: #EEF3FA;
 
   --font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+
+  /* Escala tipográfica (rediseño) */
+  --fs-hero: clamp(2.4rem, 4.7vw, 4.2rem);
+  --fs-h1: clamp(1.9rem, 3.4vw, 2.9rem);
+  --fs-h2: clamp(1.4rem, 2.2vw, 1.9rem);
+  --fs-lead: clamp(1rem, 1.3vw, 1.175rem);
+
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* Marca */
+  --brand-olive: #181A12;
+  --brand-moss: #596A4D;
+  --brand-green: #2F9A62;
+  --brand-sand: #F5F1DE;
+  --gradient-brand: linear-gradient(135deg, #181A12 0%, #2C3A24 50%, #2F9A62 135%);
+  --gradient-accent: linear-gradient(120deg, #2F9A62 0%, #7DBE8E 100%);
+  --shadow-glow: 0 18px 50px rgba(47, 154, 98, 0.22);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --radius: 8px;
   --radius-sm: 6px;
@@ -73,6 +95,8 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 10px 24px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 18px 50px rgba(62, 207, 142, 0.16);
+  --gradient-accent: linear-gradient(120deg, #3ECF8E 0%, #9BE3B8 100%);
 
   /* Glassmorphic & dynamic background dark variables */
   --glass-bg: rgba(19, 22, 16, 0.82);
@@ -161,4 +185,51 @@ select {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+::selection {
+  background: rgba(47, 154, 98, 0.22);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.01em;
+}
+
+/* Accesibilidad: quien pide menos movimiento no ve animaciones grandes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Logo recortado: logo.png trae mucho margen blanco. Este contenedor muestra
+   solo el isotipo + "TourConnect" a un ancho dado (--logo-w). */
+.tc-logo-crop {
+  --logo-w: 170px;
+  position: relative;
+  display: block;
+  width: var(--logo-w);
+  height: calc(var(--logo-w) * 0.13);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.tc-logo-crop img {
+  position: absolute;
+  width: calc(var(--logo-w) * 1.138);
+  height: auto;
+  max-width: none;
+  left: calc(var(--logo-w) * -0.072);
+  top: calc(var(--logo-w) * -0.182);
+}
+
+[data-theme="dark"] .tc-logo-crop img {
+  filter: invert(1) hue-rotate(180deg) brightness(1.8);
 }

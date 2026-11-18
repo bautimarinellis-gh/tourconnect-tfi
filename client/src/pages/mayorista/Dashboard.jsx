@@ -4,6 +4,9 @@ import { Calendar, Users, DollarSign, Package, FileText, ArrowRight, CheckCircle
 import { Alert } from '../../components/ui/Alert';
 import { Card, CardBody } from '../../components/ui/Card';
 import { Spinner } from '../../components/ui/Spinner';
+import { DashboardHero } from '../../components/shared/DashboardHero';
+import { Stagger, StaggerItem } from '../../components/motion/Stagger';
+import { CountUp } from '../../components/motion/CountUp';
 import reporteService from '../../services/reporteService';
 import { usePermiso } from '../../hooks/usePermiso';
 import { formatCurrency } from '../../utils/formatters';
@@ -32,7 +35,7 @@ export const MayoristaDashboard = () => {
 
   const kpis = [
     { label: 'Reservas Activas', value: data?.reservas_activas || 0, icon: <Calendar size={18} />, link: '/mayorista/reservas' },
-    { label: 'Ingresos del Mes', value: formatCurrency(data?.ingresos_mes || 0), icon: <DollarSign size={18} />, link: '/mayorista/reportes' },
+    { label: 'Ingresos del Mes', value: data?.ingresos_mes || 0, format: formatCurrency, icon: <DollarSign size={18} />, link: '/mayorista/reportes' },
     { label: 'Agencias Activas', value: data?.agencias_activas || 0, icon: <Users size={18} />, link: '/mayorista/agencias' },
     { label: 'Cotizaciones Pendientes', value: data?.cotizaciones_pendientes || 0, icon: <FileText size={18} />, link: '/mayorista/cotizaciones?estado=pendiente' },
     { label: 'Pagos por Confirmar', value: data?.pagos_por_confirmar || 0, icon: <CheckCircle size={18} />, link: '/mayorista/reservas?estado=pago_informado' },
@@ -40,11 +43,7 @@ export const MayoristaDashboard = () => {
 
   return (
     <div className="dashboard-page">
-      <div className="page-header dashboard-heading">
-        <div>
-          <p className="page-kicker">Mes actual</p>
-          <h1 className="page-title">Panel de control</h1>
-        </div>
+      <DashboardHero kicker="Mes actual" title="Panel de control">
         {/* Sin VerReportes el acceso rápido no se muestra: llevaría a una
             sección que este usuario no tiene en el menú. */}
         {puedeVerReportes && (
@@ -52,7 +51,7 @@ export const MayoristaDashboard = () => {
             Ver reportes <ArrowRight size={14} />
           </Link>
         )}
-      </div>
+      </DashboardHero>
 
       {data?.pagos_viaje_iniciado > 0 && (
         <div style={{ marginBottom: '1.5rem' }}>
@@ -64,14 +63,15 @@ export const MayoristaDashboard = () => {
         </div>
       )}
 
-      <div className="dashboard-kpi-grid">
+      <Stagger className="dashboard-kpi-grid">
         {kpis.map((kpi) => (
-          <Card key={kpi.label} className="metric-card">
+          <StaggerItem key={kpi.label} className="metric-card-motion">
+          <Card className="metric-card">
             <CardBody>
               <div className="dashboard-kpi-top">
                 <div>
                   <p className="metric-label">{kpi.label}</p>
-                  <h3 className="metric-value">{kpi.value}</h3>
+                  <h3 className="metric-value"><CountUp value={kpi.value} format={kpi.format} /></h3>
                 </div>
                 <div className="metric-icon">{kpi.icon}</div>
               </div>
@@ -80,8 +80,9 @@ export const MayoristaDashboard = () => {
               </Link>
             </CardBody>
           </Card>
+        </StaggerItem>
         ))}
-      </div>
+      </Stagger>
 
       <div className="dashboard-panel-grid">
         <Card className="dashboard-panel">

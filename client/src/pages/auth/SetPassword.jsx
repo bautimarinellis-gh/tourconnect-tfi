@@ -6,6 +6,7 @@ import { Alert } from '../../components/ui/Alert';
 import authService from '../../services/authService';
 import './auth.css';
 import logoImg from '/logo.png';
+import { AuthShell, AuthLogo } from '../../components/shared/AuthShell';
 
 export const SetPassword = () => {
   const [searchParams] = useSearchParams();
@@ -51,21 +52,21 @@ export const SetPassword = () => {
 
   if (success) {
     return (
-      <div className="auth-layout single-col">
+      <AuthShell>
         <div className="auth-form-box text-center">
-          <img src={logoImg} alt="TourConnect" className="auth-logo-img center" />
+          <AuthLogo src={logoImg} />
           <Alert variant="success" title="¡Contraseña configurada!">
             Su contraseña ha sido configurada exitosamente. Será redirigido al inicio de sesión.
           </Alert>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="auth-layout single-col">
+    <AuthShell shakeKey={error}>
       <div className="auth-form-box">
-        <img src={logoImg} alt="TourConnect" className="auth-logo-img center" />
+        <AuthLogo src={logoImg} />
         <h1 className="auth-title text-center">Configurar Contraseña</h1>
         <p className="auth-subtitle text-center">Ingrese una nueva contraseña para su cuenta</p>
 
@@ -88,6 +89,6 @@ export const SetPassword = () => {
           </Button>
         </form>
       </div>
-    </div>
+    </AuthShell>
   );
 };

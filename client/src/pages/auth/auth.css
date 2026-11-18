@@ -305,3 +305,185 @@
     border-radius: 16px;
   }
 }
+
+/* ==========================================================================
+   Rediseño: marco de dos columnas (panel de marca + formulario)
+   ========================================================================== */
+.auth-shell {
+  display: grid;
+  grid-template-columns: minmax(380px, 1fr) minmax(420px, 1.05fr);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.72), transparent 360px),
+    linear-gradient(135deg, #F5F1DE 0%, #E6EBDD 46%, #D6E0D0 100%);
+}
+
+[data-theme="dark"] .auth-shell {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.05), transparent 360px),
+    linear-gradient(135deg, #0A0C08 0%, #12140F 42%, #1A1C16 100%);
+}
+
+.auth-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin: 1rem 0 1rem 1rem;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  border-radius: var(--radius-xl);
+  background: var(--gradient-brand);
+  color: #fff;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+[data-theme="dark"] .auth-brand {
+  background: linear-gradient(135deg, #10130C 0%, #1A2216 55%, #1E4630 140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.auth-brand::after {
+  content: '';
+  position: absolute;
+  inset: auto -20% -40% auto;
+  width: 70%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(125, 219, 166, 0.25), transparent 65%);
+  pointer-events: none;
+}
+
+.auth-back {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.auth-back:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.auth-back svg {
+  transition: transform 0.25s var(--ease-out-expo);
+}
+
+.auth-back:hover svg {
+  transform: translateX(-3px);
+}
+
+.auth-brand-map {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 520px);
+  margin: 0 auto;
+}
+
+.auth-brand-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-brand-copy h2 {
+  color: #fff;
+  font-size: clamp(1.6rem, 2.6vw, 2.3rem);
+  line-height: 1.12;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+  max-width: 22ch;
+}
+
+.auth-brand-copy p {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+}
+
+.auth-main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  overflow: hidden;
+}
+
+.auth-main .auth-bg-illustration {
+  position: absolute;
+}
+
+.auth-main .auth-form-container {
+  max-width: 460px;
+}
+
+.auth-logo-crop {
+  --logo-w: 190px;
+  margin: 0 auto 1.75rem;
+}
+
+.auth-form-box .auth-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.75rem;
+  letter-spacing: -0.01em;
+}
+
+/* Aviones de fondo: deriva lenta (se suma al rotate de cada uno) */
+.tc-plane {
+  animation: tc-plane-drift 26s ease-in-out infinite alternate;
+}
+
+.tc-plane-b { animation-duration: 32s; animation-delay: -6s; }
+.tc-plane-c { animation-duration: 22s; animation-delay: -3s; }
+.tc-plane-d { animation-duration: 30s; animation-delay: -12s; }
+.tc-plane-e { animation-duration: 24s; animation-delay: -8s; }
+.tc-plane-f { animation-duration: 28s; animation-delay: -15s; }
+
+@keyframes tc-plane-drift {
+  from { translate: 0 0; }
+  to { translate: 40px -28px; }
+}
+
+@media (max-width: 900px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .auth-brand {
+    margin: 0.75rem 0.75rem 0;
+    padding: 1.25rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .auth-brand-map {
+    display: none;
+  }
+
+  .auth-brand-copy h2 {
+    font-size: 1.3rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .auth-brand-copy p {
+    font-size: 0.85rem;
+  }
+
+  .auth-main {
+    padding: 1.25rem 1rem 2rem;
+  }
+}

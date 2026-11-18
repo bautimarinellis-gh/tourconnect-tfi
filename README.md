@@ -4,7 +4,9 @@ Plataforma B2B SaaS que digitaliza la relación comercial entre **operadores may
 
 Trabajo Final de Ingeniería — Bautista Marinelli Scaglia, UAI, Facultad de Tecnología Informática (2026).
 
-Stack MERN: React 19 + Vite en el cliente, Node.js + Express en el servidor y MongoDB Atlas con Mongoose.
+Stack MERN: React 19 + Vite en el cliente, Node.js + Express en el servidor y MongoDB Atlas con Mongoose. Las animaciones de la interfaz usan [Motion](https://motion.dev) (ex Framer Motion).
+
+En `/`, quien no tiene sesión ve la página de presentación (con el mapa de rutas y el avión que recorre el circuito del sistema al hacer scroll); con sesión, `/` lleva al panel del rol.
 
 ---
 
@@ -121,10 +123,13 @@ client/              SPA (React 19 + Vite)
     context/         Sesión y tema (claro / oscuro)
     services/        Llamadas a la API por módulo
     pages/           Una carpeta por rol: admin/, mayorista/, agencia/, auth/, auditoria/
+      landing/       Página pública de presentación y sus secciones
     components/
       layout/        Estructura de página (navbar)
-      shared/        Componentes de dominio compartidos entre roles
+      motion/        Animaciones reutilizables (Reveal, Stagger, CountUp, PageTransition)
+      shared/        Componentes de dominio compartidos entre roles (mapa de rutas, marco del login…)
       ui/            Componentes base (Button, Modal, Table, Toast…)
+    styles/          Pulido visual de los paneles (hover, entradas, menú)
     hooks/           Sesión, permisos, tema, toasts y auditoría
     utils/           Formatos, validaciones (CUIT, teléfono), precios y fechas
 ```

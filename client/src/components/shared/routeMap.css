@@ -1,0 +1,80 @@
+/* ---------- Mapa de rutas (también usado en el login) ---------- */
+.route-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.route-map-dot {
+  fill: var(--color-secondary);
+  opacity: 0.35;
+}
+
+.route-map-arc {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 1 0;
+  opacity: 0.75;
+}
+
+.route-map-circuit {
+  fill: none;
+  stroke: var(--color-secondary);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 7;
+  opacity: 0.45;
+}
+
+.route-map-pin {
+  fill: var(--color-surface);
+  stroke: var(--color-secondary);
+  stroke-width: 2.5;
+}
+
+.route-map-hub {
+  fill: var(--color-accent);
+  stroke: var(--color-surface);
+  stroke-width: 3;
+}
+
+.route-map-pulse {
+  fill: var(--color-accent);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: lp-pulse 2.4s ease-out infinite;
+}
+
+@keyframes lp-pulse {
+  0% { transform: scale(1); opacity: 0.45; }
+  100% { transform: scale(3.6); opacity: 0; }
+}
+
+.route-map-label {
+  font-family: var(--font-family);
+  font-size: 15px;
+  font-weight: 600;
+  fill: var(--color-text-soft);
+}
+
+.route-map-label.is-hub {
+  fill: var(--color-text);
+  font-weight: 800;
+}
+
+.route-map-plane path {
+  fill: var(--color-text);
+  filter: drop-shadow(0 4px 6px rgba(24, 26, 18, 0.25));
+}
+
+/* Variante sobre fondo oscuro (panel de marca del login) */
+.route-map--dark .route-map-dot { fill: #fff; opacity: 0.16; }
+.route-map--dark .route-map-arc { stroke: #7DDBA6; }
+.route-map--dark .route-map-circuit { stroke: #fff; opacity: 0.3; }
+.route-map--dark .route-map-pin { fill: #1F2419; stroke: #CFE3C8; }
+.route-map--dark .route-map-hub { stroke: #1F2419; }
+.route-map--dark .route-map-label { fill: rgba(255, 255, 255, 0.7); }
+.route-map--dark .route-map-label.is-hub { fill: #fff; }
+.route-map--dark .route-map-plane path { fill: #fff; }
